@@ -133,36 +133,34 @@ class CS2Player {
     if (w.id === 'knife') {
       // Knife blade & handle
       const bladeGeo = new THREE.BoxGeometry(0.02, 0.08, 0.35);
-      const bladeMat = new THREE.MeshStandardMaterial({ color: 0xcccccc, metalness: 0.9, roughness: 0.2 });
+      const bladeMat = new THREE.MeshLambertMaterial({ color: 0xcccccc });
       const blade = new THREE.Mesh(bladeGeo, bladeMat);
       blade.position.set(0.2, -0.22, -0.45);
       blade.rotation.x = 0.3;
       group.add(blade);
 
       const gripGeo = new THREE.BoxGeometry(0.04, 0.06, 0.16);
-      const gripMat = new THREE.MeshStandardMaterial({ color: 0x1f2421, roughness: 0.8 });
+      const gripMat = new THREE.MeshLambertMaterial({ color: 0x1f2421 });
       const grip = new THREE.Mesh(gripGeo, gripMat);
       grip.position.set(0.2, -0.26, -0.28);
       group.add(grip);
     } else if (w.id === 'c4') {
       // C4 Explosive Pack
       const packGeo = new THREE.BoxGeometry(0.18, 0.12, 0.28);
-      const packMat = new THREE.MeshStandardMaterial({ color: 0x966838, roughness: 0.8 });
+      const packMat = new THREE.MeshLambertMaterial({ color: 0x966838 });
       const pack = new THREE.Mesh(packGeo, packMat);
       pack.position.set(0.18, -0.22, -0.45);
       group.add(pack);
 
       const keypadGeo = new THREE.BoxGeometry(0.09, 0.03, 0.12);
-      const keypad = new THREE.Mesh(keypadGeo, new THREE.MeshStandardMaterial({ color: 0x111111 }));
+      const keypad = new THREE.Mesh(keypadGeo, new THREE.MeshLambertMaterial({ color: 0x111111 }));
       keypad.position.set(0.18, -0.15, -0.45);
       group.add(keypad);
     } else if (w.category === 'pistols') {
       // Pistol Slide
       const slideGeo = new THREE.BoxGeometry(0.06, 0.09, 0.32);
-      const slideMat = new THREE.MeshStandardMaterial({
-        color: w.id === 'deagle' ? 0xd0d5dd : 0x242830,
-        metalness: w.id === 'deagle' ? 0.9 : 0.6,
-        roughness: 0.3
+      const slideMat = new THREE.MeshLambertMaterial({
+        color: w.id === 'deagle' ? 0xd0d5dd : 0x242830
       });
       const slide = new THREE.Mesh(slideGeo, slideMat);
       slide.position.set(0.22, -0.22, -0.45);
@@ -170,7 +168,7 @@ class CS2Player {
 
       // Grip
       const gripGeo = new THREE.BoxGeometry(0.05, 0.14, 0.1);
-      const gripMat = new THREE.MeshStandardMaterial({ color: 0x1a1d24, roughness: 0.8 });
+      const gripMat = new THREE.MeshLambertMaterial({ color: 0x1a1d24 });
       const grip = new THREE.Mesh(gripGeo, gripMat);
       grip.rotation.x = -0.3;
       grip.position.set(0.22, -0.29, -0.36);
@@ -178,8 +176,8 @@ class CS2Player {
 
       // Silencer for USP-S
       if (w.isSilenced) {
-        const silencerGeo = new THREE.CylinderGeometry(0.025, 0.025, 0.28, 16);
-        const silencer = new THREE.Mesh(silencerGeo, new THREE.MeshStandardMaterial({ color: 0x1b1e24 }));
+        const silencerGeo = new THREE.CylinderGeometry(0.025, 0.025, 0.28, 12);
+        const silencer = new THREE.Mesh(silencerGeo, new THREE.MeshLambertMaterial({ color: 0x1b1e24 }));
         silencer.rotation.x = Math.PI / 2;
         silencer.position.set(0.22, -0.21, -0.7);
         group.add(silencer);
@@ -187,52 +185,51 @@ class CS2Player {
     } else if (w.id === 'awp') {
       // AWP Sniper
       const bodyGeo = new THREE.BoxGeometry(0.09, 0.14, 0.65);
-      const bodyMat = new THREE.MeshStandardMaterial({ color: 0x3d5a45, roughness: 0.6 }); // Olive drab
+      const bodyMat = new THREE.MeshLambertMaterial({ color: 0x3d5a45 }); // Olive drab
       const body = new THREE.Mesh(bodyGeo, bodyMat);
       body.position.set(0.24, -0.22, -0.55);
       group.add(body);
 
       // Heavy Long Barrel
-      const barrelGeo = new THREE.CylinderGeometry(0.022, 0.022, 0.55, 12);
-      const barrel = new THREE.Mesh(barrelGeo, new THREE.MeshStandardMaterial({ color: 0x14161a, metalness: 0.9 }));
+      const barrelGeo = new THREE.CylinderGeometry(0.022, 0.022, 0.55, 10);
+      const barrel = new THREE.Mesh(barrelGeo, new THREE.MeshLambertMaterial({ color: 0x14161a }));
       barrel.rotation.x = Math.PI / 2;
       barrel.position.set(0.24, -0.20, -0.95);
       group.add(barrel);
 
       // Telescopic Scope
-      const scopeGeo = new THREE.CylinderGeometry(0.035, 0.035, 0.32, 16);
-      const scope = new THREE.Mesh(scopeGeo, new THREE.MeshStandardMaterial({ color: 0x111111, metalness: 0.7 }));
+      const scopeGeo = new THREE.CylinderGeometry(0.035, 0.035, 0.32, 12);
+      const scope = new THREE.Mesh(scopeGeo, new THREE.MeshLambertMaterial({ color: 0x111111 }));
       scope.rotation.x = Math.PI / 2;
       scope.position.set(0.24, -0.11, -0.55);
       group.add(scope);
     } else {
       // Assault Rifles (AK-47 / M4A4 / M4A1)
       const bodyGeo = new THREE.BoxGeometry(0.08, 0.13, 0.6);
-      const bodyMat = new THREE.MeshStandardMaterial({
-        color: w.id === 'ak47' ? 0x6e3c1b : 0x2c333d, // AK Wood vs M4 Charcoal
-        roughness: 0.5
+      const bodyMat = new THREE.MeshLambertMaterial({
+        color: w.id === 'ak47' ? 0x6e3c1b : 0x2c333d // AK Wood vs M4 Charcoal
       });
       const body = new THREE.Mesh(bodyGeo, bodyMat);
       body.position.set(0.25, -0.22, -0.52);
       group.add(body);
 
       // Barrel
-      const barrelGeo = new THREE.CylinderGeometry(0.02, 0.02, 0.45, 12);
-      const barrel = new THREE.Mesh(barrelGeo, new THREE.MeshStandardMaterial({ color: 0x15181e, metalness: 0.85 }));
+      const barrelGeo = new THREE.CylinderGeometry(0.02, 0.02, 0.45, 10);
+      const barrel = new THREE.Mesh(barrelGeo, new THREE.MeshLambertMaterial({ color: 0x15181e }));
       barrel.rotation.x = Math.PI / 2;
       barrel.position.set(0.25, -0.19, -0.85);
       group.add(barrel);
 
       // Banana Magazine for AK
       const magGeo = new THREE.BoxGeometry(0.05, 0.22, 0.1);
-      const mag = new THREE.Mesh(magGeo, new THREE.MeshStandardMaterial({ color: w.id === 'ak47' ? 0x222222 : 0x333b45 }));
+      const mag = new THREE.Mesh(magGeo, new THREE.MeshLambertMaterial({ color: w.id === 'ak47' ? 0x222222 : 0x333b45 }));
       mag.rotation.x = 0.4;
       mag.position.set(0.25, -0.32, -0.48);
       group.add(mag);
 
       if (w.isSilenced) {
-        const silencerGeo = new THREE.CylinderGeometry(0.028, 0.028, 0.26, 16);
-        const silencer = new THREE.Mesh(silencerGeo, new THREE.MeshStandardMaterial({ color: 0x181a20 }));
+        const silencerGeo = new THREE.CylinderGeometry(0.028, 0.028, 0.26, 12);
+        const silencer = new THREE.Mesh(silencerGeo, new THREE.MeshLambertMaterial({ color: 0x181a20 }));
         silencer.rotation.x = Math.PI / 2;
         silencer.position.set(0.25, -0.19, -1.05);
         group.add(silencer);
@@ -572,15 +569,19 @@ class CS2Player {
       this.isGrounded = true;
     }
 
-    // Collisions
+    // Fast Collisions Check
+    const px = this.position.x;
+    const pz = this.position.z;
     const playerRadius = 0.6;
-    for (const collider of this.map.colliders) {
+    const colliders = this.map.colliders;
+    for (let i = 0; i < colliders.length; i++) {
+      const collider = colliders[i];
       const box = collider.box;
       if (
-        this.position.x + playerRadius > box.min.x &&
-        this.position.x - playerRadius < box.max.x &&
-        this.position.z + playerRadius > box.min.z &&
-        this.position.z - playerRadius < box.max.z
+        px + playerRadius > box.min.x &&
+        px - playerRadius < box.max.x &&
+        pz + playerRadius > box.min.z &&
+        pz - playerRadius < box.max.z
       ) {
         if (collider.isClimbable && this.position.y >= collider.topY + 0.2) {
           this.position.y = collider.topY + this.playerHeight;

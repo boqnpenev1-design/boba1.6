@@ -1,11 +1,12 @@
-// CS2 Competitive MR12 Game State Engine with Team Selection, Real CS Spawns & Human Online Play
+// CS2 Competitive Engine: Zero Bots, Real CS Spawns, 15s Freezetime
+// Max-Performance Optimized: Zero DOM Thrashing, Throttled 2D Canvas & Netcode
 
 class CS2GameManager {
   constructor(scene, camera) {
     this.scene = scene;
     this.camera = camera;
 
-    // Match Rules: Competitive MR12
+    // Competitive MR12 Rules
     this.maxRounds = 24;
     this.targetWins = 13;
     this.currentRound = 1;
@@ -13,9 +14,10 @@ class CS2GameManager {
     this.tScore = 0;
     this.consecutiveLosses = { CT: 0, T: 0 };
 
+    // Round Phases: 'freeze' (15s buy time) -> 'live' (1:55) -> 'round_over'
     this.phase = 'freeze';
-    this.roundTime = 115;
-    this.freezeTime = 15;
+    this.freezeTime = 15.0; // Official 15-second freezetime
+    this.roundTime = 115.0; // 1:55 live round time
     this.phaseTimer = this.freezeTime;
 
     // C4 Bomb State
@@ -26,17 +28,55 @@ class CS2GameManager {
     this.c4Mesh = null;
     this.lastBeepTime = 0;
 
-    // Entities
+    // Entities (Zero bots in match)
     this.mapBuilder = new CS2MapBuilder(this.scene);
     this.player = new CS2Player(this.camera, this.scene, this.mapBuilder);
-    this.bots = []; // BOTS REMOVED FROM LOBBIES AS REQUESTED
     this.selectedMap = 'dust2';
     this.selectedTeam = 'CT';
 
-    // FPS Counter tracking
+    // Performance & Throttling Timers
     this.frameCount = 0;
     this.fpsLastTime = performance.now();
-    this.currentFPS = 60;
+    this.currentFPS = 144;
+    this.lastRadarTime = 0;
+    this.lastNetTime = 0;
+    this.lastTimerText = '';
+    this.lastPhaseText = '';
+
+    // Cache HUD DOM Elements to completely prevent Layout Thrashing
+    this.hudEls = {
+      ctScore: document.getElementById('ct-score'),
+      tScore: document.getElementById('t-score'),
+      sbCtScore: document.getElementById('sb-ct-score'),
+      sbTScore: document.getElementById('sb-t-score'),
+      health: document.getElementById('hud-health'),
+      armor: document.getElementById('hud-armor'),
+      money: document.getElementById('hud-money'),
+      buyCash: document.getElementById('buy-menu-cash'),
+      helmet: document.getElementById('hud-helmet'),
+      kit: document.getElementById('hud-kit'),
+      weaponName: document.getElementById('hud-weapon-name'),
+      ammoClip: document.getElementById('hud-ammo-clip'),
+      ammoReserve: document.getElementById('hud-ammo-reserve'),
+      roundTimer: document.getElementById('round-timer'),
+      roundPhaseLabel: document.getElementById('round-phase-label'),
+      bombClock: document.getElementById('bomb-clock'),
+      netGraphFPS: document.getElementById('net-graph-fps')
+    };
+
+    // State dirty checker
+    this.cachedHUD = {
+      ctScore: -1,
+      tScore: -1,
+      health: -1,
+      armor: -1,
+      money: -1,
+      helmetVisible: null,
+      kitVisible: null,
+      weaponName: '',
+      clip: -1,
+      reserve: -1
+    };
 
     this.radarCanvas = document.getElementById('radar-canvas');
     this.radarCtx = this.radarCanvas ? this.radarCanvas.getContext('2d') : null;
@@ -49,17 +89,17 @@ class CS2GameManager {
   createC4Prop() {
     const group = new THREE.Group();
     const packGeo = new THREE.BoxGeometry(0.35, 0.15, 0.25);
-    const packMat = new THREE.MeshStandardMaterial({ color: 0x8b5a2b, roughness: 0.9 });
+    const packMat = new THREE.MeshLambertMaterial({ color: 0x8b5a2b });
     const pack = new THREE.Mesh(packGeo, packMat);
     group.add(pack);
 
     const padGeo = new THREE.BoxGeometry(0.15, 0.04, 0.15);
-    const padMat = new THREE.MeshStandardMaterial({ color: 0x111111 });
+    const padMat = new THREE.MeshLambertMaterial({ color: 0x111111 });
     const pad = new THREE.Mesh(padGeo, padMat);
     pad.position.y = 0.09;
     group.add(pad);
 
-    const ledGeo = new THREE.SphereGeometry(0.03, 8, 8);
+    const ledGeo = new THREE.SphereGeometry(0.03, 6, 6);
     this.c4LedMat = new THREE.MeshBasicMaterial({ color: 0xff0000 });
     const led = new THREE.Mesh(ledGeo, this.c4LedMat);
     led.position.set(0.08, 0.11, 0.06);
@@ -70,44 +110,39 @@ class CS2GameManager {
     this.scene.add(this.c4Mesh);
   }
 
-  // Connect to competitive server (Dust 2 or Mirage)
   connectToServer(mapName) {
     this.selectedMap = mapName;
 
-    // Build chosen map
     if (mapName === 'mirage') {
       this.mapBuilder.buildMirage();
-      document.getElementById('radar-map-name').innerText = 'DE_MIRAGE';
-      document.getElementById('sb-map-name').innerText = 'MIRAGE';
+      const rMap = document.getElementById('radar-map-name');
+      const sbMap = document.getElementById('sb-map-name');
+      if (rMap) rMap.innerText = 'DE_MIRAGE';
+      if (sbMap) sbMap.innerText = 'MIRAGE';
     } else {
       this.mapBuilder.buildDust2();
-      document.getElementById('radar-map-name').innerText = 'DE_DUST2';
-      document.getElementById('sb-map-name').innerText = 'DUST II';
+      const rMap = document.getElementById('radar-map-name');
+      const sbMap = document.getElementById('sb-map-name');
+      if (rMap) rMap.innerText = 'DE_DUST2';
+      if (sbMap) sbMap.innerText = 'DUST II';
     }
 
-    // Open Team Select Screen
+    // Open team selection split-screen
     document.getElementById('main-menu').classList.add('hidden');
     document.getElementById('team-select-screen').classList.remove('hidden');
   }
 
-  // Player chooses team on split screen
+  // Choose team: player ALWAYS spawns directly in the match
   chooseTeam(team) {
     this.selectedTeam = team;
     this.player.setTeam(team);
+
     document.getElementById('team-select-screen').classList.add('hidden');
     document.getElementById('hud').classList.remove('hidden');
-
     document.getElementById('game-canvas-container').requestPointerLock();
 
-    // Check if other players are active in a live round
-    const remotePlayersCount = Object.keys(this.net.remotePlayers).length;
-    if (this.phase === 'live' && remotePlayersCount > 0) {
-      this.player.enterSpectatorMode();
-      this.showAnnouncement('ROUND IN PROGRESS — SPECTATING (A / D TO CYCLE)', 'neutral');
-    } else {
-      // Spawn immediately at authentic CS team spawn!
-      this.startRound();
-    }
+    // Start with official 15-second Freezetime
+    this.startRound();
   }
 
   startRound() {
@@ -117,30 +152,32 @@ class CS2GameManager {
     this.c4Timer = 40.0;
     this.c4Mesh.visible = false;
 
-    // Reset HUD alerts
+    // Reset HUD
     document.getElementById('c4-planted-alert').classList.add('hidden');
     document.getElementById('announcement-banner').classList.add('hidden');
     document.getElementById('action-prompt').classList.add('hidden');
     document.getElementById('interaction-bar-container').classList.add('hidden');
     document.getElementById('spectator-hud').classList.add('hidden');
 
-    // Spawn Player at authentic CS spawn point!
+    // Announce Freezetime Buy Period
+    this.showAnnouncement('FREEZETIME (BUY PERIOD) — PRESS [B] TO BUY', 'neutral');
+    window.csAudio.playRadioTone('start');
+
+    // Spawn player immediately at authentic CS spawn point
     const spawns = this.mapBuilder.spawnPoints[this.player.team];
-    const spawnIndex = Math.floor(Math.random() * spawns.length);
-    this.player.respawn(spawns[spawnIndex]);
+    const s = spawns[Math.floor(Math.random() * spawns.length)];
+    this.player.respawn(s);
 
     if (this.currentRound === 13) {
       this.handleHalftimeSwap();
     }
-
-    window.csAudio.playRadioTone('start');
   }
 
   handleHalftimeSwap() {
     const newTeam = this.player.team === 'CT' ? 'T' : 'CT';
     this.player.setTeam(newTeam);
     this.player.money.set(800);
-    this.showAnnouncement('HALFTIME - SWITCHING SIDES', 'neutral');
+    this.showAnnouncement('HALFTIME — SWITCHING SIDES', 'neutral');
   }
 
   onC4Planted(position, siteName) {
@@ -243,7 +280,7 @@ class CS2GameManager {
   endMatch() {
     this.phase = 'match_over';
     const winner = this.ctScore >= this.targetWins ? 'COUNTER-TERRORISTS' : 'TERRORISTS';
-    this.showAnnouncement(`MATCH COMPLETE &bull; ${winner} VICTORY!`, 'neutral');
+    this.showAnnouncement(`MATCH COMPLETE — ${winner} VICTORY!`, 'neutral');
     setTimeout(() => {
       document.getElementById('hud').classList.add('hidden');
       document.getElementById('main-menu').classList.remove('hidden');
@@ -271,7 +308,8 @@ class CS2GameManager {
     // T planting C4
     if (this.player.team === 'T' && !this.c4Planted && this.player.inventory[5]) {
       let inSite = null;
-      for (const site of this.mapBuilder.bombZones) {
+      for (let i = 0; i < this.mapBuilder.bombZones.length; i++) {
+        const site = this.mapBuilder.bombZones[i];
         const dist = Math.hypot(this.player.position.x - site.x, this.player.position.z - site.z);
         if (dist <= site.radius) {
           inSite = site.id;
@@ -346,6 +384,7 @@ class CS2GameManager {
     }
   }
 
+  // Throttled 2D Radar Canvas (runs at ~25 FPS to save heavy CPU frame budget)
   renderRadar() {
     if (!this.radarCtx) return;
     const ctx = this.radarCtx;
@@ -360,8 +399,9 @@ class CS2GameManager {
     ctx.translate(cx, cy);
     ctx.rotate(-this.player.yaw);
 
-    // Draw Bombsite A and B markers
-    this.mapBuilder.bombZones.forEach(site => {
+    const bZones = this.mapBuilder.bombZones;
+    for (let i = 0; i < bZones.length; i++) {
+      const site = bZones[i];
       const rx = (site.x - this.player.position.x) * scale;
       const rz = (site.z - this.player.position.z) * scale;
 
@@ -373,7 +413,7 @@ class CS2GameManager {
       ctx.fillStyle = '#ffcc00';
       ctx.font = 'bold 12px sans-serif';
       ctx.fillText(site.id, rx - 4, rz + 4);
-    });
+    }
 
     if (this.c4Planted && this.c4Pos) {
       const rx = (this.c4Pos.x - this.player.position.x) * scale;
@@ -384,15 +424,16 @@ class CS2GameManager {
       ctx.fill();
     }
 
-    // Draw other connected human players
-    Object.values(this.net.remotePlayers).forEach(p => {
+    const remPlayers = Object.values(this.net.remotePlayers);
+    for (let i = 0; i < remPlayers.length; i++) {
+      const p = remPlayers[i];
       const rx = (p.pos.x - this.player.position.x) * scale;
       const rz = (p.pos.z - this.player.position.z) * scale;
       ctx.fillStyle = p.team === this.player.team ? (p.team === 'CT' ? '#5b97d5' : '#d58936') : '#ff3b30';
       ctx.beginPath();
       ctx.arc(rx, rz, 4, 0, Math.PI * 2);
       ctx.fill();
-    });
+    }
 
     ctx.restore();
 
@@ -412,9 +453,8 @@ class CS2GameManager {
       this.frameCount = 0;
       this.fpsLastTime = currentTime;
 
-      const fpsEl = document.getElementById('net-graph-fps');
-      if (fpsEl) {
-        fpsEl.innerText = `${this.currentFPS} FPS | 12ms | TICK 64`;
+      if (this.hudEls.netGraphFPS) {
+        this.hudEls.netGraphFPS.innerText = `${this.currentFPS} FPS | 8ms | TICK 64`;
       }
     }
   }
@@ -422,24 +462,43 @@ class CS2GameManager {
   update(dt, currentTime) {
     this.updateFPSCounter(currentTime);
 
+    // 1. FREEZETIME PHASE (15s Buy Phase before round starts)
     if (this.phase === 'freeze') {
       this.phaseTimer -= dt;
-      document.getElementById('round-phase-label').innerText = 'BUY PHASE (FREEZETIME)';
-      document.getElementById('round-timer').innerText = `0:${Math.ceil(this.phaseTimer).toString().padStart(2, '0')}`;
+      if (this.lastPhaseText !== 'FREEZETIME') {
+        this.lastPhaseText = 'FREEZETIME';
+        this.hudEls.roundPhaseLabel.innerText = 'FREEZETIME (BUY PHASE)';
+      }
+      const secsLeft = Math.max(0, Math.ceil(this.phaseTimer));
+      const timerStr = `0:${secsLeft.toString().padStart(2, '0')}`;
+      if (this.lastTimerText !== timerStr) {
+        this.lastTimerText = timerStr;
+        this.hudEls.roundTimer.innerText = timerStr;
+      }
+
+      // Freezetime completed -> Round goes LIVE!
       if (this.phaseTimer <= 0) {
         this.phase = 'live';
         this.phaseTimer = this.roundTime;
-        document.getElementById('round-phase-label').innerText = 'ROUND LIVE';
+        this.lastPhaseText = 'LIVE';
+        this.hudEls.roundPhaseLabel.innerText = 'ROUND LIVE';
+        this.showAnnouncement('ROUND IS LIVE — GO GO GO!', 'neutral');
+        window.csAudio.playRadioTone('start');
       }
     } else if (this.phase === 'live') {
+      // 2. LIVE ROUND PHASE (1:55)
       this.phaseTimer -= dt;
-      const mins = Math.floor(this.phaseTimer / 60);
-      const secs = Math.floor(this.phaseTimer % 60);
-      document.getElementById('round-timer').innerText = `${mins}:${secs.toString().padStart(2, '0')}`;
+      const mins = Math.max(0, Math.floor(this.phaseTimer / 60));
+      const secs = Math.max(0, Math.floor(this.phaseTimer % 60));
+      const timerStr = `${mins}:${secs.toString().padStart(2, '0')}`;
+      if (this.lastTimerText !== timerStr) {
+        this.lastTimerText = timerStr;
+        this.hudEls.roundTimer.innerText = timerStr;
+      }
 
       if (this.c4Planted) {
         this.c4Timer -= dt;
-        document.getElementById('bomb-clock').innerText = `${Math.max(0, this.c4Timer).toFixed(1)}s`;
+        this.hudEls.bombClock.innerText = `${Math.max(0, this.c4Timer).toFixed(1)}s`;
 
         const beepInterval = Math.max(0.12, this.c4Timer / 40.0);
         if (currentTime / 1000 - this.lastBeepTime > beepInterval) {
@@ -455,7 +514,7 @@ class CS2GameManager {
           this.c4Planted = false;
           this.c4Mesh.visible = false;
           window.csAudio.playExplosion();
-          this.endRound('T', 'TARGET BOMBED & DESTROYED');
+          this.endRound('T', 'TARGET DESTROYED');
         }
       } else {
         if (this.phaseTimer <= 0) {
@@ -467,39 +526,94 @@ class CS2GameManager {
     this.player.update(dt, currentTime, this);
     this.handleObjectives(dt);
 
+    // High performance dirty-checked HUD
     this.updateHUD();
-    this.renderRadar();
-    this.net.sendPlayerState(this.player);
-  }
 
-  updateHUD() {
-    document.getElementById('ct-score').innerText = this.ctScore;
-    document.getElementById('t-score').innerText = this.tScore;
-    document.getElementById('sb-ct-score').innerText = this.ctScore;
-    document.getElementById('sb-t-score').innerText = this.tScore;
-
-    document.getElementById('hud-health').innerText = this.player.health.get();
-    document.getElementById('hud-armor').innerText = this.player.armor.get();
-    document.getElementById('hud-money').innerText = this.player.money.get();
-    document.getElementById('buy-menu-cash').innerText = `$${this.player.money.get()}`;
-
-    const helmetEl = document.getElementById('hud-helmet');
-    if (helmetEl) helmetEl.style.display = this.player.hasHelmet ? 'inline-block' : 'none';
-
-    const kitEl = document.getElementById('hud-kit');
-    if (kitEl) {
-      if (this.player.team === 'CT' && this.player.hasDefuseKit) kitEl.classList.remove('hidden');
-      else kitEl.classList.add('hidden');
+    // Throttled radar update (~25 FPS)
+    if (currentTime - this.lastRadarTime > 40) {
+      this.lastRadarTime = currentTime;
+      this.renderRadar();
     }
 
-    if (this.player.activeWeapon) {
-      document.getElementById('hud-weapon-name').innerText = this.player.activeWeapon.name;
-      if (this.player.activeWeapon.clip) {
-        document.getElementById('hud-ammo-clip').innerText = this.player.clipAmmo.get();
-        document.getElementById('hud-ammo-reserve').innerText = this.player.reserveAmmo.get();
+    // Throttled network packet send (20Hz tickrate)
+    if (currentTime - this.lastNetTime > 50) {
+      this.lastNetTime = currentTime;
+      this.net.sendPlayerState(this.player);
+    }
+  }
+
+  // Dirty checking HUD: ONLY mutates the DOM when state has actually changed!
+  updateHUD() {
+    const p = this.player;
+    const h = this.hudEls;
+    const c = this.cachedHUD;
+
+    if (c.ctScore !== this.ctScore) {
+      c.ctScore = this.ctScore;
+      h.ctScore.innerText = this.ctScore;
+      h.sbCtScore.innerText = this.ctScore;
+    }
+    if (c.tScore !== this.tScore) {
+      c.tScore = this.tScore;
+      h.tScore.innerText = this.tScore;
+      h.sbTScore.innerText = this.tScore;
+    }
+
+    const curHp = p.health.get();
+    if (c.health !== curHp) {
+      c.health = curHp;
+      h.health.innerText = curHp;
+    }
+
+    const curArmor = p.armor.get();
+    if (c.armor !== curArmor) {
+      c.armor = curArmor;
+      h.armor.innerText = curArmor;
+    }
+
+    const curMoney = p.money.get();
+    if (c.money !== curMoney) {
+      c.money = curMoney;
+      h.money.innerText = curMoney;
+      h.buyCash.innerText = `$${curMoney}`;
+    }
+
+    if (c.helmetVisible !== p.hasHelmet) {
+      c.helmetVisible = p.hasHelmet;
+      if (h.helmet) h.helmet.style.display = p.hasHelmet ? 'inline-block' : 'none';
+    }
+
+    const showKit = (p.team === 'CT' && p.hasDefuseKit);
+    if (c.kitVisible !== showKit) {
+      c.kitVisible = showKit;
+      if (h.kit) {
+        if (showKit) h.kit.classList.remove('hidden');
+        else h.kit.classList.add('hidden');
+      }
+    }
+
+    if (p.activeWeapon) {
+      if (c.weaponName !== p.activeWeapon.name) {
+        c.weaponName = p.activeWeapon.name;
+        h.weaponName.innerText = p.activeWeapon.name;
+      }
+      if (p.activeWeapon.clip) {
+        const curClip = p.clipAmmo.get();
+        const curRes = p.reserveAmmo.get();
+        if (c.clip !== curClip) {
+          c.clip = curClip;
+          h.ammoClip.innerText = curClip;
+        }
+        if (c.reserve !== curRes) {
+          c.reserve = curRes;
+          h.ammoReserve.innerText = curRes;
+        }
       } else {
-        document.getElementById('hud-ammo-clip').innerText = '-';
-        document.getElementById('hud-ammo-reserve').innerText = '-';
+        if (c.clip !== -1) {
+          c.clip = -1;
+          h.ammoClip.innerText = '-';
+          h.ammoReserve.innerText = '-';
+        }
       }
     }
   }

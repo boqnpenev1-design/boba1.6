@@ -8,13 +8,11 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:ital,wght@0,400;0,600;0,700;1,700&family=Rajdhani:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/style.css?v=3.5">
   
-  <!-- Three.js 3D Engine, Loaders & PeerJS (Multiplayer) -->
+  <!-- Three.js 3D Engine & PeerJS (Multiplayer) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/OBJLoader.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/MTLLoader.js"></script>
   <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 </head>
 <body>
@@ -31,10 +29,10 @@
   <div id="damage-vignette"></div>
   <div id="flash-overlay"></div>
 
-  <!-- Spectator HUD Overlay (Visible when dead or joined during round) -->
+  <!-- Spectator HUD Overlay -->
   <div id="spectator-hud" class="hidden">
     <div class="spectator-badge">SPECTATING POV</div>
-    <div class="spectator-name" id="spectator-target-name">Bot Vitaly (CT)</div>
+    <div class="spectator-name" id="spectator-target-name">Player</div>
     <div class="spectator-controls">
       <span><kbd>A</kbd> PREVIOUS PLAYER</span>
       <span class="sep">&bull;</span>
@@ -49,13 +47,13 @@
     <div class="hud-top">
       <div class="team-score-card ct-score-card">
         <div class="team-logo ct-logo">CT</div>
-        <div class="team-alive-count" id="ct-alive-count">5 ALIVE</div>
+        <div class="team-alive-count" id="ct-alive-count">1 ALIVE</div>
         <div class="team-score" id="ct-score">0</div>
       </div>
 
       <div class="match-clock-box">
-        <div class="round-status-text" id="round-phase-label">COMPETITIVE MR12</div>
-        <div class="round-timer" id="round-timer">1:55</div>
+        <div class="round-status-text" id="round-phase-label">FREEZETIME (BUY PHASE)</div>
+        <div class="round-timer" id="round-timer">0:15</div>
         <div class="bomb-carrier-indicator hidden" id="c4-planted-alert">
           <span class="bomb-icon">💣</span>
           <span class="bomb-clock" id="bomb-clock">40.0s</span>
@@ -64,7 +62,7 @@
 
       <div class="team-score-card t-score-card">
         <div class="team-score" id="t-score">0</div>
-        <div class="team-alive-count" id="t-alive-count">5 ALIVE</div>
+        <div class="team-alive-count" id="t-alive-count">1 ALIVE</div>
         <div class="team-logo t-logo">T</div>
       </div>
     </div>
@@ -78,7 +76,7 @@
 
     <!-- Top Right: Killfeed & FPS Net-Graph -->
     <div class="hud-top-right">
-      <div class="net-graph-counter" id="net-graph-fps">144 FPS &bull; 12ms &bull; TICK 64</div>
+      <div class="net-graph-counter" id="net-graph-fps">144 FPS &bull; 8ms &bull; TICK 64</div>
       <div class="killfeed" id="killfeed"></div>
     </div>
 
@@ -133,20 +131,20 @@
     <!-- Bottom Right: Weapon, Firemode & Ammo -->
     <div class="hud-bottom-right">
       <div class="weapon-hud-display">
-        <div class="weapon-name" id="hud-weapon-name">AK-47</div>
-        <div class="weapon-firemode" id="hud-weapon-mode">AUTOMATIC</div>
+        <div class="weapon-name" id="hud-weapon-name">USP-S</div>
+        <div class="weapon-firemode" id="hud-weapon-mode">SEMI-AUTO</div>
       </div>
       <div class="hud-box ammo-box">
-        <span class="ammo-clip" id="hud-ammo-clip">30</span>
+        <span class="ammo-clip" id="hud-ammo-clip">12</span>
         <span class="ammo-slash">/</span>
-        <span class="ammo-reserve" id="hud-ammo-reserve">90</span>
+        <span class="ammo-reserve" id="hud-ammo-reserve">24</span>
       </div>
     </div>
 
     <!-- Weapon Inventory Slots -->
     <div class="weapon-slots-hud" id="weapon-slots">
-      <div class="slot-item active" data-slot="1">1: PRIMARY</div>
-      <div class="slot-item" data-slot="2">2: SECONDARY</div>
+      <div class="slot-item" data-slot="1">1: PRIMARY</div>
+      <div class="slot-item active" data-slot="2">2: SECONDARY</div>
       <div class="slot-item" data-slot="3">3: KNIFE</div>
       <div class="slot-item" data-slot="4">4: GRENADES</div>
       <div class="slot-item" data-slot="5">5: C4 BOMB</div>
@@ -309,8 +307,8 @@
             <div class="server-details-row">
               <div class="s-detail"><span>MODE:</span> <strong>COMPETITIVE MR12</strong></div>
               <div class="s-detail"><span>TICK:</span> <strong>64 TICK</strong></div>
-              <div class="s-detail"><span>PING:</span> <strong>12ms</strong></div>
-              <div class="s-detail"><span>SLOTS:</span> <strong>5v5 ACTIVE</strong></div>
+              <div class="s-detail"><span>PING:</span> <strong>8ms</strong></div>
+              <div class="s-detail"><span>SLOTS:</span> <strong>HUMAN ONLINE LOBBY</strong></div>
             </div>
             <button class="btn-connect-server" id="btn-connect-dust2">
               CONNECT TO DUST II SERVER
@@ -327,8 +325,8 @@
             <div class="server-details-row">
               <div class="s-detail"><span>MODE:</span> <strong>COMPETITIVE MR12</strong></div>
               <div class="s-detail"><span>TICK:</span> <strong>64 TICK</strong></div>
-              <div class="s-detail"><span>PING:</span> <strong>15ms</strong></div>
-              <div class="s-detail"><span>SLOTS:</span> <strong>5v5 ACTIVE</strong></div>
+              <div class="s-detail"><span>PING:</span> <strong>10ms</strong></div>
+              <div class="s-detail"><span>SLOTS:</span> <strong>HUMAN ONLINE LOBBY</strong></div>
             </div>
             <button class="btn-connect-server" id="btn-connect-mirage">
               CONNECT TO MIRAGE SERVER
@@ -337,7 +335,7 @@
         </div>
       </div>
 
-      <!-- TAB 2: CUSTOM ROOM (CROSS-WIFI PEER-TO-PEER) -->
+      <!-- TAB 2: CUSTOM ROOM -->
       <div class="tab-pane" id="pane-custom">
         <div class="online-setup-container">
           <div class="menu-card">
@@ -429,6 +427,14 @@
           <div class="menu-card">
             <h3>AUDIO & PERFORMANCE</h3>
             <div class="setting-row">
+              <label for="setting-graphics-mode">FPS & Graphics Preset:</label>
+              <select id="setting-graphics-mode" style="background:#151b24;color:#ffae35;border:1px solid #334;padding:6px;border-radius:3px;font-weight:700;">
+                <option value="comp" selected>Competitive (144+ FPS Max)</option>
+                <option value="ultra">Ultra Boost (240+ FPS Potato PC)</option>
+                <option value="high">High Fidelity (Native Antialias)</option>
+              </select>
+            </div>
+            <div class="setting-row">
               <label for="setting-master-vol">Master Volume:</label>
               <input type="range" id="setting-master-vol" min="0" max="1" step="0.05" value="0.7">
             </div>
@@ -457,15 +463,14 @@
     </div>
   </div>
 
-  <!-- Game Scripts -->
-  <script src="js/audio.js"></script>
-  <script src="js/antiCheat.js"></script>
-  <script src="js/weapons.js"></script>
-  <script src="js/maps.js"></script>
-  <script src="js/player.js"></script>
-  <script src="js/bots.js"></script>
-  <script src="js/network.js"></script>
-  <script src="js/game.js"></script>
-  <script src="js/main.js"></script>
+  <!-- Game Scripts (Cache-busted v3.6 - 144+ FPS Engine Optimization) -->
+  <script src="js/audio.js?v=3.6"></script>
+  <script src="js/antiCheat.js?v=3.6"></script>
+  <script src="js/weapons.js?v=3.6"></script>
+  <script src="js/maps.js?v=3.6"></script>
+  <script src="js/player.js?v=3.6"></script>
+  <script src="js/network.js?v=3.6"></script>
+  <script src="js/game.js?v=3.6"></script>
+  <script src="js/main.js?v=3.6"></script>
 </body>
 </html>
