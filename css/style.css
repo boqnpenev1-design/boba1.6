@@ -421,19 +421,8 @@ body, html {
 }
 
 .announcement {
-  font-family: var(--cs-font-display);
-  font-size: 26px;
-  font-weight: 700;
-  letter-spacing: 2px;
-  text-shadow: 0 0 16px rgba(0,0,0,0.9);
-  padding: 8px 24px;
-  background: rgba(8, 12, 18, 0.85);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 4px;
+  display: none !important;
 }
-
-.announcement.ct-win { color: var(--cs-ct-blue); border-color: var(--cs-ct-blue); }
-.announcement.t-win { color: var(--cs-t-orange); border-color: var(--cs-t-orange); }
 
 #interaction-bar-container {
   display: flex;
@@ -481,6 +470,30 @@ body, html {
 .helmet-indicator { font-size: 9px; font-family: var(--cs-font-display); background: #1f3a58; color: #8bc2ff; padding: 2px 5px; border-radius: 2px; }
 .kit-icon { font-size: 16px; color: #ffcc00; }
 .kit-label { font-size: 11px; font-family: var(--cs-font-display); color: #ffcc00; font-weight: 700; }
+
+.hud-buyzone-box {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(10, 14, 20, 0.88);
+  border: 1px solid #37d376;
+  border-left: 3px solid #37d376;
+  border-radius: 4px;
+  padding: 6px 12px;
+  font-family: var(--cs-font-display);
+  font-size: 12px;
+  font-weight: 700;
+  color: #37d376;
+  box-shadow: 0 0 10px rgba(55, 211, 118, 0.25);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+.hud-buyzone-box.inactive {
+  opacity: 0.25;
+  border-color: rgba(255, 255, 255, 0.15);
+  color: #7b8e9f;
+  box-shadow: none;
+}
+.buyzone-icon { font-size: 16px; }
 
 .hud-money {
   font-family: var(--cs-font-num);

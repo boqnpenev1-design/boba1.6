@@ -13,6 +13,8 @@
   <!-- Three.js 3D Engine & PeerJS (Multiplayer) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/MTLLoader.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/OBJLoader.js"></script>
   <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 </head>
 <body>
@@ -52,7 +54,7 @@
       </div>
 
       <div class="match-clock-box">
-        <div class="round-status-text" id="round-phase-label">FREEZETIME (BUY PHASE)</div>
+        <div class="round-status-text" id="round-phase-label">FREEZETIME</div>
         <div class="round-timer" id="round-timer">0:15</div>
         <div class="bomb-carrier-indicator hidden" id="c4-planted-alert">
           <span class="bomb-icon">💣</span>
@@ -80,10 +82,8 @@
       <div class="killfeed" id="killfeed"></div>
     </div>
 
-    <!-- Center Screen Alerts & Interaction Progress -->
+    <!-- Center Screen Alerts & Interaction Progress (Giant announcement text removed as requested) -->
     <div class="center-notifications">
-      <div id="announcement-banner" class="announcement hidden"></div>
-      
       <div id="interaction-bar-container" class="hidden">
         <div class="interaction-title" id="interaction-title">DEFUSING BOMB...</div>
         <div class="interaction-progress-track">
@@ -105,7 +105,7 @@
       <div class="crosshair-dot"></div>
     </div>
 
-    <!-- Bottom Left: Health, Armor, Kit & Money -->
+    <!-- Bottom Left: Health, Armor, Kit, Buyzone & Money -->
     <div class="hud-bottom-left">
       <div class="hud-box health-box">
         <span class="hud-icon">+</span>
@@ -121,6 +121,11 @@
       <div class="hud-box kit-box hidden" id="hud-kit">
         <span class="kit-icon">✂</span>
         <span class="kit-label">DEFUSER</span>
+      </div>
+
+      <div class="hud-buyzone-box" id="hud-buyzone">
+        <span class="buyzone-icon">🛒</span>
+        <span class="buyzone-text">BUYZONE [B]</span>
       </div>
 
       <div class="hud-money">
@@ -172,8 +177,13 @@
       </div>
 
       <div class="buy-footer">
-        <span>PRESS <kbd>B</kbd> OR <kbd>ESC</kbd> TO RETURN TO MATCH</span>
-        <span id="buy-time-remaining">BUY TIME: 15s</span>
+        <div>
+          <span>PRESS <kbd>B</kbd> OR <kbd>ESC</kbd> TO RETURN</span>
+          <span id="buy-time-remaining" style="margin-left:14px;color:#ffae35;">BUY TIME: 15s</span>
+        </div>
+        <button id="btn-refund-weapon" class="btn-secondary" style="background:#5c2424;color:#ffb3b3;border-color:#ea3f3f;padding:6px 14px;font-size:12px;font-weight:700;">
+          ↺ REFUND WEAPON
+        </button>
       </div>
     </div>
   </div>

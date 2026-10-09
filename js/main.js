@@ -172,6 +172,9 @@ document.addEventListener('DOMContentLoaded', () => {
   let currentBuyCategory = 'pistols';
 
   function openBuyMenu() {
+    if (!gameManager.canBuy()) {
+      return;
+    }
     buyMenu.classList.remove('hidden');
     document.exitPointerLock();
     renderBuyItems(currentBuyCategory);
@@ -185,6 +188,14 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   document.getElementById('close-buy-menu').addEventListener('click', closeBuyMenu);
+
+  const refundBtn = document.getElementById('btn-refund-weapon');
+  if (refundBtn) {
+    refundBtn.addEventListener('click', () => {
+      gameManager.refundLastPurchase();
+      renderBuyItems(currentBuyCategory);
+    });
+  }
 
   document.querySelectorAll('.buy-cat-btn').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -245,11 +256,16 @@ document.addEventListener('DOMContentLoaded', () => {
         gameManager.player.hasHelmet = true;
       } else if (weapon.type === 'kit') {
         gameManager.player.hasDefuseKit = true;
+      } else if (weapon.type === 'grenade' || weapon.id === 'flashbang' || weapon.id === 'hegrenade' || weapon.id === 'smoke') {
+        gameManager.player.inventory[4] = weapon;
+        gameManager.player.switchSlot(4);
       }
     } else if (weapon.slot) {
       gameManager.player.inventory[weapon.slot] = weapon;
       gameManager.player.switchSlot(weapon.slot);
     }
+
+    gameManager.purchaseHistory.push(weapon);
 
     window.csAudio.playRadioTone('buy');
     renderBuyItems(currentBuyCategory);

@@ -1,5 +1,5 @@
-// CS2 Competitive Engine: Zero Bots, Real CS Spawns, 15s Freezetime
-// Max-Performance Optimized: Zero DOM Thrashing, Throttled 2D Canvas & Netcode
+// CS2 Competitive Engine: Zero Bots, Real CS Spawns, 15s Freezetime, Fully Visible C4,
+// Buy Zone + 20s Buy Time Restriction, Weapon Refund, and Zero Screen Text Banners
 
 class CS2GameManager {
   constructor(scene, camera) {
@@ -28,6 +28,9 @@ class CS2GameManager {
     this.c4Mesh = null;
     this.lastBeepTime = 0;
 
+    // Weapon Refund History (Last purchased item in buy menu)
+    this.purchaseHistory = [];
+
     // Entities (Zero bots in match)
     this.mapBuilder = new CS2MapBuilder(this.scene);
     this.player = new CS2Player(this.camera, this.scene, this.mapBuilder);
@@ -43,7 +46,7 @@ class CS2GameManager {
     this.lastTimerText = '';
     this.lastPhaseText = '';
 
-    // Cache HUD DOM Elements to completely prevent Layout Thrashing
+    // Cache HUD DOM Elements
     this.hudEls = {
       ctScore: document.getElementById('ct-score'),
       tScore: document.getElementById('t-score'),
@@ -61,7 +64,8 @@ class CS2GameManager {
       roundTimer: document.getElementById('round-timer'),
       roundPhaseLabel: document.getElementById('round-phase-label'),
       bombClock: document.getElementById('bomb-clock'),
-      netGraphFPS: document.getElementById('net-graph-fps')
+      netGraphFPS: document.getElementById('net-graph-fps'),
+      buyzoneBox: document.getElementById('hud-buyzone')
     };
 
     // State dirty checker
@@ -75,7 +79,8 @@ class CS2GameManager {
       kitVisible: null,
       weaponName: '',
       clip: -1,
-      reserve: -1
+      reserve: -1,
+      buyzoneActive: null
     };
 
     this.radarCanvas = document.getElementById('radar-canvas');
@@ -86,24 +91,34 @@ class CS2GameManager {
     this.createC4Prop();
   }
 
+  // Highly visible 3D C4 Prop with flashing red/white beacon light
   createC4Prop() {
     const group = new THREE.Group();
-    const packGeo = new THREE.BoxGeometry(0.35, 0.15, 0.25);
-    const packMat = new THREE.MeshLambertMaterial({ color: 0x8b5a2b });
+
+    // Main Explosive Pack
+    const packGeo = new THREE.BoxGeometry(0.5, 0.22, 0.35);
+    const packMat = new THREE.MeshLambertMaterial({ color: 0x9a6835 });
     const pack = new THREE.Mesh(packGeo, packMat);
     group.add(pack);
 
-    const padGeo = new THREE.BoxGeometry(0.15, 0.04, 0.15);
-    const padMat = new THREE.MeshLambertMaterial({ color: 0x111111 });
+    // Electronics & Keypad
+    const padGeo = new THREE.BoxGeometry(0.25, 0.06, 0.2);
+    const padMat = new THREE.MeshLambertMaterial({ color: 0x1a1a1a });
     const pad = new THREE.Mesh(padGeo, padMat);
-    pad.position.y = 0.09;
+    pad.position.y = 0.13;
     group.add(pad);
 
-    const ledGeo = new THREE.SphereGeometry(0.03, 6, 6);
+    // Blinking LED Indicator
+    const ledGeo = new THREE.SphereGeometry(0.05, 8, 8);
     this.c4LedMat = new THREE.MeshBasicMaterial({ color: 0xff0000 });
     const led = new THREE.Mesh(ledGeo, this.c4LedMat);
-    led.position.set(0.08, 0.11, 0.06);
+    led.position.set(0.12, 0.16, 0.08);
     group.add(led);
+
+    // Dynamic Point Light Beacon
+    this.c4BeaconLight = new THREE.PointLight(0xff0000, 1.5, 12);
+    this.c4BeaconLight.position.set(0.12, 0.25, 0.08);
+    group.add(this.c4BeaconLight);
 
     this.c4Mesh = group;
     this.c4Mesh.visible = false;
@@ -127,12 +142,16 @@ class CS2GameManager {
       if (sbMap) sbMap.innerText = 'DUST II';
     }
 
+    // Connect to shared multiplayer room for this map
+    this.net.autoJoinPublicServer(mapName, (role) => {
+      console.log(`Connected to online server ${mapName} as ${role}`);
+    });
+
     // Open team selection split-screen
     document.getElementById('main-menu').classList.add('hidden');
     document.getElementById('team-select-screen').classList.remove('hidden');
   }
 
-  // Choose team: player ALWAYS spawns directly in the match
   chooseTeam(team) {
     this.selectedTeam = team;
     this.player.setTeam(team);
@@ -141,7 +160,6 @@ class CS2GameManager {
     document.getElementById('hud').classList.remove('hidden');
     document.getElementById('game-canvas-container').requestPointerLock();
 
-    // Start with official 15-second Freezetime
     this.startRound();
   }
 
@@ -151,16 +169,14 @@ class CS2GameManager {
     this.c4Planted = false;
     this.c4Timer = 40.0;
     this.c4Mesh.visible = false;
+    this.purchaseHistory = [];
 
     // Reset HUD
     document.getElementById('c4-planted-alert').classList.add('hidden');
-    document.getElementById('announcement-banner').classList.add('hidden');
     document.getElementById('action-prompt').classList.add('hidden');
     document.getElementById('interaction-bar-container').classList.add('hidden');
     document.getElementById('spectator-hud').classList.add('hidden');
 
-    // Announce Freezetime Buy Period
-    this.showAnnouncement('FREEZETIME (BUY PERIOD) — PRESS [B] TO BUY', 'neutral');
     window.csAudio.playRadioTone('start');
 
     // Spawn player immediately at authentic CS spawn point
@@ -177,7 +193,43 @@ class CS2GameManager {
     const newTeam = this.player.team === 'CT' ? 'T' : 'CT';
     this.player.setTeam(newTeam);
     this.player.money.set(800);
-    this.showAnnouncement('HALFTIME — SWITCHING SIDES', 'neutral');
+  }
+
+  // Authentic CS2 Buy Zone & Buy Time Rules
+  canBuy() {
+    // 1. Freezetime: always allowed to buy
+    if (this.phase === 'freeze') return true;
+
+    // 2. Live Round: only allowed within the first 20 seconds AND inside buy zone
+    if (this.phase === 'live') {
+      const liveSecondsElapsed = this.roundTime - this.phaseTimer;
+      if (liveSecondsElapsed <= 20.0) {
+        return this.mapBuilder.isInBuyZone(this.player.team, this.player.position);
+      }
+    }
+    return false;
+  }
+
+  // Weapon Refund System: Sell back last purchased weapon for 100% refund
+  refundLastPurchase() {
+    if (!this.canBuy() || this.purchaseHistory.length === 0) {
+      alert("No weapons eligible for refund or buy time expired.");
+      return;
+    }
+
+    const last = this.purchaseHistory.pop();
+    this.player.money.add(last.cost);
+
+    if (last.slot === 1) {
+      this.player.inventory[1] = null;
+      this.player.switchSlot(2);
+    } else if (last.slot === 2) {
+      this.player.inventory[2] = this.player.team === 'CT' ? CS2_WEAPONS.usp : CS2_WEAPONS.glock;
+      this.player.switchSlot(2);
+    }
+
+    window.csAudio.playRadioTone('buy');
+    this.updateHUD();
   }
 
   onC4Planted(position, siteName) {
@@ -186,11 +238,12 @@ class CS2GameManager {
     this.c4Pos = position;
     this.c4Site = siteName;
 
-    this.c4Mesh.position.set(position.x, 0.08, position.z);
+    // Explicitly elevated Y position so bomb is 100% visible on platforms
+    const posY = (position.y !== undefined ? position.y : 0.1) + 0.1;
+    this.c4Mesh.position.set(position.x, posY, position.z);
     this.c4Mesh.visible = true;
 
     document.getElementById('c4-planted-alert').classList.remove('hidden');
-    this.showAnnouncement(`THE BOMB HAS BEEN PLANTED AT ${siteName}!`, 't-win');
     window.csAudio.playRadioTone('alert');
   }
 
@@ -242,13 +295,11 @@ class CS2GameManager {
       this.ctScore++;
       this.consecutiveLosses.CT = 0;
       this.consecutiveLosses.T++;
-      this.showAnnouncement(`COUNTER-TERRORISTS WIN (${reason})`, 'ct-win');
       window.csAudio.playRadioTone('win');
     } else {
       this.tScore++;
       this.consecutiveLosses.T = 0;
       this.consecutiveLosses.CT++;
-      this.showAnnouncement(`TERRORISTS WIN (${reason})`, 't-win');
       window.csAudio.playRadioTone('win');
     }
 
@@ -279,21 +330,11 @@ class CS2GameManager {
 
   endMatch() {
     this.phase = 'match_over';
-    const winner = this.ctScore >= this.targetWins ? 'COUNTER-TERRORISTS' : 'TERRORISTS';
-    this.showAnnouncement(`MATCH COMPLETE — ${winner} VICTORY!`, 'neutral');
     setTimeout(() => {
       document.getElementById('hud').classList.add('hidden');
       document.getElementById('main-menu').classList.remove('hidden');
       document.exitPointerLock();
     }, 6000);
-  }
-
-  showAnnouncement(text, styleClass) {
-    const banner = document.getElementById('announcement-banner');
-    if (!banner) return;
-    banner.className = `announcement ${styleClass}`;
-    banner.innerText = text;
-    banner.classList.remove('hidden');
   }
 
   handleObjectives(dt) {
@@ -308,11 +349,13 @@ class CS2GameManager {
     // T planting C4
     if (this.player.team === 'T' && !this.c4Planted && this.player.inventory[5]) {
       let inSite = null;
+      let siteY = 0.1;
       for (let i = 0; i < this.mapBuilder.bombZones.length; i++) {
         const site = this.mapBuilder.bombZones[i];
         const dist = Math.hypot(this.player.position.x - site.x, this.player.position.z - site.z);
         if (dist <= site.radius) {
           inSite = site.id;
+          siteY = site.y || 0.1;
           break;
         }
       }
@@ -334,10 +377,17 @@ class CS2GameManager {
             this.player.plantProgress = 0;
             this.player.inventory[5] = null;
             progressTrack.classList.add('hidden');
-            this.onC4Planted(
-              { x: this.player.position.x, y: 0.1, z: this.player.position.z },
-              `BOMBSITE ${inSite}`
-            );
+            const plantPos = { x: this.player.position.x, y: siteY, z: this.player.position.z };
+            this.onC4Planted(plantPos, `BOMBSITE ${inSite}`);
+
+            // Broadcast to network
+            if (this.net) {
+              if (this.net.isHost) {
+                this.net.broadcast({ type: 'plant_c4', pos: plantPos, site: `BOMBSITE ${inSite}` });
+              } else if (this.net.hostConnection && this.net.hostConnection.open) {
+                this.net.hostConnection.send({ type: 'plant_c4', pos: plantPos, site: `BOMBSITE ${inSite}` });
+              }
+            }
           }
           return;
         } else {
@@ -352,7 +402,7 @@ class CS2GameManager {
     // CT defusing C4
     if (this.player.team === 'CT' && this.c4Planted && this.c4Pos) {
       const distToC4 = Math.hypot(this.player.position.x - this.c4Pos.x, this.player.position.z - this.c4Pos.z);
-      if (distToC4 < 3.2) {
+      if (distToC4 < 3.8) {
         actionPrompt.classList.remove('hidden');
         const kitText = this.player.hasDefuseKit ? '(DEFUSE KIT - 5s)' : '(NO KIT - 10s)';
         promptText.innerText = `HOLD [E] TO DEFUSE C4 ${kitText}`;
@@ -372,6 +422,15 @@ class CS2GameManager {
             this.player.defuseProgress = 0;
             progressTrack.classList.add('hidden');
             this.onC4Defused();
+
+            // Broadcast defusal
+            if (this.net) {
+              if (this.net.isHost) {
+                this.net.broadcast({ type: 'defuse_c4' });
+              } else if (this.net.hostConnection && this.net.hostConnection.open) {
+                this.net.hostConnection.send({ type: 'defuse_c4' });
+              }
+            }
           }
           return;
         } else {
@@ -384,7 +443,6 @@ class CS2GameManager {
     }
   }
 
-  // Throttled 2D Radar Canvas (runs at ~25 FPS to save heavy CPU frame budget)
   renderRadar() {
     if (!this.radarCtx) return;
     const ctx = this.radarCtx;
@@ -420,7 +478,7 @@ class CS2GameManager {
       const rz = (this.c4Pos.z - this.player.position.z) * scale;
       ctx.fillStyle = '#ff0000';
       ctx.beginPath();
-      ctx.arc(rx, rz, 5, 0, Math.PI * 2);
+      ctx.arc(rx, rz, 6, 0, Math.PI * 2);
       ctx.fill();
     }
 
@@ -462,12 +520,12 @@ class CS2GameManager {
   update(dt, currentTime) {
     this.updateFPSCounter(currentTime);
 
-    // 1. FREEZETIME PHASE (15s Buy Phase before round starts)
+    // Freezetime phase
     if (this.phase === 'freeze') {
       this.phaseTimer -= dt;
       if (this.lastPhaseText !== 'FREEZETIME') {
         this.lastPhaseText = 'FREEZETIME';
-        this.hudEls.roundPhaseLabel.innerText = 'FREEZETIME (BUY PHASE)';
+        this.hudEls.roundPhaseLabel.innerText = 'FREEZETIME';
       }
       const secsLeft = Math.max(0, Math.ceil(this.phaseTimer));
       const timerStr = `0:${secsLeft.toString().padStart(2, '0')}`;
@@ -476,17 +534,14 @@ class CS2GameManager {
         this.hudEls.roundTimer.innerText = timerStr;
       }
 
-      // Freezetime completed -> Round goes LIVE!
       if (this.phaseTimer <= 0) {
         this.phase = 'live';
         this.phaseTimer = this.roundTime;
         this.lastPhaseText = 'LIVE';
         this.hudEls.roundPhaseLabel.innerText = 'ROUND LIVE';
-        this.showAnnouncement('ROUND IS LIVE — GO GO GO!', 'neutral');
         window.csAudio.playRadioTone('start');
       }
     } else if (this.phase === 'live') {
-      // 2. LIVE ROUND PHASE (1:55)
       this.phaseTimer -= dt;
       const mins = Math.max(0, Math.floor(this.phaseTimer / 60));
       const secs = Math.max(0, Math.floor(this.phaseTimer % 60));
@@ -506,8 +561,13 @@ class CS2GameManager {
           const urgency = 1.0 - (this.c4Timer / 40.0);
           window.csAudio.playC4Beep(urgency);
 
+          // Flash light & LED
           if (this.c4LedMat) this.c4LedMat.color.set(0xffffff);
-          setTimeout(() => { if (this.c4LedMat) this.c4LedMat.color.set(0xff0000); }, 50);
+          if (this.c4BeaconLight) this.c4BeaconLight.intensity = 3.5;
+          setTimeout(() => {
+            if (this.c4LedMat) this.c4LedMat.color.set(0xff0000);
+            if (this.c4BeaconLight) this.c4BeaconLight.intensity = 1.0;
+          }, 60);
         }
 
         if (this.c4Timer <= 0) {
@@ -525,24 +585,19 @@ class CS2GameManager {
 
     this.player.update(dt, currentTime, this);
     this.handleObjectives(dt);
-
-    // High performance dirty-checked HUD
     this.updateHUD();
 
-    // Throttled radar update (~25 FPS)
     if (currentTime - this.lastRadarTime > 40) {
       this.lastRadarTime = currentTime;
       this.renderRadar();
     }
 
-    // Throttled network packet send (20Hz tickrate)
     if (currentTime - this.lastNetTime > 50) {
       this.lastNetTime = currentTime;
       this.net.sendPlayerState(this.player);
     }
   }
 
-  // Dirty checking HUD: ONLY mutates the DOM when state has actually changed!
   updateHUD() {
     const p = this.player;
     const h = this.hudEls;
@@ -589,6 +644,16 @@ class CS2GameManager {
       if (h.kit) {
         if (showKit) h.kit.classList.remove('hidden');
         else h.kit.classList.add('hidden');
+      }
+    }
+
+    // Buyzone active state
+    const inBuy = this.canBuy();
+    if (c.buyzoneActive !== inBuy) {
+      c.buyzoneActive = inBuy;
+      if (h.buyzoneBox) {
+        if (inBuy) h.buyzoneBox.classList.remove('inactive');
+        else h.buyzoneBox.classList.add('inactive');
       }
     }
 

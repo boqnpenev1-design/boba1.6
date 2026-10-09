@@ -1,4 +1,6 @@
-// CS2 First-Person Player Controller with High-Fidelity Weapon Viewmodels and Spectator POV
+// CS2 First-Person Player Controller:
+// Tactical Viewmodel Arms/Hands, Reload Animations, Bullet Holes, Authentic Knife Run-Speed,
+// Freezetime Movement/Shoot Lock, Fixed Site Platform Jumping, Grenades (4) & C4 (5)
 
 class CS2Player {
   constructor(camera, scene, mapBuilder) {
@@ -19,7 +21,7 @@ class CS2Player {
       1: null,
       2: CS2_WEAPONS.usp,
       3: CS2_WEAPONS.knife,
-      4: null,
+      4: CS2_WEAPONS.flashbang,
       5: null
     };
     this.activeSlot = 2;
@@ -43,6 +45,12 @@ class CS2Player {
     this.isSpectating = false;
     this.spectatorIndex = 0;
     this.spectatedTarget = null;
+
+    // Active Bullet Decals
+    this.bulletDecals = [];
+
+    // Active Thrown Grenades
+    this.activeGrenades = [];
 
     // Input States
     this.keys = {};
@@ -109,17 +117,19 @@ class CS2Player {
     this.team = team;
     if (team === 'CT') {
       this.inventory[2] = CS2_WEAPONS.usp;
+      this.inventory[4] = CS2_WEAPONS.flashbang;
       this.inventory[5] = null;
       this.hasDefuseKit = false;
     } else {
       this.inventory[2] = CS2_WEAPONS.glock;
+      this.inventory[4] = CS2_WEAPONS.flashbang;
       this.inventory[5] = CS2_WEAPONS.c4;
       this.hasDefuseKit = false;
     }
     this.switchSlot(2);
   }
 
-  // Builds instant high-fidelity 3D weapon models tailored to weapon type
+  // Builds 3D weapon models with realistic tactical arms and hands
   buildCurrentWeaponModel() {
     while (this.weaponRig.children.length > 0) {
       this.weaponRig.remove(this.weaponRig.children[0]);
@@ -130,34 +140,81 @@ class CS2Player {
 
     const group = new THREE.Group();
 
+    // 1. Tactical Operator Sleeves & Gloves
+    const sleeveColor = this.team === 'CT' ? 0x223244 : 0x4a3b2b;
+    const gloveColor = 0x14181c;
+    const sleeveMat = new THREE.MeshLambertMaterial({ color: sleeveColor });
+    const gloveMat = new THREE.MeshLambertMaterial({ color: gloveColor });
+
+    // Right Arm & Hand (Primary holding arm)
+    const rForearmGeo = new THREE.CylinderGeometry(0.05, 0.055, 0.42, 8);
+    const rForearm = new THREE.Mesh(rForearmGeo, sleeveMat);
+    rForearm.rotation.set(-1.1, 0.3, -0.4);
+    rForearm.position.set(0.28, -0.38, -0.32);
+    group.add(rForearm);
+
+    const rHandGeo = new THREE.BoxGeometry(0.065, 0.07, 0.1);
+    const rHand = new THREE.Mesh(rHandGeo, gloveMat);
+    rHand.rotation.set(-0.9, 0.3, -0.3);
+    rHand.position.set(0.24, -0.27, -0.42);
+    group.add(rHand);
+
+    // Left Arm & Hand (Support arm for rifles/two-handed)
+    if (w.category === 'rifles' || w.id === 'awp') {
+      const lForearmGeo = new THREE.CylinderGeometry(0.05, 0.055, 0.45, 8);
+      const lForearm = new THREE.Mesh(lForearmGeo, sleeveMat);
+      lForearm.rotation.set(-1.0, -0.5, 0.6);
+      lForearm.position.set(-0.06, -0.39, -0.42);
+      group.add(lForearm);
+
+      const lHandGeo = new THREE.BoxGeometry(0.065, 0.065, 0.09);
+      const lHand = new THREE.Mesh(lHandGeo, gloveMat);
+      lHand.rotation.set(-0.8, -0.4, 0.4);
+      lHand.position.set(0.12, -0.25, -0.62);
+      group.add(lHand);
+    }
+
+    // 2. Weapon 3D Geometry
     if (w.id === 'knife') {
-      // Knife blade & handle
-      const bladeGeo = new THREE.BoxGeometry(0.02, 0.08, 0.35);
-      const bladeMat = new THREE.MeshLambertMaterial({ color: 0xcccccc });
+      // Tactical Combat Knife
+      const bladeGeo = new THREE.BoxGeometry(0.015, 0.07, 0.34);
+      const bladeMat = new THREE.MeshLambertMaterial({ color: 0xdde2e6 });
       const blade = new THREE.Mesh(bladeGeo, bladeMat);
-      blade.position.set(0.2, -0.22, -0.45);
-      blade.rotation.x = 0.3;
+      blade.position.set(0.22, -0.21, -0.48);
+      blade.rotation.x = 0.35;
       group.add(blade);
 
-      const gripGeo = new THREE.BoxGeometry(0.04, 0.06, 0.16);
+      const gripGeo = new THREE.BoxGeometry(0.035, 0.05, 0.16);
       const gripMat = new THREE.MeshLambertMaterial({ color: 0x1f2421 });
       const grip = new THREE.Mesh(gripGeo, gripMat);
-      grip.position.set(0.2, -0.26, -0.28);
+      grip.position.set(0.22, -0.25, -0.32);
       group.add(grip);
     } else if (w.id === 'c4') {
       // C4 Explosive Pack
-      const packGeo = new THREE.BoxGeometry(0.18, 0.12, 0.28);
-      const packMat = new THREE.MeshLambertMaterial({ color: 0x966838 });
+      const packGeo = new THREE.BoxGeometry(0.2, 0.13, 0.3);
+      const packMat = new THREE.MeshLambertMaterial({ color: 0x9a6c3a });
       const pack = new THREE.Mesh(packGeo, packMat);
-      pack.position.set(0.18, -0.22, -0.45);
+      pack.position.set(0.19, -0.21, -0.48);
       group.add(pack);
 
-      const keypadGeo = new THREE.BoxGeometry(0.09, 0.03, 0.12);
-      const keypad = new THREE.Mesh(keypadGeo, new THREE.MeshLambertMaterial({ color: 0x111111 }));
-      keypad.position.set(0.18, -0.15, -0.45);
+      const padGeo = new THREE.BoxGeometry(0.1, 0.03, 0.14);
+      const keypad = new THREE.Mesh(padGeo, new THREE.MeshLambertMaterial({ color: 0x111111 }));
+      keypad.position.set(0.19, -0.14, -0.48);
       group.add(keypad);
+    } else if (w.category === 'equipment' || w.id === 'flashbang' || w.id === 'hegrenade' || w.id === 'smoke') {
+      // Grenade Canister in Hand
+      const grenGeo = new THREE.CylinderGeometry(0.04, 0.04, 0.16, 12);
+      const grenMat = new THREE.MeshLambertMaterial({ color: w.id === 'flashbang' ? 0x6e8090 : 0x3d4a36 });
+      const gren = new THREE.Mesh(grenGeo, grenMat);
+      gren.position.set(0.2, -0.22, -0.46);
+      group.add(gren);
+
+      const pinGeo = new THREE.TorusGeometry(0.02, 0.005, 6, 12);
+      const pin = new THREE.Mesh(pinGeo, new THREE.MeshLambertMaterial({ color: 0xcccccc }));
+      pin.position.set(0.2, -0.13, -0.46);
+      group.add(pin);
     } else if (w.category === 'pistols') {
-      // Pistol Slide
+      // Pistols: Desert Eagle / Glock-18 / USP-S
       const slideGeo = new THREE.BoxGeometry(0.06, 0.09, 0.32);
       const slideMat = new THREE.MeshLambertMaterial({
         color: w.id === 'deagle' ? 0xd0d5dd : 0x242830
@@ -166,7 +223,6 @@ class CS2Player {
       slide.position.set(0.22, -0.22, -0.45);
       group.add(slide);
 
-      // Grip
       const gripGeo = new THREE.BoxGeometry(0.05, 0.14, 0.1);
       const gripMat = new THREE.MeshLambertMaterial({ color: 0x1a1d24 });
       const grip = new THREE.Mesh(gripGeo, gripMat);
@@ -174,7 +230,6 @@ class CS2Player {
       grip.position.set(0.22, -0.29, -0.36);
       group.add(grip);
 
-      // Silencer for USP-S
       if (w.isSilenced) {
         const silencerGeo = new THREE.CylinderGeometry(0.025, 0.025, 0.28, 12);
         const silencer = new THREE.Mesh(silencerGeo, new THREE.MeshLambertMaterial({ color: 0x1b1e24 }));
@@ -183,21 +238,19 @@ class CS2Player {
         group.add(silencer);
       }
     } else if (w.id === 'awp') {
-      // AWP Sniper
+      // AWP Sniper Rifle
       const bodyGeo = new THREE.BoxGeometry(0.09, 0.14, 0.65);
       const bodyMat = new THREE.MeshLambertMaterial({ color: 0x3d5a45 }); // Olive drab
       const body = new THREE.Mesh(bodyGeo, bodyMat);
       body.position.set(0.24, -0.22, -0.55);
       group.add(body);
 
-      // Heavy Long Barrel
       const barrelGeo = new THREE.CylinderGeometry(0.022, 0.022, 0.55, 10);
       const barrel = new THREE.Mesh(barrelGeo, new THREE.MeshLambertMaterial({ color: 0x14161a }));
       barrel.rotation.x = Math.PI / 2;
       barrel.position.set(0.24, -0.20, -0.95);
       group.add(barrel);
 
-      // Telescopic Scope
       const scopeGeo = new THREE.CylinderGeometry(0.035, 0.035, 0.32, 12);
       const scope = new THREE.Mesh(scopeGeo, new THREE.MeshLambertMaterial({ color: 0x111111 }));
       scope.rotation.x = Math.PI / 2;
@@ -207,20 +260,18 @@ class CS2Player {
       // Assault Rifles (AK-47 / M4A4 / M4A1)
       const bodyGeo = new THREE.BoxGeometry(0.08, 0.13, 0.6);
       const bodyMat = new THREE.MeshLambertMaterial({
-        color: w.id === 'ak47' ? 0x6e3c1b : 0x2c333d // AK Wood vs M4 Charcoal
+        color: w.id === 'ak47' ? 0x6e3c1b : 0x2c333d
       });
       const body = new THREE.Mesh(bodyGeo, bodyMat);
       body.position.set(0.25, -0.22, -0.52);
       group.add(body);
 
-      // Barrel
       const barrelGeo = new THREE.CylinderGeometry(0.02, 0.02, 0.45, 10);
       const barrel = new THREE.Mesh(barrelGeo, new THREE.MeshLambertMaterial({ color: 0x15181e }));
       barrel.rotation.x = Math.PI / 2;
       barrel.position.set(0.25, -0.19, -0.85);
       group.add(barrel);
 
-      // Banana Magazine for AK
       const magGeo = new THREE.BoxGeometry(0.05, 0.22, 0.1);
       const mag = new THREE.Mesh(magGeo, new THREE.MeshLambertMaterial({ color: w.id === 'ak47' ? 0x222222 : 0x333b45 }));
       mag.rotation.x = 0.4;
@@ -243,7 +294,7 @@ class CS2Player {
     window.addEventListener('keydown', (e) => {
       this.keys[e.code] = true;
 
-      // Spectator Cycle: Press A or D to change spectated player
+      // Spectator Cycle: A or D
       if (this.isSpectating) {
         if (e.code === 'KeyA') this.cycleSpectator(-1);
         if (e.code === 'KeyD') this.cycleSpectator(1);
@@ -256,41 +307,17 @@ class CS2Player {
       if (e.code === this.keybinds.slot4) this.switchSlot(4);
       if (e.code === this.keybinds.slot5) this.switchSlot(5);
 
-      if (e.code === this.keybinds.reload) this.startReload();
-
-      if (e.code === 'KeyQ') {
-        const alt = this.activeSlot === 1 ? 2 : 1;
-        if (this.inventory[alt]) this.switchSlot(alt);
+      if (e.code === this.keybinds.reload) {
+        this.startReload();
       }
     });
 
     window.addEventListener('keyup', (e) => {
       this.keys[e.code] = false;
-      if (e.code === this.keybinds.use) {
-        this.isPlanting = false;
-        this.plantProgress = 0;
-        this.isDefusing = false;
-        this.defuseProgress = 0;
-      }
-    });
-
-    window.addEventListener('mousemove', (e) => {
-      if (document.pointerLockElement !== document.getElementById('game-canvas-container')) return;
-      if (this.isSpectating) return;
-
-      const sens = (this.sensitivity * 0.002) * (this.isScoped ? 0.35 : 1.0);
-      this.yaw -= e.movementX * sens;
-      const yDelta = e.movementY * sens * (this.invertY ? -1 : 1);
-      this.pitch = Math.max(-Math.PI / 2.1, Math.min(Math.PI / 2.1, this.pitch - yDelta));
     });
 
     window.addEventListener('mousedown', (e) => {
-      if (document.pointerLockElement !== document.getElementById('game-canvas-container')) return;
-      if (this.isSpectating) {
-        if (e.button === 0) this.cycleSpectator(1);
-        return;
-      }
-
+      if (!document.pointerLockElement) return;
       if (e.button === 0) {
         this.isShooting = true;
       } else if (e.button === 2) {
@@ -303,37 +330,43 @@ class CS2Player {
         this.isShooting = false;
       }
     });
-  }
 
-  cycleSpectator(dir = 1) {
-    if (!window.csGameManager) return;
-    const remoteList = Object.values(window.csGameManager.net.remotePlayers);
-    if (remoteList.length === 0) return;
+    window.addEventListener('mousemove', (e) => {
+      if (!document.pointerLockElement) return;
 
-    this.spectatorIndex = (this.spectatorIndex + dir + remoteList.length) % remoteList.length;
-    this.spectatedTarget = remoteList[this.spectatorIndex];
+      const sens = (this.sensitivity * 0.0012) * (this.isScoped ? 0.4 : 1.0);
+      this.yaw -= e.movementX * sens;
 
-    const banner = document.getElementById('spectator-hud');
-    if (banner && this.spectatedTarget) {
-      banner.classList.remove('hidden');
-      document.getElementById('spectator-target-name').innerText = `Player (${this.spectatedTarget.team})`;
-    }
+      const invertMult = this.invertY ? -1 : 1;
+      this.pitch -= e.movementY * sens * invertMult;
+      this.pitch = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, this.pitch));
+    });
   }
 
   enterSpectatorMode() {
     this.isSpectating = true;
+    document.getElementById('hud').classList.add('hidden');
+    document.getElementById('spectator-hud').classList.remove('hidden');
     this.viewmodelGroup.visible = false;
-    const specHud = document.getElementById('spectator-hud');
-    if (specHud) specHud.classList.remove('hidden');
-    this.cycleSpectator(0);
   }
 
   exitSpectatorMode() {
     this.isSpectating = false;
-    this.spectatedTarget = null;
+    document.getElementById('spectator-hud').classList.add('hidden');
+    document.getElementById('hud').classList.remove('hidden');
     this.viewmodelGroup.visible = true;
-    const specHud = document.getElementById('spectator-hud');
-    if (specHud) specHud.classList.add('hidden');
+  }
+
+  cycleSpectator(dir) {
+    if (!window.csGameManager) return;
+    const rem = Object.values(window.csGameManager.net.remotePlayers);
+    if (rem.length === 0) {
+      document.getElementById('spectator-target-name').innerText = 'WAITING FOR PLAYERS...';
+      return;
+    }
+    this.spectatorIndex = (this.spectatorIndex + dir + rem.length) % rem.length;
+    this.spectatedTarget = rem[this.spectatorIndex];
+    document.getElementById('spectator-target-name').innerText = `Player_${this.spectatorIndex + 1} (${this.spectatedTarget.team})`;
   }
 
   toggleScope() {
@@ -399,10 +432,29 @@ class CS2Player {
   shoot(currentTime, gameManager = null) {
     if (!this.activeWeapon) return;
 
+    // Freezetime shoot lock
+    if (gameManager && gameManager.phase === 'freeze') {
+      return;
+    }
+
+    // Grenade throwing
+    if (this.activeSlot === 4 || this.activeWeapon.category === 'equipment') {
+      if (currentTime - this.lastShotTime < 1.0) return;
+      this.lastShotTime = currentTime;
+      this.throwGrenade();
+      return;
+    }
+
+    // Knife melee attack
     if (this.activeWeapon.category === 'melee') {
       if (currentTime - this.lastShotTime < this.activeWeapon.fireRate) return;
       this.lastShotTime = currentTime;
       window.csAudio.playKnifeSlash();
+      this.weaponRig.position.z = -0.35;
+      this.weaponRig.rotation.y = 0.4;
+      setTimeout(() => {
+        this.weaponRig.rotation.y = 0;
+      }, 120);
       return;
     }
 
@@ -429,13 +481,14 @@ class CS2Player {
 
     this.weaponRig.position.z = -0.42;
 
-    // Raycast hit check against remote players
-    if (gameManager && gameManager.net) {
-      const raycaster = new THREE.Raycaster();
-      const camDir = new THREE.Vector3();
-      this.camera.getWorldDirection(camDir);
-      raycaster.set(this.camera.position, camDir);
+    // Raycast hit check & bullet hole creation
+    const raycaster = new THREE.Raycaster();
+    const camDir = new THREE.Vector3();
+    this.camera.getWorldDirection(camDir);
+    raycaster.set(this.camera.position, camDir);
 
+    // Hit players
+    if (gameManager && gameManager.net) {
       Object.entries(gameManager.net.remotePlayers).forEach(([id, p]) => {
         if (p.team === this.team) return;
         const intersects = raycaster.intersectObject(p.mesh, true);
@@ -443,6 +496,96 @@ class CS2Player {
           gameManager.net.sendDamage(id, this.activeWeapon.damage, this.activeWeapon.name);
         }
       });
+    }
+
+    // Bullet hole impact on map obstacles
+    if (this.map && this.map.mapGroup) {
+      const wallHits = raycaster.intersectObjects(this.map.mapGroup.children, true);
+      if (wallHits.length > 0 && wallHits[0].distance < 80) {
+        this.spawnBulletHole(wallHits[0].point, wallHits[0].face.normal);
+      }
+    }
+  }
+
+  // Realistic bullet holes on walls and obstacles
+  spawnBulletHole(point, normal) {
+    const geo = new THREE.CircleGeometry(0.06, 8);
+    const mat = new THREE.MeshBasicMaterial({ color: 0x1a1a1a, side: THREE.DoubleSide });
+    const decal = new THREE.Mesh(geo, mat);
+
+    // Position slightly offset from surface to prevent z-fighting
+    decal.position.copy(point).addScaledVector(normal, 0.02);
+    decal.lookAt(point.clone().add(normal));
+    this.scene.add(decal);
+
+    this.bulletDecals.push(decal);
+    if (this.bulletDecals.length > 40) {
+      const old = this.bulletDecals.shift();
+      this.scene.remove(old);
+      if (old.geometry) old.geometry.dispose();
+      if (old.material) old.material.dispose();
+    }
+  }
+
+  // Physical thrown grenade with arc & flash
+  throwGrenade() {
+    window.csAudio.playKnifeSlash();
+    const spawnPos = this.camera.position.clone();
+    const dir = new THREE.Vector3();
+    this.camera.getWorldDirection(dir);
+
+    const geo = new THREE.SphereGeometry(0.08, 8, 8);
+    const mat = new THREE.MeshLambertMaterial({ color: 0x3d4a36 });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.copy(spawnPos).addScaledVector(dir, 0.8);
+    this.scene.add(mesh);
+
+    const velocity = dir.clone().multiplyScalar(16.0);
+    velocity.y += 4.5;
+
+    const gren = {
+      mesh,
+      velocity,
+      lifetime: 1.8,
+      type: this.activeWeapon ? this.activeWeapon.id : 'flashbang'
+    };
+    this.activeGrenades.push(gren);
+
+    // Remove from slot 4
+    this.inventory[4] = null;
+    this.switchSlot(2);
+  }
+
+  updateGrenades(dt) {
+    for (let i = this.activeGrenades.length - 1; i >= 0; i--) {
+      const g = this.activeGrenades[i];
+      g.velocity.y -= 18.0 * dt;
+      g.mesh.position.addScaledVector(g.velocity, dt);
+      g.lifetime -= dt;
+
+      if (g.mesh.position.y <= 0.1) {
+        g.mesh.position.y = 0.1;
+        g.velocity.y = -g.velocity.y * 0.4;
+        g.velocity.x *= 0.6;
+        g.velocity.z *= 0.6;
+      }
+
+      if (g.lifetime <= 0) {
+        // Explode / Flash
+        this.scene.remove(g.mesh);
+        this.activeGrenades.splice(i, 1);
+
+        if (g.type === 'flashbang') {
+          const flashEl = document.getElementById('flash-overlay');
+          if (flashEl) {
+            flashEl.style.opacity = '1';
+            setTimeout(() => { flashEl.style.opacity = '0'; }, 1500);
+          }
+          window.csAudio.playExplosion();
+        } else {
+          window.csAudio.playExplosion();
+        }
+      }
     }
   }
 
@@ -496,6 +639,8 @@ class CS2Player {
   }
 
   update(dt, currentTime, gameManager) {
+    this.updateGrenades(dt);
+
     // Spectator POV Camera following
     if (this.isSpectating) {
       if (this.spectatedTarget && this.spectatedTarget.mesh) {
@@ -509,24 +654,56 @@ class CS2Player {
       return;
     }
 
-    if (this.isReloading && currentTime - this.reloadStartTime > 2200) {
-      this.finishReload();
+    // Realistic Reload Animation
+    if (this.isReloading) {
+      const elapsed = currentTime - this.reloadStartTime;
+      const t = Math.min(1.0, elapsed / 2200);
+
+      // Gun tilts down and to the side while mag is inserted
+      this.weaponRig.position.y = -Math.sin(t * Math.PI) * 0.14;
+      this.weaponRig.rotation.z = Math.sin(t * Math.PI) * 0.35;
+      this.weaponRig.rotation.x = Math.sin(t * Math.PI) * 0.22;
+
+      if (elapsed > 2200) {
+        this.weaponRig.position.y = 0;
+        this.weaponRig.rotation.z = 0;
+        this.weaponRig.rotation.x = 0;
+        this.finishReload();
+      }
     }
 
-    if (this.isShooting && !this.isReloading) {
+    // Freezetime Lock (Movement & Shooting prohibited in real CS2)
+    const inFreeze = gameManager && gameManager.phase === 'freeze';
+    if (inFreeze) {
+      this.velocity.x = 0;
+      this.velocity.z = 0;
+      this.isShooting = false;
+    }
+
+    if (this.isShooting && !this.isReloading && !inFreeze) {
       this.shoot(currentTime / 1000, gameManager);
     }
 
-    // Movement
-    const moveSpeed = (this.isCrouched ? 2.5 : this.keys[this.keybinds.walk] ? 3.5 : 7.5) * (this.isScoped ? 0.6 : 1.0);
+    // Authentic CS2 Movement Speeds (Knife provides run-boost)
+    let baseSpeed = 7.2;
+    if (this.activeWeapon) {
+      if (this.activeWeapon.id === 'knife') baseSpeed = 9.2; // CS2 250 units/s Knife Boost
+      else if (this.activeWeapon.category === 'pistols') baseSpeed = 8.2; // 240 units/s
+      else if (this.activeWeapon.id === 'awp') baseSpeed = 6.2; // 200 units/s
+      else baseSpeed = 7.2; // 215 units/s Rifles
+    }
+
+    const moveSpeed = (this.isCrouched ? 2.5 : this.keys[this.keybinds.walk] ? 3.5 : baseSpeed) * (this.isScoped ? 0.6 : 1.0);
     const forward = new THREE.Vector3(-Math.sin(this.yaw), 0, -Math.cos(this.yaw));
     const right = new THREE.Vector3(Math.cos(this.yaw), 0, -Math.sin(this.yaw));
 
     const moveDir = new THREE.Vector3();
-    if (this.keys[this.keybinds.forward]) moveDir.add(forward);
-    if (this.keys[this.keybinds.backward]) moveDir.sub(forward);
-    if (this.keys[this.keybinds.right]) moveDir.add(right);
-    if (this.keys[this.keybinds.left]) moveDir.sub(right);
+    if (!inFreeze) {
+      if (this.keys[this.keybinds.forward]) moveDir.add(forward);
+      if (this.keys[this.keybinds.backward]) moveDir.sub(forward);
+      if (this.keys[this.keybinds.right]) moveDir.add(right);
+      if (this.keys[this.keybinds.left]) moveDir.sub(right);
+    }
 
     if (moveDir.length() > 0) {
       moveDir.normalize();
@@ -541,7 +718,8 @@ class CS2Player {
       this.velocity.z *= 0.7;
     }
 
-    if (this.keys[this.keybinds.jump] && this.isGrounded) {
+    // Jumping
+    if (this.keys[this.keybinds.jump] && this.isGrounded && !inFreeze) {
       this.velocity.y = 6.2;
       this.isGrounded = false;
     }
@@ -569,11 +747,12 @@ class CS2Player {
       this.isGrounded = true;
     }
 
-    // Fast Collisions Check
+    // Fast Collisions Check (Fixed: Allows jumping on A and B sites when velocity.y > 0)
     const px = this.position.x;
     const pz = this.position.z;
     const playerRadius = 0.6;
     const colliders = this.map.colliders;
+
     for (let i = 0; i < colliders.length; i++) {
       const collider = colliders[i];
       const box = collider.box;
@@ -583,11 +762,12 @@ class CS2Player {
         pz + playerRadius > box.min.z &&
         pz - playerRadius < box.max.z
       ) {
-        if (collider.isClimbable && this.position.y >= collider.topY + 0.2) {
+        // If standing on or falling onto a platform: only snap when NOT jumping upwards!
+        if (collider.isClimbable && this.velocity.y <= 0 && this.position.y >= collider.topY + 0.1) {
           this.position.y = collider.topY + this.playerHeight;
           this.velocity.y = 0;
           this.isGrounded = true;
-        } else {
+        } else if (this.position.y < collider.topY + 0.4) {
           this.position.x = oldPos.x;
           this.position.z = oldPos.z;
         }
@@ -602,11 +782,13 @@ class CS2Player {
     this.camera.rotation.y = this.yaw + this.recoilYaw;
     this.camera.rotation.x = this.pitch + this.recoilPitch;
 
-    // Viewmodel Recoil Recovery & Bobbing
+    // Viewmodel Recoil Recovery & Weapon Bobbing
     this.weaponRig.position.z += (-0.5 - this.weaponRig.position.z) * 0.15;
     const speed2D = Math.sqrt(this.velocity.x * this.velocity.x + this.velocity.z * this.velocity.z);
     const bob = Math.sin(currentTime * 0.008) * (speed2D * 0.004);
-    this.weaponRig.position.y = bob;
+    if (!this.isReloading) {
+      this.weaponRig.position.y = bob;
+    }
   }
 }
 
