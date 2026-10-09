@@ -1,4 +1,4 @@
-// CS2 Complete Weapon Arsenal & Equipment Database
+// CS2 Complete Weapon Arsenal & Equipment Database with 3D Model Links
 
 const CS2_WEAPONS = {
   // ==================== PISTOLS ====================
@@ -13,13 +13,12 @@ const CS2_WEAPONS = {
     reserve: 120,
     damage: 30,
     armorPen: 0.47,
-    fireRate: 0.15, // seconds between shots
+    fireRate: 0.15,
     spread: 0.015,
     recoil: 0.02,
     audioType: 'pistol',
     killReward: 300,
-    pellets: 1,
-    canScope: false,
+    modelPath: null,
     color: '#8b8475'
   },
   usp: {
@@ -39,8 +38,7 @@ const CS2_WEAPONS = {
     audioType: 'pistol',
     isSilenced: true,
     killReward: 300,
-    pellets: 1,
-    canScope: false,
+    modelPath: 'source/USPS.glb',
     color: '#34495e'
   },
   p250: {
@@ -59,8 +57,7 @@ const CS2_WEAPONS = {
     recoil: 0.022,
     audioType: 'pistol',
     killReward: 300,
-    pellets: 1,
-    canScope: false,
+    modelPath: null,
     color: '#7f8c8d'
   },
   deagle: {
@@ -79,8 +76,7 @@ const CS2_WEAPONS = {
     recoil: 0.045,
     audioType: 'pistol',
     killReward: 300,
-    pellets: 1,
-    canScope: false,
+    modelPath: 'source/DEAGLE.glb',
     color: '#bdc3c7'
   },
   dualberettas: {
@@ -99,8 +95,7 @@ const CS2_WEAPONS = {
     recoil: 0.025,
     audioType: 'pistol',
     killReward: 300,
-    pellets: 1,
-    canScope: false,
+    modelPath: null,
     color: '#2c3e50'
   },
   fiveseven: {
@@ -119,8 +114,7 @@ const CS2_WEAPONS = {
     recoil: 0.02,
     audioType: 'pistol',
     killReward: 300,
-    pellets: 1,
-    canScope: false,
+    modelPath: null,
     color: '#2980b9'
   },
   tec9: {
@@ -139,8 +133,7 @@ const CS2_WEAPONS = {
     recoil: 0.024,
     audioType: 'pistol',
     killReward: 300,
-    pellets: 1,
-    canScope: false,
+    modelPath: null,
     color: '#e67e22'
   },
   cz75: {
@@ -159,8 +152,7 @@ const CS2_WEAPONS = {
     recoil: 0.035,
     audioType: 'pistol',
     killReward: 100,
-    pellets: 1,
-    canScope: false,
+    modelPath: null,
     color: '#34495e'
   },
 
@@ -181,8 +173,7 @@ const CS2_WEAPONS = {
     recoil: 0.028,
     audioType: 'smg',
     killReward: 600,
-    pellets: 1,
-    canScope: false,
+    modelPath: null,
     color: '#7f8c8d'
   },
   mp9: {
@@ -201,8 +192,7 @@ const CS2_WEAPONS = {
     recoil: 0.026,
     audioType: 'smg',
     killReward: 600,
-    pellets: 1,
-    canScope: false,
+    modelPath: null,
     color: '#2980b9'
   },
   mp7: {
@@ -221,8 +211,7 @@ const CS2_WEAPONS = {
     recoil: 0.025,
     audioType: 'smg',
     killReward: 600,
-    pellets: 1,
-    canScope: false,
+    modelPath: null,
     color: '#34495e'
   },
   mp5sd: {
@@ -242,8 +231,7 @@ const CS2_WEAPONS = {
     audioType: 'smg',
     isSilenced: true,
     killReward: 600,
-    pellets: 1,
-    canScope: false,
+    modelPath: null,
     color: '#2c3e50'
   },
   ump45: {
@@ -262,8 +250,7 @@ const CS2_WEAPONS = {
     recoil: 0.03,
     audioType: 'smg',
     killReward: 600,
-    pellets: 1,
-    canScope: false,
+    modelPath: null,
     color: '#16a085'
   },
   p90: {
@@ -282,8 +269,7 @@ const CS2_WEAPONS = {
     recoil: 0.024,
     audioType: 'smg',
     killReward: 300,
-    pellets: 1,
-    canScope: false,
+    modelPath: null,
     color: '#27ae60'
   },
   bizon: {
@@ -302,8 +288,7 @@ const CS2_WEAPONS = {
     recoil: 0.022,
     audioType: 'smg',
     killReward: 600,
-    pellets: 1,
-    canScope: false,
+    modelPath: null,
     color: '#1abc9c'
   },
   nova: {
@@ -323,7 +308,7 @@ const CS2_WEAPONS = {
     audioType: 'shotgun',
     killReward: 900,
     pellets: 9,
-    canScope: false,
+    modelPath: null,
     color: '#8e44ad'
   },
   xm1014: {
@@ -343,7 +328,7 @@ const CS2_WEAPONS = {
     audioType: 'shotgun',
     killReward: 900,
     pellets: 6,
-    canScope: false,
+    modelPath: null,
     color: '#9b59b6'
   },
   mag7: {
@@ -363,7 +348,7 @@ const CS2_WEAPONS = {
     audioType: 'shotgun',
     killReward: 900,
     pellets: 8,
-    canScope: false,
+    modelPath: null,
     color: '#2980b9'
   },
   sawedoff: {
@@ -383,7 +368,7 @@ const CS2_WEAPONS = {
     audioType: 'shotgun',
     killReward: 900,
     pellets: 8,
-    canScope: false,
+    modelPath: null,
     color: '#d35400'
   },
   negev: {
@@ -402,8 +387,7 @@ const CS2_WEAPONS = {
     recoil: 0.035,
     audioType: 'rifle',
     killReward: 300,
-    pellets: 1,
-    canScope: false,
+    modelPath: null,
     color: '#34495e'
   },
   m249: {
@@ -422,8 +406,7 @@ const CS2_WEAPONS = {
     recoil: 0.04,
     audioType: 'rifle',
     killReward: 300,
-    pellets: 1,
-    canScope: false,
+    modelPath: null,
     color: '#2c3e50'
   },
 
@@ -444,8 +427,7 @@ const CS2_WEAPONS = {
     recoil: 0.036,
     audioType: 'rifle',
     killReward: 300,
-    pellets: 1,
-    canScope: false,
+    modelPath: 'source/AK47.glb',
     color: '#b75b28'
   },
   m4a4: {
@@ -464,8 +446,7 @@ const CS2_WEAPONS = {
     recoil: 0.030,
     audioType: 'rifle',
     killReward: 300,
-    pellets: 1,
-    canScope: false,
+    modelPath: 'source/M4A4.glb',
     color: '#42576c'
   },
   m4a1s: {
@@ -485,8 +466,7 @@ const CS2_WEAPONS = {
     audioType: 'rifle',
     isSilenced: true,
     killReward: 300,
-    pellets: 1,
-    canScope: false,
+    modelPath: 'source/M4A1.glb',
     color: '#2980b9'
   },
   galil: {
@@ -505,8 +485,7 @@ const CS2_WEAPONS = {
     recoil: 0.034,
     audioType: 'rifle',
     killReward: 300,
-    pellets: 1,
-    canScope: false,
+    modelPath: null,
     color: '#7f8c8d'
   },
   famas: {
@@ -525,8 +504,7 @@ const CS2_WEAPONS = {
     recoil: 0.032,
     audioType: 'rifle',
     killReward: 300,
-    pellets: 1,
-    canScope: false,
+    modelPath: null,
     color: '#34495e'
   },
   ssg08: {
@@ -545,8 +523,8 @@ const CS2_WEAPONS = {
     recoil: 0.04,
     audioType: 'sniper',
     killReward: 300,
-    pellets: 1,
     canScope: true,
+    modelPath: null,
     color: '#95a5a6'
   },
   awp: {
@@ -565,8 +543,8 @@ const CS2_WEAPONS = {
     recoil: 0.08,
     audioType: 'sniper',
     killReward: 100,
-    pellets: 1,
     canScope: true,
+    modelPath: 'source/AWP.glb',
     color: '#27ae60'
   },
   aug: {
@@ -585,8 +563,8 @@ const CS2_WEAPONS = {
     recoil: 0.028,
     audioType: 'rifle',
     killReward: 300,
-    pellets: 1,
     canScope: true,
+    modelPath: null,
     color: '#34495e'
   },
   sg553: {
@@ -605,8 +583,8 @@ const CS2_WEAPONS = {
     recoil: 0.035,
     audioType: 'rifle',
     killReward: 300,
-    pellets: 1,
     canScope: true,
+    modelPath: null,
     color: '#d35400'
   },
   scar20: {
@@ -625,8 +603,8 @@ const CS2_WEAPONS = {
     recoil: 0.045,
     audioType: 'sniper',
     killReward: 300,
-    pellets: 1,
     canScope: true,
+    modelPath: null,
     color: '#2c3e50'
   },
   g3sg1: {
@@ -645,8 +623,8 @@ const CS2_WEAPONS = {
     recoil: 0.045,
     audioType: 'sniper',
     killReward: 300,
-    pellets: 1,
     canScope: true,
+    modelPath: null,
     color: '#c0392b'
   },
 
@@ -721,10 +699,10 @@ const CS2_WEAPONS = {
     team: 'ANY',
     cost: 0,
     damage: 55,
-    backstabDamage: 120,
     fireRate: 0.4,
     killReward: 1500,
-    audioType: 'knife'
+    audioType: 'knife',
+    color: '#444444'
   },
   c4: {
     id: 'c4',
@@ -734,6 +712,7 @@ const CS2_WEAPONS = {
     team: 'T',
     cost: 0,
     plantTime: 3.2,
-    fuseTime: 40.0
+    fuseTime: 40.0,
+    modelPath: 'source/C4.glb'
   }
 };

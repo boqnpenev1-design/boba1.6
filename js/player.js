@@ -1,4 +1,4 @@
-// CS2 First-Person Player Controller, Weapon Viewmodels, and Ballistics
+// CS2 First-Person Player Controller, Weapon Viewmodels, GLTF Loader & Spectator POV
 
 class CS2Player {
   constructor(camera, scene, mapBuilder) {
@@ -12,7 +12,7 @@ class CS2Player {
     this.hasHelmet = true;
     this.hasDefuseKit = false;
     this.money = window.__CS2_AC.createProtectedValue(800);
-    this.team = 'CT'; // 'CT' or 'T'
+    this.team = 'CT';
 
     // Inventory Loadout: 1=Primary, 2=Secondary, 3=Knife, 4=Grenade, 5=C4
     this.inventory = {
@@ -25,7 +25,7 @@ class CS2Player {
     this.activeSlot = 2;
     this.activeWeapon = CS2_WEAPONS.usp;
 
-    // Ammo counts per slot (using AntiCheat canaries)
+    // Ammo counts
     this.clipAmmo = window.__CS2_AC.createProtectedValue(12);
     this.reserveAmmo = window.__CS2_AC.createProtectedValue(24);
 
@@ -38,6 +38,11 @@ class CS2Player {
     this.isCrouched = false;
     this.isScoped = false;
     this.playerHeight = 1.8;
+
+    // Spectator Mode
+    this.isSpectating = false;
+    this.spectatorIndex = 0;
+    this.spectatedTarget = null;
 
     // Input States
     this.keys = {};
@@ -77,12 +82,14 @@ class CS2Player {
     this.recoilPitch = 0;
     this.recoilYaw = 0;
 
-    // Viewmodel 3D Rig
+    // Viewmodel 3D Rig & GLTF Loader
+    this.gltfLoader = typeof THREE.GLTFLoader !== 'undefined' ? new THREE.GLTFLoader() : null;
+    this.loadedModels = {};
+    this.currentWeaponModel = null;
     this.viewmodelGroup = new THREE.Group();
     this.camera.add(this.viewmodelGroup);
     this.createViewmodelMeshes();
 
-    // Setup Event Listeners
     this.initControls();
   }
 
@@ -90,6 +97,7 @@ class CS2Player {
     this.team = team;
     if (team === 'CT') {
       this.inventory[2] = CS2_WEAPONS.usp;
+      this.inventory[5] = null;
       this.hasDefuseKit = false;
     } else {
       this.inventory[2] = CS2_WEAPONS.glock;
@@ -100,20 +108,18 @@ class CS2Player {
   }
 
   createViewmodelMeshes() {
-    // Gun Body Mesh (3D procedural representation)
+    // Procedural Fallback Meshes
     const gunBodyGeo = new THREE.BoxGeometry(0.08, 0.12, 0.55);
     const gunBodyMat = new THREE.MeshStandardMaterial({ color: 0x22262c, roughness: 0.4, metalness: 0.8 });
     this.vmGunBody = new THREE.Mesh(gunBodyGeo, gunBodyMat);
     this.vmGunBody.position.set(0.25, -0.22, -0.5);
 
-    // Gun Barrel
     const barrelGeo = new THREE.CylinderGeometry(0.02, 0.02, 0.35, 12);
     const barrelMat = new THREE.MeshStandardMaterial({ color: 0x111317, roughness: 0.3, metalness: 0.9 });
     this.vmBarrel = new THREE.Mesh(barrelGeo, barrelMat);
     this.vmBarrel.rotation.x = Math.PI / 2;
     this.vmBarrel.position.set(0.25, -0.19, -0.75);
 
-    // Muzzle Flash Light & Mesh
     this.muzzleLight = new THREE.PointLight(0xffaa33, 0, 8);
     this.muzzleLight.position.set(0.25, -0.19, -0.95);
 
@@ -129,15 +135,70 @@ class CS2Player {
     this.viewmodelGroup.add(this.muzzleFlashMesh);
   }
 
+  loadWeaponGLTF(modelPath) {
+    if (!this.gltfLoader || !modelPath) return;
+
+    if (this.currentWeaponModel) {
+      this.viewmodelGroup.remove(this.currentWeaponModel);
+      this.currentWeaponModel = null;
+    }
+
+    if (this.loadedModels[modelPath]) {
+      this.attachWeaponModel(this.loadedModels[modelPath].clone());
+      return;
+    }
+
+    this.gltfLoader.load(modelPath, (gltf) => {
+      this.loadedModels[modelPath] = gltf.scene;
+      this.attachWeaponModel(gltf.scene.clone());
+    }, undefined, () => {});
+  }
+
+  attachWeaponModel(model) {
+    if (this.currentWeaponModel) {
+      this.viewmodelGroup.remove(this.currentWeaponModel);
+    }
+    this.currentWeaponModel = model;
+
+    // Scale and position relative to camera viewmodel
+    model.scale.set(0.08, 0.08, 0.08);
+    model.position.set(0.25, -0.22, -0.5);
+    model.rotation.set(0, Math.PI, 0);
+
+    // Hide procedural boxes while GLTF is visible
+    this.vmGunBody.visible = false;
+    this.vmBarrel.visible = false;
+
+    this.viewmodelGroup.add(model);
+  }
+
   updateViewmodelSkin() {
     if (!this.activeWeapon) return;
-    const color = this.activeWeapon.color || '#333333';
-    this.vmGunBody.material.color.set(color);
+
+    if (this.activeWeapon.modelPath) {
+      this.loadWeaponGLTF(this.activeWeapon.modelPath);
+    } else {
+      if (this.currentWeaponModel) {
+        this.viewmodelGroup.remove(this.currentWeaponModel);
+        this.currentWeaponModel = null;
+      }
+      this.vmGunBody.visible = true;
+      this.vmBarrel.visible = true;
+      const color = this.activeWeapon.color || '#333333';
+      this.vmGunBody.material.color.set(color);
+    }
   }
 
   initControls() {
     window.addEventListener('keydown', (e) => {
       this.keys[e.code] = true;
+
+      // Spectator Cycle (Press A or D to change spectated player)
+      if (this.isSpectating) {
+        if (e.code === 'KeyA') this.cycleSpectator(-1);
+        if (e.code === 'KeyD') this.cycleSpectator(1);
+        return;
+      }
 
       // Slot switching
       if (e.code === this.keybinds.slot1) this.switchSlot(1);
@@ -146,12 +207,9 @@ class CS2Player {
       if (e.code === this.keybinds.slot4) this.switchSlot(4);
       if (e.code === this.keybinds.slot5) this.switchSlot(5);
 
-      // Reload
       if (e.code === this.keybinds.reload) this.startReload();
 
-      // Scope / ADS on right click or alternate
       if (e.code === 'KeyQ') {
-        // Quickswitch weapon
         const alt = this.activeSlot === 1 ? 2 : 1;
         if (this.inventory[alt]) this.switchSlot(alt);
       }
@@ -167,9 +225,9 @@ class CS2Player {
       }
     });
 
-    // Mouse Look
     window.addEventListener('mousemove', (e) => {
       if (document.pointerLockElement !== document.getElementById('game-canvas-container')) return;
+      if (this.isSpectating) return;
 
       const sens = (this.sensitivity * 0.002) * (this.isScoped ? 0.35 : 1.0);
       this.yaw -= e.movementX * sens;
@@ -177,13 +235,16 @@ class CS2Player {
       this.pitch = Math.max(-Math.PI / 2.1, Math.min(Math.PI / 2.1, this.pitch - yDelta));
     });
 
-    // Mouse Clicks (Fire & Scope)
     window.addEventListener('mousedown', (e) => {
       if (document.pointerLockElement !== document.getElementById('game-canvas-container')) return;
+      if (this.isSpectating) {
+        if (e.button === 0) this.cycleSpectator(1);
+        return;
+      }
 
-      if (e.button === 0) { // Left click
+      if (e.button === 0) {
         this.isShooting = true;
-      } else if (e.button === 2) { // Right click
+      } else if (e.button === 2) {
         this.toggleScope();
       }
     });
@@ -195,6 +256,38 @@ class CS2Player {
     });
   }
 
+  // Spectator POV cycle
+  cycleSpectator(dir = 1) {
+    if (!window.csGameManager) return;
+    const aliveBots = window.csGameManager.bots.filter(b => b.isAlive);
+    if (aliveBots.length === 0) return;
+
+    this.spectatorIndex = (this.spectatorIndex + dir + aliveBots.length) % aliveBots.length;
+    this.spectatedTarget = aliveBots[this.spectatorIndex];
+
+    const banner = document.getElementById('spectator-hud');
+    if (banner && this.spectatedTarget) {
+      banner.classList.remove('hidden');
+      document.getElementById('spectator-target-name').innerText = `${this.spectatedTarget.name} (${this.spectatedTarget.team})`;
+    }
+  }
+
+  enterSpectatorMode() {
+    this.isSpectating = true;
+    this.viewmodelGroup.visible = false;
+    const specHud = document.getElementById('spectator-hud');
+    if (specHud) specHud.classList.remove('hidden');
+    this.cycleSpectator(0);
+  }
+
+  exitSpectatorMode() {
+    this.isSpectating = false;
+    this.spectatedTarget = null;
+    this.viewmodelGroup.visible = true;
+    const specHud = document.getElementById('spectator-hud');
+    if (specHud) specHud.classList.add('hidden');
+  }
+
   toggleScope() {
     if (!this.activeWeapon || !this.activeWeapon.canScope) return;
     this.isScoped = !this.isScoped;
@@ -203,6 +296,7 @@ class CS2Player {
       this.camera.fov = 25;
       scopeEl.classList.remove('hidden');
       this.viewmodelGroup.visible = false;
+      window.csAudio.playZoom();
     } else {
       this.camera.fov = Number(document.getElementById('setting-fov').value) || 85;
       scopeEl.classList.add('hidden');
@@ -218,7 +312,6 @@ class CS2Player {
     this.isReloading = false;
     if (this.isScoped) this.toggleScope();
 
-    // Update ammo canaries for active weapon
     if (this.activeWeapon.clip) {
       this.clipAmmo.set(this.activeWeapon.clip);
       this.reserveAmmo.set(this.activeWeapon.reserve);
@@ -255,11 +348,9 @@ class CS2Player {
     this.reserveAmmo.add(-added);
   }
 
-  // Shoot weapon with spread, recoil punch, and hit detection
   shoot(currentTime, bots = [], gameManager = null) {
     if (!this.activeWeapon) return;
 
-    // Knife attack
     if (this.activeWeapon.category === 'melee') {
       if (currentTime - this.lastShotTime < this.activeWeapon.fireRate) return;
       this.lastShotTime = currentTime;
@@ -268,7 +359,6 @@ class CS2Player {
       return;
     }
 
-    // Gunfire
     if (this.clipAmmo.get() <= 0) {
       this.startReload();
       return;
@@ -277,13 +367,10 @@ class CS2Player {
     if (currentTime - this.lastShotTime < this.activeWeapon.fireRate) return;
     this.lastShotTime = currentTime;
 
-    // Deduct ammo through AntiCheat canary
     this.clipAmmo.add(-1);
 
-    // Play synthesized gunfire sound
-    window.csAudio.playGunshot(this.activeWeapon.audioType, this.activeWeapon.isSilenced);
+    window.csAudio.playGunshot(this.activeWeapon.audioType, this.activeWeapon.id, this.activeWeapon.isSilenced);
 
-    // Muzzle flash visual
     this.muzzleLight.intensity = 2.5;
     this.muzzleFlashMesh.visible = true;
     setTimeout(() => {
@@ -291,14 +378,12 @@ class CS2Player {
       this.muzzleFlashMesh.visible = false;
     }, 45);
 
-    // Recoil Punch
     this.recoilPitch += (this.activeWeapon.recoil || 0.02) * (0.8 + Math.random() * 0.4);
     this.recoilYaw += (Math.random() - 0.5) * (this.activeWeapon.recoil || 0.02);
 
-    // Viewmodel kick animation
     this.vmGunBody.position.z = -0.42;
+    if (this.currentWeaponModel) this.currentWeaponModel.position.z = -0.42;
 
-    // Raycast hit detection for bullets
     const pellets = this.activeWeapon.pellets || 1;
     for (let p = 0; p < pellets; p++) {
       this.fireBulletRaycast(bots, gameManager);
@@ -319,7 +404,6 @@ class CS2Player {
 
     raycaster.set(this.camera.position, camDir);
 
-    // Check hit against bots
     let closestBot = null;
     let closestDist = Infinity;
     let isHeadshot = false;
@@ -330,7 +414,6 @@ class CS2Player {
       if (intersects.length > 0 && intersects[0].distance < closestDist) {
         closestDist = intersects[0].distance;
         closestBot = bot;
-        // Headshot detection: hit point near top of bot mesh
         const hitY = intersects[0].point.y - bot.mesh.position.y;
         if (hitY > 1.45) isHeadshot = true;
       }
@@ -362,7 +445,6 @@ class CS2Player {
     });
   }
 
-  // Damage handling for local player
   takeDamage(amount, attackerName, weaponName) {
     const currentHealth = this.health.get();
     if (currentHealth <= 0) return;
@@ -377,8 +459,8 @@ class CS2Player {
 
     const newHealth = Math.max(0, currentHealth - Math.round(dmg));
     this.health.set(newHealth);
+    window.csAudio.playDamage();
 
-    // Red screen flash
     const dmgVignette = document.getElementById('damage-vignette');
     dmgVignette.style.opacity = '0.8';
     setTimeout(() => { dmgVignette.style.opacity = '0'; }, 180);
@@ -389,12 +471,15 @@ class CS2Player {
   }
 
   onDeath(attackerName, weaponName) {
+    window.csAudio.playSound('death');
     if (this.isScoped) this.toggleScope();
     document.getElementById('action-prompt').classList.add('hidden');
     document.getElementById('interaction-bar-container').classList.add('hidden');
+    this.enterSpectatorMode();
   }
 
   respawn(spawnPos) {
+    this.exitSpectatorMode();
     this.position.set(spawnPos.x, this.playerHeight, spawnPos.z);
     this.velocity.set(0, 0, 0);
     this.health.set(100);
@@ -403,26 +488,40 @@ class CS2Player {
     this.isDefusing = false;
     if (this.isScoped) this.toggleScope();
 
-    // Refill clip ammo on round start
     if (this.activeWeapon && this.activeWeapon.clip) {
       this.clipAmmo.set(this.activeWeapon.clip);
       this.reserveAmmo.set(this.activeWeapon.reserve);
     }
   }
 
-  // Update physics, collision, and viewmodel bobbing per tick
   update(dt, currentTime, bots, gameManager) {
-    // 1. Reloading logic
+    // 1. Spectator Camera POV update
+    if (this.isSpectating) {
+      if (this.spectatedTarget && this.spectatedTarget.isAlive) {
+        // Place camera at spectated bot's eyes
+        this.camera.position.set(
+          this.spectatedTarget.position.x,
+          this.spectatedTarget.position.y + 1.7,
+          this.spectatedTarget.position.z
+        );
+        this.camera.rotation.set(0, this.spectatedTarget.mesh.rotation.y, 0);
+      } else {
+        // Current target died, pick next alive target
+        this.cycleSpectator(1);
+      }
+      return;
+    }
+
+    // 2. Normal Player Update
     if (this.isReloading && currentTime - this.reloadStartTime > 2200) {
       this.finishReload();
     }
 
-    // 2. Firing logic (auto-fire on held left click)
     if (this.isShooting && !this.isReloading) {
       this.shoot(currentTime / 1000, bots, gameManager);
     }
 
-    // 3. Movement Physics (WASD + Jump + Crouch)
+    // Movement
     const moveSpeed = (this.isCrouched ? 2.5 : this.keys[this.keybinds.walk] ? 3.5 : 7.5) * (this.isScoped ? 0.6 : 1.0);
     const forward = new THREE.Vector3(-Math.sin(this.yaw), 0, -Math.cos(this.yaw));
     const right = new THREE.Vector3(Math.cos(this.yaw), 0, -Math.sin(this.yaw));
@@ -438,7 +537,6 @@ class CS2Player {
       this.velocity.x = moveDir.x * moveSpeed;
       this.velocity.z = moveDir.z * moveSpeed;
 
-      // Footstep audio cadence
       if (this.isGrounded && Math.random() < 0.05) {
         window.csAudio.playFootstep();
       }
@@ -452,14 +550,12 @@ class CS2Player {
       this.velocity.y = 6.2;
       this.isGrounded = false;
     }
-    this.velocity.y -= 18.0 * dt; // Gravity
+    this.velocity.y -= 18.0 * dt;
 
-    // Crouch height
     this.isCrouched = !!this.keys[this.keybinds.crouch];
     const targetHeight = this.isCrouched ? 1.0 : 1.8;
     this.playerHeight += (targetHeight - this.playerHeight) * 0.2;
 
-    // Proposed new position
     const oldPos = { x: this.position.x, y: this.position.y, z: this.position.z };
     const newPos = {
       x: this.position.x + this.velocity.x * dt,
@@ -467,20 +563,18 @@ class CS2Player {
       z: this.position.z + this.velocity.z * dt
     };
 
-    // Apply AntiCheat speedhack validation
     const validatedPos = window.__CS2_AC.validateMovementDelta(oldPos, newPos, dt);
     this.position.x = validatedPos.x;
     this.position.y = validatedPos.y;
     this.position.z = validatedPos.z;
 
-    // Ground collision
     if (this.position.y <= this.playerHeight) {
       this.position.y = this.playerHeight;
       this.velocity.y = 0;
       this.isGrounded = true;
     }
 
-    // Obstacle Box Collisions
+    // Collisions
     const playerRadius = 0.6;
     for (const collider of this.map.colliders) {
       const box = collider.box;
@@ -490,35 +584,34 @@ class CS2Player {
         this.position.z + playerRadius > box.min.z &&
         this.position.z - playerRadius < box.max.z
       ) {
-        // Can climb on top if jumping
         if (collider.isClimbable && this.position.y >= collider.topY + 0.2) {
           this.position.y = collider.topY + this.playerHeight;
           this.velocity.y = 0;
           this.isGrounded = true;
         } else {
-          // Push player back
           this.position.x = oldPos.x;
           this.position.z = oldPos.z;
         }
       }
     }
 
-    // 4. Decay Recoil Punch
     this.recoilPitch *= 0.88;
     this.recoilYaw *= 0.88;
 
-    // 5. Update Camera
     this.camera.position.copy(this.position);
     this.camera.rotation.order = 'YXZ';
     this.camera.rotation.y = this.yaw + this.recoilYaw;
     this.camera.rotation.x = this.pitch + this.recoilPitch;
 
-    // 6. Viewmodel Bobbing & Recovery
+    // Viewmodel Bobbing
     this.vmGunBody.position.z += (-0.5 - this.vmGunBody.position.z) * 0.15;
+    if (this.currentWeaponModel) this.currentWeaponModel.position.z += (-0.5 - this.currentWeaponModel.position.z) * 0.15;
+
     const speed2D = Math.sqrt(this.velocity.x * this.velocity.x + this.velocity.z * this.velocity.z);
     const bob = Math.sin(currentTime * 0.008) * (speed2D * 0.004);
     this.vmGunBody.position.y = -0.22 + bob;
     this.vmBarrel.position.y = -0.19 + bob;
+    if (this.currentWeaponModel) this.currentWeaponModel.position.y = -0.22 + bob;
   }
 }
 

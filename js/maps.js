@@ -1,5 +1,5 @@
-// CS2 Map Geometry Engine: Dust II (de_dust2) & Mirage (de_mirage)
-// Builds 3D maps using procedural materials, collision boundaries, and radar blueprints
+// CS2 Map Engine: 3D Model Loading & Textured Geometry for Dust II and Mirage
+// Handles OBJ/MTL for Dust II and GLTF with Procedural Texturing for Mirage
 
 class CS2MapBuilder {
   constructor(scene) {
@@ -9,6 +9,10 @@ class CS2MapBuilder {
     this.spawnPoints = { CT: [], T: [] };
     this.mapGroup = new THREE.Group();
     this.scene.add(this.mapGroup);
+
+    this.objLoader = typeof THREE.OBJLoader !== 'undefined' ? new THREE.OBJLoader() : null;
+    this.mtlLoader = typeof THREE.MTLLoader !== 'undefined' ? new THREE.MTLLoader() : null;
+    this.gltfLoader = typeof THREE.GLTFLoader !== 'undefined' ? new THREE.GLTFLoader() : null;
   }
 
   clear() {
@@ -26,69 +30,62 @@ class CS2MapBuilder {
     this.spawnPoints = { CT: [], T: [] };
   }
 
-  // Generates procedural tile / sand / brick canvas textures
-  createTexture(type) {
+  createProceduralTexture(type) {
     const canvas = document.createElement('canvas');
-    canvas.width = 256;
-    canvas.height = 256;
+    canvas.width = 512;
+    canvas.height = 512;
     const ctx = canvas.getContext('2d');
 
-    if (type === 'dust_ground') {
-      ctx.fillStyle = '#c2a373';
-      ctx.fillRect(0, 0, 256, 256);
-      for (let i = 0; i < 4000; i++) {
-        ctx.fillStyle = Math.random() > 0.5 ? '#b59463' : '#ceb284';
-        ctx.fillRect(Math.random() * 256, Math.random() * 256, 2, 2);
+    if (type === 'mirage_stucco') {
+      ctx.fillStyle = '#d2b48c';
+      ctx.fillRect(0, 0, 512, 512);
+      for (let i = 0; i < 8000; i++) {
+        ctx.fillStyle = Math.random() > 0.5 ? '#c5a378' : '#e0c69e';
+        ctx.fillRect(Math.random() * 512, Math.random() * 512, 2, 2);
       }
-    } else if (type === 'dust_wall') {
-      ctx.fillStyle = '#bfa585';
-      ctx.fillRect(0, 0, 256, 256);
-      ctx.strokeStyle = '#a68c6d';
-      ctx.lineWidth = 3;
-      for (let y = 0; y < 256; y += 32) {
-        ctx.beginPath();
-        ctx.moveTo(0, y);
-        ctx.lineTo(256, y);
-        ctx.stroke();
-      }
-    } else if (type === 'crate_wood') {
-      ctx.fillStyle = '#8e613b';
-      ctx.fillRect(0, 0, 256, 256);
-      ctx.strokeStyle = '#5a3b20';
-      ctx.lineWidth = 10;
-      ctx.strokeRect(5, 5, 246, 246);
-      ctx.beginPath();
-      ctx.moveTo(10, 10);
-      ctx.lineTo(246, 246);
-      ctx.moveTo(246, 10);
-      ctx.lineTo(10, 246);
-      ctx.stroke();
-    } else if (type === 'mirage_ground') {
-      ctx.fillStyle = '#8c7664';
-      ctx.fillRect(0, 0, 256, 256);
-      ctx.strokeStyle = '#6e5a4b';
-      ctx.lineWidth = 2;
-      for (let x = 0; x < 256; x += 32) {
-        for (let y = 0; y < 256; y += 32) {
+    } else if (type === 'mirage_cobblestone') {
+      ctx.fillStyle = '#8a7968';
+      ctx.fillRect(0, 0, 512, 512);
+      ctx.strokeStyle = '#5a4d3f';
+      ctx.lineWidth = 4;
+      for (let x = 0; x < 512; x += 32) {
+        for (let y = 0; y < 512; y += 32) {
+          ctx.fillStyle = (x + y) % 64 === 0 ? '#988573' : '#7f6f5e';
+          ctx.fillRect(x + 2, y + 2, 28, 28);
           ctx.strokeRect(x, y, 32, 32);
         }
       }
-    } else if (type === 'mirage_wall') {
-      ctx.fillStyle = '#cfb299';
-      ctx.fillRect(0, 0, 256, 256);
-      ctx.fillStyle = '#bca087';
-      for (let i = 0; i < 50; i++) {
-        ctx.fillRect(Math.random() * 240, Math.random() * 240, 16, 8);
+    } else if (type === 'mirage_terracotta') {
+      ctx.fillStyle = '#b35434';
+      ctx.fillRect(0, 0, 512, 512);
+      ctx.strokeStyle = '#85371c';
+      ctx.lineWidth = 3;
+      for (let y = 0; y < 512; y += 48) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(512, y);
+        ctx.stroke();
       }
+    } else if (type === 'wood_crate') {
+      ctx.fillStyle = '#7a5230';
+      ctx.fillRect(0, 0, 512, 512);
+      ctx.strokeStyle = '#4e331c';
+      ctx.lineWidth = 14;
+      ctx.strokeRect(8, 8, 496, 496);
+      ctx.beginPath();
+      ctx.moveTo(12, 12);
+      ctx.lineTo(500, 500);
+      ctx.moveTo(500, 12);
+      ctx.lineTo(12, 500);
+      ctx.stroke();
     }
 
-    const texture = new THREE.CanvasTexture(canvas);
-    texture.wrapS = THREE.RepeatWrapping;
-    texture.wrapT = THREE.RepeatWrapping;
-    return texture;
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.wrapS = THREE.RepeatWrapping;
+    tex.wrapT = THREE.RepeatWrapping;
+    return tex;
   }
 
-  // Adds a solid wall / obstacle with physics bounding box
   addObstacle(x, y, z, w, h, d, mat, isClimbable = false) {
     const geo = new THREE.BoxGeometry(w, h, d);
     const mesh = new THREE.Mesh(geo, mat);
@@ -103,29 +100,26 @@ class CS2MapBuilder {
     return mesh;
   }
 
-  // Adds holographic Bombsite A/B plant zone
-  addBombsiteZone(id, x, z, radius = 7) {
+  addBombsiteZone(id, x, z, radius = 7.5) {
     this.bombZones.push({ id, x, z, radius });
 
-    // Glowing ground decal ring
     const ringGeo = new THREE.RingGeometry(radius - 0.5, radius, 32);
     const ringMat = new THREE.MeshBasicMaterial({
       color: 0xff3b30,
       side: THREE.DoubleSide,
       transparent: true,
-      opacity: 0.8
+      opacity: 0.85
     });
     const ringMesh = new THREE.Mesh(ringGeo, ringMat);
     ringMesh.rotation.x = -Math.PI / 2;
-    ringMesh.position.set(x, 0.05, z);
+    ringMesh.position.set(x, 0.08, z);
     this.mapGroup.add(ringMesh);
 
-    // Pillar / Marker indicator
     const pillarGeo = new THREE.CylinderGeometry(0.3, 0.3, 4, 16);
     const pillarMat = new THREE.MeshStandardMaterial({
       color: 0xff9500,
       emissive: 0xff3b30,
-      emissiveIntensity: 0.5
+      emissiveIntensity: 0.6
     });
     const pillar = new THREE.Mesh(pillarGeo, pillarMat);
     pillar.position.set(x, 2, z);
@@ -138,11 +132,11 @@ class CS2MapBuilder {
   buildDust2() {
     this.clear();
 
-    const groundTex = this.createTexture('dust_ground');
-    groundTex.repeat.set(24, 24);
-    const wallTex = this.createTexture('dust_wall');
+    const groundTex = this.createProceduralTexture('mirage_stucco');
+    groundTex.repeat.set(16, 16);
+    const wallTex = this.createProceduralTexture('mirage_stucco');
     wallTex.repeat.set(4, 2);
-    const crateTex = this.createTexture('crate_wood');
+    const crateTex = this.createProceduralTexture('wood_crate');
 
     const groundMat = new THREE.MeshStandardMaterial({ map: groundTex, roughness: 0.9 });
     const wallMat = new THREE.MeshStandardMaterial({ map: wallTex, roughness: 0.85 });
@@ -155,46 +149,34 @@ class CS2MapBuilder {
     floor.receiveShadow = true;
     this.mapGroup.add(floor);
 
-    // Perimeter Outer Walls
-    this.addObstacle(0, 0, -110, 220, 12, 6, wallMat);  // North wall
-    this.addObstacle(0, 0, 110, 220, 12, 6, wallMat);   // South wall
-    this.addObstacle(-110, 0, 0, 6, 12, 220, wallMat);  // West wall
-    this.addObstacle(110, 0, 0, 6, 12, 220, wallMat);   // East wall
+    // Perimeter Walls
+    this.addObstacle(0, 0, -110, 220, 12, 6, wallMat);
+    this.addObstacle(0, 0, 110, 220, 12, 6, wallMat);
+    this.addObstacle(-110, 0, 0, 6, 12, 220, wallMat);
+    this.addObstacle(110, 0, 0, 6, 12, 220, wallMat);
 
-    // ============ MID LANE ============
-    // Mid Doors (Left & Right)
+    // Mid & Doors
     this.addObstacle(-7, 0, 10, 6, 8, 2, wallMat);
     this.addObstacle(7, 0, 10, 6, 8, 2, wallMat);
-    // Xbox crate at Mid / Catwalk intersection
     this.addObstacle(0, 0, -10, 4, 3.5, 4, crateMat, true);
-    // Mid corridor walls
     this.addObstacle(-18, 0, 20, 4, 10, 60, wallMat);
     this.addObstacle(18, 0, 20, 4, 10, 60, wallMat);
 
-    // ============ BOMBSITE A ============
-    // Site A Platform
+    // Bombsite A
     this.addObstacle(50, 0, -60, 26, 2.5, 26, wallMat, true);
-    // Crates on Site A
     this.addObstacle(44, 2.5, -55, 3.5, 3.5, 3.5, crateMat, true);
     this.addObstacle(56, 2.5, -65, 3.5, 3.5, 3.5, crateMat, true);
-    // Goose wall
     this.addObstacle(50, 2.5, -73, 26, 6, 2, wallMat);
-    // Long A Doors
     this.addObstacle(75, 0, 15, 25, 10, 4, wallMat);
     this.addObstacle(75, 0, -25, 4, 10, 50, wallMat);
-    // Catwalk / Short A ramp wall
     this.addObstacle(25, 0, -45, 4, 8, 40, wallMat);
 
-    // ============ BOMBSITE B ============
-    // Site B Platform
+    // Bombsite B
     this.addObstacle(-60, 0, -50, 28, 2, 28, wallMat, true);
-    // B Site Crates
     this.addObstacle(-55, 2, -45, 3.5, 3.5, 3.5, crateMat, true);
     this.addObstacle(-65, 2, -55, 3.5, 3.5, 3.5, crateMat, true);
-    // B Doors & Window
     this.addObstacle(-40, 0, -40, 14, 10, 3, wallMat);
     this.addObstacle(-75, 0, -35, 3, 10, 20, wallMat);
-    // Upper Tunnels to B
     this.addObstacle(-55, 0, 15, 3, 9, 50, wallMat);
     this.addObstacle(-75, 0, 15, 3, 9, 50, wallMat);
 
@@ -202,22 +184,27 @@ class CS2MapBuilder {
     this.addBombsiteZone('A', 50, -60, 7.5);
     this.addBombsiteZone('B', -60, -50, 7.5);
 
-    // Team Spawn Points
+    // Spawns
     this.spawnPoints.CT = [
-      { x: 0, z: -85 },
-      { x: -8, z: -85 },
-      { x: 8, z: -85 },
-      { x: -16, z: -85 },
-      { x: 16, z: -85 }
+      { x: 0, z: -85 }, { x: -8, z: -85 }, { x: 8, z: -85 }, { x: -16, z: -85 }, { x: 16, z: -85 }
+    ];
+    this.spawnPoints.T = [
+      { x: 0, z: 85 }, { x: -8, z: 85 }, { x: 8, z: 85 }, { x: -16, z: 85 }, { x: 16, z: 85 }
     ];
 
-    this.spawnPoints.T = [
-      { x: 0, z: 85 },
-      { x: -8, z: 85 },
-      { x: 8, z: 85 },
-      { x: -16, z: 85 },
-      { x: 16, z: 85 }
-    ];
+    // Attempt loading Dust 2 3D OBJ & MTL Model asynchronously
+    if (this.mtlLoader && this.objLoader) {
+      this.mtlLoader.load('source/de_dust2/de_dust2.mtl', (materials) => {
+        materials.preload();
+        this.objLoader.setMaterials(materials);
+        this.objLoader.load('source/de_dust2/de_dust2.obj', (obj) => {
+          obj.rotation.x = -Math.PI / 2;
+          obj.scale.set(0.026, 0.026, 0.026);
+          obj.position.set(0, 0, 0);
+          this.mapGroup.add(obj);
+        }, undefined, () => {});
+      }, undefined, () => {});
+    }
   }
 
   // ==============================================================
@@ -226,84 +213,93 @@ class CS2MapBuilder {
   buildMirage() {
     this.clear();
 
-    const groundTex = this.createTexture('mirage_ground');
-    groundTex.repeat.set(24, 24);
-    const wallTex = this.createTexture('mirage_wall');
-    wallTex.repeat.set(4, 2);
-    const crateTex = this.createTexture('crate_wood');
+    const stuccoTex = this.createProceduralTexture('mirage_stucco');
+    stuccoTex.repeat.set(4, 3);
+    const cobbleTex = this.createProceduralTexture('mirage_cobblestone');
+    cobbleTex.repeat.set(18, 18);
+    const roofTex = this.createProceduralTexture('mirage_terracotta');
+    const crateTex = this.createProceduralTexture('wood_crate');
 
-    const groundMat = new THREE.MeshStandardMaterial({ map: groundTex, roughness: 0.9 });
-    const wallMat = new THREE.MeshStandardMaterial({ map: wallTex, roughness: 0.85 });
-    const crateMat = new THREE.MeshStandardMaterial({ map: crateTex, roughness: 0.7 });
+    const cobbleMat = new THREE.MeshStandardMaterial({ map: cobbleTex, roughness: 0.85 });
+    const stuccoMat = new THREE.MeshStandardMaterial({ map: stuccoTex, roughness: 0.8 });
+    const roofMat = new THREE.MeshStandardMaterial({ map: roofTex, roughness: 0.7 });
+    const crateMat = new THREE.MeshStandardMaterial({ map: crateTex, roughness: 0.75 });
 
     // Main Floor
     const floorGeo = new THREE.PlaneGeometry(240, 240);
-    const floor = new THREE.Mesh(floorGeo, groundMat);
+    const floor = new THREE.Mesh(floorGeo, cobbleMat);
     floor.rotation.x = -Math.PI / 2;
     floor.receiveShadow = true;
     this.mapGroup.add(floor);
 
-    // Outer Walls
-    this.addObstacle(0, 0, -115, 230, 14, 6, wallMat);
-    this.addObstacle(0, 0, 115, 230, 14, 6, wallMat);
-    this.addObstacle(-115, 0, 0, 6, 14, 230, wallMat);
-    this.addObstacle(115, 0, 0, 6, 14, 230, wallMat);
+    // Outer Boundary Walls
+    this.addObstacle(0, 0, -115, 230, 14, 6, stuccoMat);
+    this.addObstacle(0, 0, 115, 230, 14, 6, stuccoMat);
+    this.addObstacle(-115, 0, 0, 6, 14, 230, stuccoMat);
+    this.addObstacle(115, 0, 0, 6, 14, 230, stuccoMat);
 
-    // ============ MID & SNIPER WINDOW ============
-    // Mid Window / Sniper Nest
-    this.addObstacle(0, 0, -35, 18, 7, 4, wallMat);
-    // Connector from Mid to A
-    this.addObstacle(16, 0, -20, 4, 8, 30, wallMat);
-    // Catwalk from Mid to B
-    this.addObstacle(-22, 0, -15, 4, 8, 35, wallMat);
-    // Top Mid boxes
+    // Mid & Sniper Window
+    this.addObstacle(0, 0, -35, 18, 7, 4, stuccoMat);
+    this.addObstacle(16, 0, -20, 4, 8, 30, stuccoMat);
+    this.addObstacle(-22, 0, -15, 4, 8, 35, stuccoMat);
     this.addObstacle(0, 0, 25, 4, 3.5, 4, crateMat, true);
 
-    // ============ BOMBSITE A ============
-    // Tetris Crates
+    // Bombsite A
     this.addObstacle(40, 0, -25, 3.5, 3.5, 3.5, crateMat, true);
     this.addObstacle(44, 0, -25, 3.5, 3.5, 3.5, crateMat, true);
-    // Triple Box
     this.addObstacle(50, 0, -45, 3.5, 3.5, 3.5, crateMat, true);
-    // Ticket Booth (CT Stairs)
-    this.addObstacle(25, 0, -60, 6, 5, 8, wallMat);
-    // Palace Balcony
-    this.addObstacle(65, 0, -15, 18, 4.5, 12, wallMat, true);
-    this.addObstacle(75, 4.5, -15, 2, 6, 12, wallMat);
-    // A Ramp walls
-    this.addObstacle(55, 0, 10, 4, 9, 35, wallMat);
+    this.addObstacle(25, 0, -60, 6, 5, 8, stuccoMat);
+    this.addObstacle(65, 0, -15, 18, 4.5, 12, roofMat, true);
+    this.addObstacle(75, 4.5, -15, 2, 6, 12, stuccoMat);
+    this.addObstacle(55, 0, 10, 4, 9, 35, stuccoMat);
 
-    // ============ BOMBSITE B ============
-    // B Apartments / Apps
-    this.addObstacle(-65, 0, 0, 16, 5, 45, wallMat, true);
-    this.addObstacle(-74, 5, 0, 2, 6, 45, wallMat);
-    // Van on B site
+    // Bombsite B
+    this.addObstacle(-65, 0, 0, 16, 5, 45, stuccoMat, true);
+    this.addObstacle(-74, 5, 0, 2, 6, 45, stuccoMat);
     this.addObstacle(-42, 0, -38, 5, 3, 9, crateMat, true);
-    // Market / Kitchen Window and Doors
-    this.addObstacle(-25, 0, -60, 25, 9, 4, wallMat);
-    // Back site pillars
-    this.addObstacle(-60, 0, -55, 4, 8, 4, wallMat);
+    this.addObstacle(-25, 0, -60, 25, 9, 4, stuccoMat);
+    this.addObstacle(-60, 0, -55, 4, 8, 4, stuccoMat);
 
     // Bombsite Zones
     this.addBombsiteZone('A', 48, -42, 7.5);
     this.addBombsiteZone('B', -48, -45, 7.5);
 
-    // Team Spawn Points
+    // Spawns
     this.spawnPoints.CT = [
-      { x: 0, z: -90 },
-      { x: -10, z: -90 },
-      { x: 10, z: -90 },
-      { x: -20, z: -90 },
-      { x: 20, z: -90 }
+      { x: 0, z: -90 }, { x: -10, z: -90 }, { x: 10, z: -90 }, { x: -20, z: -90 }, { x: 20, z: -90 }
+    ];
+    this.spawnPoints.T = [
+      { x: 0, z: 90 }, { x: -10, z: 90 }, { x: 10, z: 90 }, { x: -20, z: 90 }, { x: 20, z: 90 }
     ];
 
-    this.spawnPoints.T = [
-      { x: 0, z: 90 },
-      { x: -10, z: 90 },
-      { x: 10, z: 90 },
-      { x: -20, z: 90 },
-      { x: 20, z: 90 }
-    ];
+    // Load Mirage 3D Mesh (source/untitled.glb) and texture untextured surfaces with Moroccan materials
+    if (this.gltfLoader) {
+      this.gltfLoader.load('source/untitled.glb', (gltf) => {
+        const model = gltf.scene;
+        model.scale.set(0.03, 0.03, 0.03);
+        model.position.set(0, 0, 0);
+
+        // Apply realistic Moroccan textures to untextured Mirage surfaces
+        model.traverse((child) => {
+          if (child.isMesh) {
+            child.castShadow = true;
+            child.receiveShadow = true;
+            if (!child.material || !child.material.map) {
+              const y = child.position.y;
+              if (y < 2) {
+                child.material = cobbleMat;
+              } else if (y > 8) {
+                child.material = roofMat;
+              } else {
+                child.material = stuccoMat;
+              }
+            }
+          }
+        });
+
+        this.mapGroup.add(model);
+      }, undefined, () => {});
+    }
   }
 }
 

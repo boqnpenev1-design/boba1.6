@@ -1,10 +1,10 @@
-// CS2 Main Bootstrap & UI Controller
+// CS2 Main Bootstrap & Server Browser Controller
 
 document.addEventListener('DOMContentLoaded', () => {
-  // 1. Initialize Three.js 3D Scene, Camera & WebGL Renderer
+  // 1. Initialize Three.js 3D Viewport
   const container = document.getElementById('game-canvas-container');
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0xd6e5f3); // CS2 Sky blue
+  scene.background = new THREE.Color(0xd6e5f3);
   scene.fog = new THREE.FogExp2(0xd6e5f3, 0.007);
 
   const camera = new THREE.PerspectiveCamera(85, window.innerWidth / window.innerHeight, 0.1, 1000);
@@ -28,24 +28,19 @@ document.addEventListener('DOMContentLoaded', () => {
   sunLight.shadow.mapSize.height = 2048;
   sunLight.shadow.camera.near = 0.5;
   sunLight.shadow.camera.far = 250;
-  sunLight.shadow.camera.left = -90;
-  sunLight.shadow.camera.right = 90;
-  sunLight.shadow.camera.top = 90;
-  sunLight.shadow.camera.bottom = -90;
   scene.add(sunLight);
 
-  // Resize handler
   window.addEventListener('resize', () => {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
   });
 
-  // 2. Initialize Anti-Cheat & Game Engine
+  // 2. Initialize Silent Anti-Cheat & Game Engine
   window.__CS2_AC.initDevToolsGuard();
   const gameManager = new CS2GameManager(scene, camera);
 
-  // 3. Main Menu Navigation & Tab Switching
+  // 3. Tab Navigation (Online Competitive, Custom Room, Settings)
   const navTabs = document.querySelectorAll('.nav-tab');
   navTabs.forEach(tab => {
     tab.addEventListener('click', () => {
@@ -58,95 +53,42 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // 4. Map & Team Radio selection UI
-  document.querySelectorAll('.map-option').forEach(opt => {
-    opt.addEventListener('click', () => {
-      document.querySelectorAll('.map-option').forEach(o => o.classList.remove('active'));
-      opt.classList.add('active');
-    });
-  });
-
-  document.querySelectorAll('.team-option').forEach(opt => {
-    opt.addEventListener('click', () => {
-      document.querySelectorAll('.team-option').forEach(o => o.classList.remove('active'));
-      opt.classList.add('active');
-    });
-  });
-
-  // 5. Deploy / Start Match Button
-  const btnStartMatch = document.getElementById('btn-start-match');
-  btnStartMatch.addEventListener('click', () => {
+  // 4. Server Connect Buttons (Dust II & Mirage)
+  document.getElementById('btn-connect-dust2').addEventListener('click', () => {
     window.csAudio.ensureContext();
-
-    const selectedMap = document.querySelector('input[name="selected-map"]:checked').value;
-    const selectedTeam = document.querySelector('input[name="selected-team"]:checked').value;
-
-    document.getElementById('main-menu').classList.add('hidden');
-    document.getElementById('hud').classList.remove('hidden');
-
-    gameManager.startMatch(selectedMap, selectedTeam);
-
-    // Request pointer lock
-    container.requestPointerLock();
+    gameManager.connectToServer('dust2');
   });
 
-  // Click on canvas to lock pointer during match
-  container.addEventListener('click', () => {
-    if (document.getElementById('main-menu').classList.contains('hidden') &&
-        document.getElementById('pause-menu').classList.contains('hidden') &&
-        document.getElementById('buy-menu').classList.contains('hidden')) {
-      container.requestPointerLock();
-    }
+  document.getElementById('btn-connect-mirage').addEventListener('click', () => {
+    window.csAudio.ensureContext();
+    gameManager.connectToServer('mirage');
   });
 
-  // Pointer lock state changes
-  document.addEventListener('pointerlockchange', () => {
-    if (document.pointerLockElement !== container) {
-      // If pointer is unlocked during an active match, open pause menu
-      if (document.getElementById('main-menu').classList.contains('hidden') &&
-          document.getElementById('buy-menu').classList.contains('hidden')) {
-        document.getElementById('pause-menu').classList.remove('hidden');
-      }
-    } else {
-      document.getElementById('pause-menu').classList.add('hidden');
-      document.getElementById('buy-menu').classList.add('hidden');
-    }
+  // 5. Team Selection (Terrorists | Line | Counter-Terrorists)
+  document.getElementById('btn-select-t').addEventListener('click', () => {
+    window.csAudio.ensureContext();
+    gameManager.chooseTeam('T');
   });
 
-  // Pause Menu Buttons
-  document.getElementById('btn-resume').addEventListener('click', () => {
-    document.getElementById('pause-menu').classList.add('hidden');
-    container.requestPointerLock();
+  document.getElementById('btn-select-ct').addEventListener('click', () => {
+    window.csAudio.ensureContext();
+    gameManager.chooseTeam('CT');
   });
 
-  document.getElementById('btn-pause-buy').addEventListener('click', () => {
-    document.getElementById('pause-menu').classList.add('hidden');
-    openBuyMenu();
-  });
-
-  document.getElementById('btn-pause-settings').addEventListener('click', () => {
-    document.getElementById('pause-menu').classList.add('hidden');
-    document.getElementById('main-menu').classList.remove('hidden');
-    // Switch to settings tab
-    document.querySelector('.nav-tab[data-tab="settings"]').click();
-  });
-
-  document.getElementById('btn-quit-to-menu').addEventListener('click', () => {
-    document.getElementById('pause-menu').classList.add('hidden');
-    document.getElementById('hud').classList.add('hidden');
-    document.getElementById('main-menu').classList.remove('hidden');
-  });
-
-  // 6. Online Multiplayer Buttons
+  // 6. Custom Room Lobby
   document.getElementById('btn-create-lobby').addEventListener('click', () => {
     const codeTag = document.getElementById('host-room-code');
     const infoBox = document.getElementById('host-room-info');
+    const selectedMap = document.getElementById('custom-room-map').value;
     infoBox.classList.remove('hidden');
-    codeTag.innerText = 'CONNECTING...';
+    codeTag.innerText = 'GENERATING...';
 
     gameManager.net.createLobby((code) => {
       codeTag.innerText = code;
-      document.getElementById('sb-net-status').innerText = `ONLINE HOST &bull; ROOM ${code}`;
+      document.getElementById('sb-net-status').innerText = `HOST &bull; ROOM ${code}`;
+      setTimeout(() => {
+        gameManager.connectToServer(selectedMap);
+      }, 1000);
     });
   });
 
@@ -165,18 +107,66 @@ document.addEventListener('DOMContentLoaded', () => {
     gameManager.net.joinLobby(
       input,
       () => {
-        status.innerText = 'CONNECTED! READY TO DEPLOY';
+        status.innerText = 'CONNECTED!';
         status.style.color = '#37d376';
-        document.getElementById('sb-net-status').innerText = `ONLINE CLIENT &bull; ROOM ${input}`;
+        document.getElementById('sb-net-status').innerText = `CLIENT &bull; ROOM ${input}`;
+        setTimeout(() => {
+          gameManager.connectToServer('dust2');
+        }, 800);
       },
-      (err) => {
+      () => {
         status.innerText = 'FAILED TO CONNECT (CHECK CODE)';
         status.style.color = '#ea3f3f';
       }
     );
   });
 
-  // 7. Buy Menu Setup
+  // 7. Pointer Lock Handling
+  container.addEventListener('click', () => {
+    if (document.getElementById('main-menu').classList.contains('hidden') &&
+        document.getElementById('team-select-screen').classList.contains('hidden') &&
+        document.getElementById('pause-menu').classList.contains('hidden') &&
+        document.getElementById('buy-menu').classList.contains('hidden')) {
+      container.requestPointerLock();
+    }
+  });
+
+  document.addEventListener('pointerlockchange', () => {
+    if (document.pointerLockElement !== container) {
+      if (document.getElementById('main-menu').classList.contains('hidden') &&
+          document.getElementById('team-select-screen').classList.contains('hidden') &&
+          document.getElementById('buy-menu').classList.contains('hidden')) {
+        document.getElementById('pause-menu').classList.remove('hidden');
+      }
+    } else {
+      document.getElementById('pause-menu').classList.add('hidden');
+      document.getElementById('buy-menu').classList.add('hidden');
+    }
+  });
+
+  // Pause Menu Buttons
+  document.getElementById('btn-resume').addEventListener('click', () => {
+    document.getElementById('pause-menu').classList.add('hidden');
+    container.requestPointerLock();
+  });
+
+  document.getElementById('btn-pause-switch-team').addEventListener('click', () => {
+    document.getElementById('pause-menu').classList.add('hidden');
+    document.getElementById('team-select-screen').classList.remove('hidden');
+  });
+
+  document.getElementById('btn-pause-buy').addEventListener('click', () => {
+    document.getElementById('pause-menu').classList.add('hidden');
+    openBuyMenu();
+  });
+
+  document.getElementById('btn-quit-to-menu').addEventListener('click', () => {
+    document.getElementById('pause-menu').classList.add('hidden');
+    document.getElementById('hud').classList.add('hidden');
+    document.getElementById('main-menu').classList.remove('hidden');
+  });
+
+  // 8. Buy Menu Setup
   const buyMenu = document.getElementById('buy-menu');
   let currentBuyCategory = 'pistols';
 
@@ -265,7 +255,7 @@ document.addEventListener('DOMContentLoaded', () => {
     gameManager.updateHUD();
   }
 
-  // 8. Keybindings Remapping Table Setup
+  // 9. Keybinds Remapping
   const defaultKeybinds = {
     'Move Forward': 'KeyW',
     'Move Backward': 'KeyS',
@@ -313,7 +303,6 @@ document.addEventListener('DOMContentLoaded', () => {
   renderKeybindsTable();
 
   window.addEventListener('keydown', (e) => {
-    // Keybind remapping capture
     if (listeningButton) {
       e.preventDefault();
       const action = listeningButton.dataset.action;
@@ -324,7 +313,6 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    // In-game 'B' opens Buy Menu during freeze / buy time
     if (e.code === 'KeyB' && !document.getElementById('hud').classList.contains('hidden')) {
       if (buyMenu.classList.contains('hidden')) {
         openBuyMenu();
@@ -333,7 +321,6 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
 
-    // Scoreboard on Tab
     if (e.code === 'Tab') {
       e.preventDefault();
       if (!document.getElementById('hud').classList.contains('hidden')) {
@@ -355,7 +342,6 @@ document.addEventListener('DOMContentLoaded', () => {
     ctTbody.innerHTML = '';
     tTbody.innerHTML = '';
 
-    // Render local player row
     const playerRow = document.createElement('tr');
     playerRow.className = `is-you ${gameManager.player.health.get() <= 0 ? 'is-dead' : ''}`;
     playerRow.innerHTML = `
@@ -373,7 +359,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (gameManager.player.team === 'CT') ctTbody.appendChild(playerRow);
     else tTbody.appendChild(playerRow);
 
-    // Render bots rows
     gameManager.bots.forEach(bot => {
       const row = document.createElement('tr');
       row.className = bot.isAlive ? '' : 'is-dead';
@@ -394,26 +379,22 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // 9. Settings Sliders & Crosshair Realtime Binding
-  const sensSlider = document.getElementById('setting-sens');
-  sensSlider.addEventListener('input', (e) => {
+  // 10. Sensitivity & Crosshair Sliders
+  document.getElementById('setting-sens').addEventListener('input', (e) => {
     document.getElementById('val-sens').innerText = e.target.value;
     gameManager.player.sensitivity = Number(e.target.value);
   });
 
-  const fovSlider = document.getElementById('setting-fov');
-  fovSlider.addEventListener('input', (e) => {
+  document.getElementById('setting-fov').addEventListener('input', (e) => {
     document.getElementById('val-fov').innerText = `${e.target.value}°`;
     camera.fov = Number(e.target.value);
     camera.updateProjectionMatrix();
   });
 
-  const invertCheck = document.getElementById('setting-invert');
-  invertCheck.addEventListener('change', (e) => {
+  document.getElementById('setting-invert').addEventListener('change', (e) => {
     gameManager.player.invertY = e.target.checked;
   });
 
-  // Crosshair Customization
   const chColor = document.getElementById('setting-ch-color');
   const chSize = document.getElementById('setting-ch-size');
   const chGap = document.getElementById('setting-ch-gap');
@@ -435,13 +416,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.querySelector('.ch-top').style.height = size;
     document.querySelector('.ch-top').style.top = gap;
-
     document.querySelector('.ch-bottom').style.height = size;
     document.querySelector('.ch-bottom').style.bottom = gap;
-
     document.querySelector('.ch-left').style.width = size;
     document.querySelector('.ch-left').style.left = gap;
-
     document.querySelector('.ch-right').style.width = size;
     document.querySelector('.ch-right').style.right = gap;
   }
@@ -469,13 +447,7 @@ document.addEventListener('DOMContentLoaded', () => {
   sfxVol.addEventListener('input', updateAudioVolumes);
   c4Vol.addEventListener('input', updateAudioVolumes);
 
-  // DevTools Guard Toggle
-  const devtoolsGuard = document.getElementById('setting-devtools-guard');
-  devtoolsGuard.addEventListener('change', (e) => {
-    window.__CS2_AC.setEnabled(e.target.checked);
-  });
-
-  // 10. Main Animation Loop (High Performance 60+ FPS)
+  // 11. Main Loop
   let lastTime = performance.now();
 
   function animate(currentTime) {
@@ -484,8 +456,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const dt = Math.min((currentTime - lastTime) / 1000, 0.1);
     lastTime = currentTime;
 
-    // Run game logic only when match has started
-    if (!document.getElementById('hud').classList.contains('hidden')) {
+    if (!document.getElementById('hud').classList.contains('hidden') ||
+        !document.getElementById('spectator-hud').classList.contains('hidden')) {
       gameManager.update(dt, currentTime);
     }
 

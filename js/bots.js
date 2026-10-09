@@ -1,10 +1,9 @@
-// CS2 Tactical AI Bot System (CT and T teams)
-// Provides 5v5 Competitive match opponents and teammates with pathfinding, shooting, and objective play
+// CS2 Tactical AI Bot System with SAS 3D Player Models and Combat Logic
 
 class CS2Bot {
   constructor(name, team, scene, mapBuilder) {
     this.name = name;
-    this.team = team; // 'CT' or 'T'
+    this.team = team;
     this.scene = scene;
     this.map = mapBuilder;
 
@@ -22,9 +21,28 @@ class CS2Bot {
     this.lastShotTime = 0;
     this.fireRate = 0.25;
 
-    // Build 3D Bot Character Model
     this.mesh = this.createBotMesh();
     this.scene.add(this.mesh);
+
+    // Load SAS 3D Model for CT bots if available
+    this.gltfLoader = typeof THREE.GLTFLoader !== 'undefined' ? new THREE.GLTFLoader() : null;
+    if (this.team === 'CT' && this.gltfLoader) {
+      this.loadSASModel();
+    }
+  }
+
+  loadSASModel() {
+    this.gltfLoader.load('source/sas blue.glb', (gltf) => {
+      const sas = gltf.scene;
+      sas.scale.set(0.018, 0.018, 0.018);
+      sas.position.set(0, 0, 0);
+
+      // Hide simple box body and attach detailed SAS model
+      while (this.mesh.children.length > 0) {
+        this.mesh.remove(this.mesh.children[0]);
+      }
+      this.mesh.add(sas);
+    }, undefined, () => {});
   }
 
   createBotMesh() {
@@ -41,14 +59,14 @@ class CS2Bot {
 
     // Head
     const headGeo = new THREE.BoxGeometry(0.35, 0.4, 0.35);
-    const headColor = this.team === 'CT' ? 0x1f2937 : 0xd2b48c; // CT helmet vs T balaclava
+    const headColor = this.team === 'CT' ? 0x1f2937 : 0xd2b48c;
     const headMat = new THREE.MeshStandardMaterial({ color: headColor, roughness: 0.6 });
     const head = new THREE.Mesh(headGeo, headMat);
     head.position.y = 1.7;
     head.castShadow = true;
     group.add(head);
 
-    // Weapon Prop in hand
+    // Gun in hand
     const weaponGeo = new THREE.BoxGeometry(0.08, 0.1, 0.5);
     const weaponMat = new THREE.MeshStandardMaterial({ color: 0x111111 });
     const weapon = new THREE.Mesh(weaponGeo, weaponMat);
@@ -63,7 +81,6 @@ class CS2Bot {
     this.health = 100;
     this.position.set(spawnPos.x, 0, spawnPos.z);
     this.mesh.position.copy(this.position);
-    this.mesh.rotation.x = 0;
     this.mesh.visible = true;
     this.chooseNextObjective();
   }
@@ -71,18 +88,15 @@ class CS2Bot {
   chooseNextObjective(c4Planted = false, c4Position = null) {
     if (c4Planted && c4Position) {
       if (this.team === 'CT') {
-        // CT bots rush to defuse C4
         this.targetPos.copy(c4Position);
         return;
       } else {
-        // T bots guard planted C4 area
         const offset = (Math.random() - 0.5) * 8;
         this.targetPos.set(c4Position.x + offset, 0, c4Position.z + offset);
         return;
       }
     }
 
-    // Default: head towards Bombsite A or B
     const sites = this.map.bombZones;
     if (sites.length > 0) {
       const site = sites[Math.floor(Math.random() * sites.length)];
@@ -110,12 +124,11 @@ class CS2Bot {
   update(dt, currentTime, player, otherBots, gameManager) {
     if (!this.isAlive) return;
 
-    // 1. Check for visible enemies (player or opposing bots)
     let enemyTarget = null;
-    let minDistance = 45; // Sight range
+    let minDistance = 45;
 
-    // Check player
-    if (player.team !== this.team && player.health.get() > 0) {
+    // Target player if enemy and alive
+    if (player.team !== this.team && !player.isSpectating && player.health.get() > 0) {
       const dist = this.position.distanceTo(player.position);
       if (dist < minDistance) {
         minDistance = dist;
@@ -123,7 +136,7 @@ class CS2Bot {
       }
     }
 
-    // Check opposing bots
+    // Target opposing bots
     for (const other of otherBots) {
       if (other.isAlive && other.team !== this.team) {
         const dist = this.position.distanceTo(other.position);
@@ -134,27 +147,22 @@ class CS2Bot {
       }
     }
 
-    // 2. Combat / Shooting AI
     if (enemyTarget) {
-      // Face enemy
       const angle = Math.atan2(enemyTarget.x - this.position.x, enemyTarget.z - this.position.z);
       this.mesh.rotation.y = angle;
 
-      // Shoot if ready
       if (currentTime / 1000 - this.lastShotTime > this.fireRate) {
         this.lastShotTime = currentTime / 1000;
-        window.csAudio.playGunshot('rifle', false);
+        window.csAudio.playGunshot('rifle', this.team === 'CT' ? 'm4a1' : 'ak47', false);
 
-        // Accuracy chance based on distance
-        const hitChance = Math.max(0.2, 0.7 - (minDistance / 60));
+        const hitChance = Math.max(0.2, 0.65 - (minDistance / 60));
         if (Math.random() < hitChance) {
-          if (enemyTarget === player.position) {
-            player.takeDamage(18 + Math.floor(Math.random() * 12), this.name, 'M4A4');
+          if (enemyTarget === player.position && !player.isSpectating) {
+            player.takeDamage(18 + Math.floor(Math.random() * 12), this.name, this.team === 'CT' ? 'M4A4' : 'AK-47');
           }
         }
       }
     } else {
-      // 3. Movement towards objective
       const dir = new THREE.Vector3().subVectors(this.targetPos, this.position);
       dir.y = 0;
       const distToObjective = dir.length();
@@ -165,7 +173,6 @@ class CS2Bot {
         this.mesh.position.copy(this.position);
         this.mesh.rotation.y = Math.atan2(dir.x, dir.z);
       } else {
-        // Reached waypoint, pick another zone
         this.chooseNextObjective(gameManager ? gameManager.c4Planted : false, gameManager ? gameManager.c4Pos : null);
       }
     }

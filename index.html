@@ -4,29 +4,44 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Counter-Strike 2 Browser Edition | Dust II & Mirage</title>
-  <meta name="description" content="Play CS2 directly in your web browser! Features official Dust 2 and Mirage maps, complete weapon arsenal, MR12 competitive mode, cross-WiFi online multiplayer, and anti-cheat protection.">
+  <meta name="description" content="Play CS2 directly in your web browser! Official Dust 2 and Mirage servers, full arsenal, MR12 competitive online play, and authentic CS2 mechanics.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:ital,wght@0,400;0,600;0,700;1,700&family=Rajdhani:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/style.css">
   
-  <!-- Three.js (3D Engine) & PeerJS (Cross-WiFi WebRTC Multiplayer) -->
+  <!-- Three.js 3D Engine, Loaders & PeerJS (Multiplayer) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/OBJLoader.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/MTLLoader.js"></script>
   <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 </head>
 <body>
-  <!-- 3D Canvas Container -->
+  <!-- 3D Canvas Viewport -->
   <div id="game-canvas-container"></div>
 
-  <!-- In-game Sniper / Scope Overlay -->
+  <!-- Sniper / Scope Overlay -->
   <div id="scope-overlay" class="hidden">
     <div class="scope-crosshair"></div>
     <div class="scope-lens"></div>
   </div>
 
-  <!-- Hit / Flash / Damage Screen Overlays -->
+  <!-- Hit / Flash Overlays -->
   <div id="damage-vignette"></div>
   <div id="flash-overlay"></div>
+
+  <!-- Spectator HUD Overlay (Visible when dead or joined during round) -->
+  <div id="spectator-hud" class="hidden">
+    <div class="spectator-badge">SPECTATING POV</div>
+    <div class="spectator-name" id="spectator-target-name">Bot Vitaly (CT)</div>
+    <div class="spectator-controls">
+      <span><kbd>A</kbd> PREVIOUS PLAYER</span>
+      <span class="sep">&bull;</span>
+      <span><kbd>D</kbd> NEXT PLAYER</span>
+    </div>
+    <div class="spectator-subtext">ROUND IN PROGRESS &bull; YOU WILL SPAWN NEXT ROUND</div>
+  </div>
 
   <!-- HUD Interface (Visible in Match) -->
   <div id="hud" class="hidden">
@@ -58,17 +73,19 @@
     <div class="radar-container">
       <canvas id="radar-canvas" width="180" height="180"></canvas>
       <div class="radar-label" id="radar-map-name">DE_DUST2</div>
-      <div class="radar-location" id="radar-location-callout">T SPAWN</div>
+      <div class="radar-location" id="radar-location-callout">ACTIVE SECTOR</div>
     </div>
 
-    <!-- Top Right: Killfeed -->
-    <div class="killfeed" id="killfeed"></div>
+    <!-- Top Right: Killfeed & FPS Net-Graph -->
+    <div class="hud-top-right">
+      <div class="net-graph-counter" id="net-graph-fps">144 FPS &bull; 12ms &bull; TICK 64</div>
+      <div class="killfeed" id="killfeed"></div>
+    </div>
 
     <!-- Center Screen Alerts & Interaction Progress -->
     <div class="center-notifications">
       <div id="announcement-banner" class="announcement hidden"></div>
       
-      <!-- Bomb Plant / Defuse Progress Bar -->
       <div id="interaction-bar-container" class="hidden">
         <div class="interaction-title" id="interaction-title">DEFUSING BOMB...</div>
         <div class="interaction-progress-track">
@@ -76,7 +93,6 @@
         </div>
       </div>
 
-      <!-- Action Prompt (e.g. Press E to Defuse / Plant) -->
       <div id="action-prompt" class="action-prompt hidden">
         <span class="key-hint">E</span> <span id="action-prompt-text">PLANT BOMB</span>
       </div>
@@ -127,7 +143,7 @@
       </div>
     </div>
 
-    <!-- Weapon Inventory Slots Indicator -->
+    <!-- Weapon Inventory Slots -->
     <div class="weapon-slots-hud" id="weapon-slots">
       <div class="slot-item active" data-slot="1">1: PRIMARY</div>
       <div class="slot-item" data-slot="2">2: SECONDARY</div>
@@ -137,7 +153,7 @@
     </div>
   </div>
 
-  <!-- Buy Wheel / Buy Menu (Triggered with 'B' during Buy Phase) -->
+  <!-- Buy Menu (B Key) -->
   <div id="buy-menu" class="overlay-modal hidden">
     <div class="buy-modal-content">
       <div class="buy-header">
@@ -147,7 +163,6 @@
       </div>
 
       <div class="buy-grid">
-        <!-- Categories Column -->
         <div class="buy-categories">
           <button class="buy-cat-btn active" data-cat="pistols">1. PISTOLS</button>
           <button class="buy-cat-btn" data-cat="mid-tier">2. MID-TIER (SMG & SHOTGUNS)</button>
@@ -155,10 +170,7 @@
           <button class="buy-cat-btn" data-cat="equipment">4. GEAR & GRENADES</button>
         </div>
 
-        <!-- Weapon Items Grid -->
-        <div class="buy-items-grid" id="buy-items-grid">
-          <!-- Populated dynamically by weapons.js -->
-        </div>
+        <div class="buy-items-grid" id="buy-items-grid"></div>
       </div>
 
       <div class="buy-footer">
@@ -168,15 +180,14 @@
     </div>
   </div>
 
-  <!-- Scoreboard (Hold TAB) -->
+  <!-- Scoreboard (TAB Key) -->
   <div id="scoreboard" class="scoreboard-overlay hidden">
     <div class="scoreboard-container">
       <div class="scoreboard-header">
         <div class="sb-match-title">COMPETITIVE MATCH &bull; <span id="sb-map-name">DUST II</span></div>
-        <div class="sb-server-status" id="sb-net-status">OFFLINE (LOCAL AI)</div>
+        <div class="sb-server-status" id="sb-net-status">ONLINE MATCH LOBBY</div>
       </div>
 
-      <!-- CT Team Table -->
       <div class="sb-team-section ct-section">
         <div class="sb-team-header">
           <span class="sb-team-tag ct-tag">COUNTER-TERRORISTS</span>
@@ -200,7 +211,6 @@
         </table>
       </div>
 
-      <!-- T Team Table -->
       <div class="sb-team-section t-section">
         <div class="sb-team-header">
           <span class="sb-team-tag t-tag">TERRORISTS</span>
@@ -230,7 +240,45 @@
     </div>
   </div>
 
-  <!-- Main Menu / Match Lobby -->
+  <!-- Split Screen Team Selection Overlay -->
+  <div id="team-select-screen" class="split-team-screen hidden">
+    <div class="team-split-side side-terrorists">
+      <div class="side-content">
+        <div class="side-badge t-badge">💣</div>
+        <h2>TERRORISTS</h2>
+        <div class="side-sub">PHOENIX CONEX CELL</div>
+        <ul class="side-bullets">
+          <li>Objective: Infiltrate bombsite & detonate C4</li>
+          <li>Default Side Weapon: Glock-18</li>
+          <li>Starting Cash: $800</li>
+        </ul>
+        <button class="btn-join-team btn-join-t" id="btn-select-t">SELECT TERRORISTS</button>
+      </div>
+    </div>
+
+    <!-- Vertical Center Divider Line -->
+    <div class="team-split-divider">
+      <div class="divider-line"></div>
+      <div class="divider-badge">VS</div>
+      <div class="divider-line"></div>
+    </div>
+
+    <div class="team-split-side side-counter-terrorists">
+      <div class="side-content">
+        <div class="side-badge ct-badge">🛡</div>
+        <h2>COUNTER-TERRORISTS</h2>
+        <div class="side-sub">SPECIAL AIR SERVICE (SAS)</div>
+        <ul class="side-bullets">
+          <li>Objective: Defend bombsites & defuse C4</li>
+          <li>Default Side Weapon: USP-S Silenced</li>
+          <li>Starting Cash: $800</li>
+        </ul>
+        <button class="btn-join-team btn-join-ct" id="btn-select-ct">SELECT COUNTER-TERRORISTS</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Menu / Server Browser & Settings -->
   <div id="main-menu" class="main-menu-overlay">
     <div class="cs2-backdrop"></div>
     <div class="menu-container">
@@ -238,114 +286,88 @@
         <div class="cs2-logo-badge">CS2</div>
         <div class="cs2-titles">
           <h1>COUNTER-STRIKE 2</h1>
-          <p class="cs2-subtitle">WEB GL EXPERIMENTAL &bull; COMPETITIVE MR12</p>
+          <p class="cs2-subtitle">WEB EDITION &bull; COMPETITIVE ONLINE SERVERS</p>
         </div>
       </div>
 
       <div class="menu-nav-tabs">
-        <button class="nav-tab active" data-tab="play">PLAY COMPETITIVE</button>
-        <button class="nav-tab" data-tab="online">ONLINE MULTIPLAYER</button>
+        <button class="nav-tab active" data-tab="servers">ONLINE COMPETITIVE</button>
+        <button class="nav-tab" data-tab="custom">CUSTOM ROOM LOBBY</button>
         <button class="nav-tab" data-tab="settings">SETTINGS & CONTROLS</button>
-        <button class="nav-tab" data-tab="security">SECURITY & ANTI-TAMPER</button>
-        <button class="nav-tab" data-tab="about">ABOUT & GITHUB</button>
       </div>
 
-      <!-- TAB 1: PLAY COMPETITIVE -->
-      <div class="tab-pane active" id="pane-play">
-        <div class="play-columns">
-          <!-- Map Selector -->
-          <div class="menu-card map-card">
-            <h3>SELECT MAP</h3>
-            <div class="map-selection-list">
-              <label class="map-option active">
-                <input type="radio" name="selected-map" value="dust2" checked>
-                <div class="map-preview dust2-preview">
-                  <div class="map-info">
-                    <h4>DUST II</h4>
-                    <span>Active Duty &bull; Middle East Desert &bull; Bombsites A & B</span>
-                  </div>
-                </div>
-              </label>
-
-              <label class="map-option">
-                <input type="radio" name="selected-map" value="mirage">
-                <div class="map-preview mirage-preview">
-                  <div class="map-info">
-                    <h4>MIRAGE</h4>
-                    <span>Active Duty &bull; Moroccan Town &bull; Bombsites A & B</span>
-                  </div>
-                </div>
-              </label>
+      <!-- TAB 1: ONLINE COMPETITIVE SERVERS (Dust 2 & Mirage) -->
+      <div class="tab-pane active" id="pane-servers">
+        <div class="server-browser-grid">
+          <!-- Server 1: Dust 2 -->
+          <div class="server-card">
+            <div class="server-img-banner dust2-banner">
+              <span class="server-tag live-tag">● LIVE ONLINE</span>
+              <h3>SERVER 1: DE_DUST2</h3>
+              <p>Active Duty &bull; Middle East Desert &bull; Bombsites A & B</p>
             </div>
+            <div class="server-details-row">
+              <div class="s-detail"><span>MODE:</span> <strong>COMPETITIVE MR12</strong></div>
+              <div class="s-detail"><span>TICK:</span> <strong>64 TICK</strong></div>
+              <div class="s-detail"><span>PING:</span> <strong>12ms</strong></div>
+              <div class="s-detail"><span>SLOTS:</span> <strong>5v5 ACTIVE</strong></div>
+            </div>
+            <button class="btn-connect-server" id="btn-connect-dust2">
+              CONNECT TO DUST II SERVER
+            </button>
           </div>
 
-          <!-- Side / Team Selector & Game Mode -->
-          <div class="menu-card team-card">
-            <h3>SELECT SIDE</h3>
-            <div class="team-selection-grid">
-              <label class="team-option ct-option active">
-                <input type="radio" name="selected-team" value="CT" checked>
-                <div class="team-box ct-box">
-                  <div class="team-avatar ct-avatar">🛡</div>
-                  <h4>COUNTER-TERRORISTS</h4>
-                  <p>Defend bombsites, defuse C4, eliminate Terrorist cell. Start with USP-S.</p>
-                </div>
-              </label>
-
-              <label class="team-option t-option">
-                <input type="radio" name="selected-team" value="T">
-                <div class="team-box t-box">
-                  <div class="team-avatar t-avatar">💣</div>
-                  <h4>TERRORISTS</h4>
-                  <p>Infiltrate sites, plant C4, guard detonation, eliminate CTs. Start with Glock-18.</p>
-                </div>
-              </label>
+          <!-- Server 2: Mirage -->
+          <div class="server-card">
+            <div class="server-img-banner mirage-banner">
+              <span class="server-tag live-tag">● LIVE ONLINE</span>
+              <h3>SERVER 2: DE_MIRAGE</h3>
+              <p>Active Duty &bull; Moroccan Town &bull; Bombsites A & B</p>
             </div>
-
-            <div class="match-mode-box">
-              <h4>MATCH MODE: COMPETITIVE MR12</h4>
-              <ul>
-                <li>First team to 13 rounds wins</li>
-                <li>Halftime side swap at Round 12</li>
-                <li>Official economy rules ($800 starting, loss streak bonus)</li>
-                <li>15s Buy phase + 1m 55s round time</li>
-                <li>40s Bomb timer & defuse kit support</li>
-              </ul>
+            <div class="server-details-row">
+              <div class="s-detail"><span>MODE:</span> <strong>COMPETITIVE MR12</strong></div>
+              <div class="s-detail"><span>TICK:</span> <strong>64 TICK</strong></div>
+              <div class="s-detail"><span>PING:</span> <strong>15ms</strong></div>
+              <div class="s-detail"><span>SLOTS:</span> <strong>5v5 ACTIVE</strong></div>
             </div>
-
-            <button class="btn-play-primary" id="btn-start-match">
-              DEPLOY TO SERVER
+            <button class="btn-connect-server" id="btn-connect-mirage">
+              CONNECT TO MIRAGE SERVER
             </button>
           </div>
         </div>
       </div>
 
-      <!-- TAB 2: ONLINE MULTIPLAYER (CROSS-WIFI PEER-TO-PEER) -->
-      <div class="tab-pane" id="pane-online">
+      <!-- TAB 2: CUSTOM ROOM (CROSS-WIFI PEER-TO-PEER) -->
+      <div class="tab-pane" id="pane-custom">
         <div class="online-setup-container">
           <div class="menu-card">
-            <h3>HOST AN ONLINE MATCH (CROSS-WIFI)</h3>
-            <p>Create a WebRTC match lobby that friends can join from any Wi-Fi network with zero port forwarding!</p>
-            
+            <h3>HOST A PRIVATE ROOM</h3>
+            <p>Create a custom match room for friends across any Wi-Fi network:</p>
             <div class="net-action-group">
-              <button class="btn-primary" id="btn-create-lobby">CREATE ROOM</button>
+              <div class="setting-row" style="margin-bottom:10px;">
+                <label for="custom-room-map">MAP:</label>
+                <select id="custom-room-map" style="background:#151b24;color:#fff;border:1px solid #334;padding:6px;border-radius:3px;">
+                  <option value="dust2">Dust II (de_dust2)</option>
+                  <option value="mirage">Mirage (de_mirage)</option>
+                </select>
+              </div>
+              <button class="btn-primary" id="btn-create-lobby">CREATE PRIVATE ROOM</button>
               <div id="host-room-info" class="room-info-display hidden">
                 <div class="room-code-tag">
-                  YOUR ROOM CODE: <strong id="host-room-code">GENERATING...</strong>
+                  ROOM CODE: <strong id="host-room-code">GENERATING...</strong>
                 </div>
                 <button class="btn-secondary" id="btn-copy-code">COPY CODE</button>
-                <p class="small-hint">Share this 6-character room code with anyone on any Wi-Fi network!</p>
               </div>
             </div>
           </div>
 
           <div class="menu-card">
-            <h3>JOIN AN ONLINE MATCH</h3>
-            <p>Enter the 6-character Room Code provided by the host:</p>
+            <h3>JOIN VIA ROOM CODE</h3>
+            <p>Enter the Room Code shared by the host:</p>
             <div class="net-action-group">
               <div class="input-with-button">
                 <input type="text" id="join-room-code-input" placeholder="e.g. CS-9X2K" maxlength="10">
-                <button class="btn-primary" id="btn-join-lobby">CONNECT</button>
+                <button class="btn-primary" id="btn-join-lobby">JOIN ROOM</button>
               </div>
               <div id="join-status-text" class="status-indicator">READY</div>
             </div>
@@ -356,7 +378,6 @@
       <!-- TAB 3: SETTINGS & CONTROLS -->
       <div class="tab-pane" id="pane-settings">
         <div class="settings-grid">
-          <!-- Mouse & Crosshair -->
           <div class="menu-card">
             <h3>MOUSE & SENSITIVITY</h3>
             <div class="setting-row">
@@ -399,16 +420,12 @@
             </div>
           </div>
 
-          <!-- Keybinds Configuration -->
           <div class="menu-card">
             <h3>KEYBINDINGS</h3>
-            <div class="keybinds-table" id="keybinds-table">
-              <!-- Populated by JavaScript -->
-            </div>
+            <div class="keybinds-table" id="keybinds-table"></div>
             <button class="btn-secondary" id="btn-reset-keybinds" style="margin-top:10px;">RESET TO DEFAULT</button>
           </div>
 
-          <!-- Audio & Video -->
           <div class="menu-card">
             <h3>AUDIO & PERFORMANCE</h3>
             <div class="setting-row">
@@ -423,92 +440,20 @@
               <label for="setting-c4-vol">C4 Beep & Alarm:</label>
               <input type="range" id="setting-c4-vol" min="0" max="1" step="0.05" value="0.9">
             </div>
-            <div class="setting-row">
-              <label for="setting-graphics">Render Quality:</label>
-              <select id="setting-graphics">
-                <option value="high" selected>High (Antialiasing + Shadows)</option>
-                <option value="medium">Medium (Standard)</option>
-                <option value="low">Low (Maximum Performance)</option>
-              </select>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- TAB 4: SECURITY & ANTI-TAMPER -->
-      <div class="tab-pane" id="pane-security">
-        <div class="menu-card security-overview-card">
-          <h3>CLIENT INTEGRITY & ANTI-DECOMPILE PROTECTION</h3>
-          <p>This browser version implements multi-tiered security defense mechanisms against client modification and script injection:</p>
-          
-          <div class="security-features-grid">
-            <div class="sec-feature">
-              <div class="sec-icon">🔒</div>
-              <h4>Memory Masking & Checksum Canaries</h4>
-              <p>Player health, armor, money, and ammo are XOR-masked in sealed closures. Any direct console manipulation triggers state mismatch and resets.</p>
-            </div>
-
-            <div class="sec-feature">
-              <div class="sec-icon">🛡</div>
-              <h4>DevTools Anti-Debugger Trap</h4>
-              <p>Detects debugger breakpoint pauses, console open states, and inspect keystrokes to prevent live variable extraction.</p>
-            </div>
-
-            <div class="sec-feature">
-              <div class="sec-icon">⚡</div>
-              <h4>Speedhack & Delta Clamping</h4>
-              <p>Player movement vectors and velocity deltas are validated per frame to reject modified position increments.</p>
-            </div>
-
-            <div class="sec-feature">
-              <div class="sec-icon">🌐</div>
-              <h4>Host-Authoritative Hit Registration</h4>
-              <p>In online matches, raycast line-of-sight and weapon cooldowns are verified on the Host server before applying damage.</p>
-            </div>
-          </div>
-
-          <div class="setting-row" style="margin-top: 20px;">
-            <label for="setting-devtools-guard">Enable DevTools & Shortcut Shield:</label>
-            <input type="checkbox" id="setting-devtools-guard" checked>
-          </div>
-          <p class="small-hint">Locks F12, Ctrl+Shift+I, and inspect shortcuts during gameplay.</p>
-        </div>
-      </div>
-
-      <!-- TAB 5: ABOUT & GITHUB -->
-      <div class="tab-pane" id="pane-about">
-        <div class="menu-card">
-          <h3>GITHUB REPOSITORY & PROJECT INFO</h3>
-          <p>Counter-Strike 2 Browser Edition is a zero-dependency 3D competitive tactical shooter engine designed to run seamlessly in any modern web browser.</p>
-          
-          <div class="github-instructions-box">
-            <h4>PUSH TO GITHUB & HOST ON GITHUB PAGES</h4>
-            <ol>
-              <li>Create a new repository on <a href="https://github.com" target="_blank" rel="noopener">GitHub</a> (e.g., <code>cs2-web-edition</code>).</li>
-              <li>Link your remote and push this repository:
-                <pre><code>git remote add origin https://github.com/YOUR_USERNAME/cs2-web-edition.git
-git branch -M main
-git push -u origin main</code></pre>
-              </li>
-              <li>Enable free hosting via <strong>GitHub Pages</strong>:
-                <br>Go to <strong>Settings</strong> &rarr; <strong>Pages</strong> &rarr; Source: <strong>Deploy from branch (main / root)</strong> &rarr; Click <strong>Save</strong>.
-              </li>
-              <li>Your game will be live for anyone to play across the globe!</li>
-            </ol>
           </div>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- Pause / Escape Menu -->
+  <!-- Pause Menu (ESC) -->
   <div id="pause-menu" class="overlay-modal hidden">
     <div class="pause-box">
       <h2>MATCH PAUSED</h2>
       <button class="btn-play-primary" id="btn-resume">RESUME MATCH</button>
-      <button class="btn-secondary" id="btn-pause-settings">SETTINGS</button>
+      <button class="btn-secondary" id="btn-pause-switch-team">CHANGE TEAM</button>
       <button class="btn-secondary" id="btn-pause-buy">BUY MENU (B)</button>
-      <button class="btn-danger" id="btn-quit-to-menu">DISCONNECT TO MAIN MENU</button>
+      <button class="btn-danger" id="btn-quit-to-menu">DISCONNECT</button>
     </div>
   </div>
 

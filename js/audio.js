@@ -1,5 +1,5 @@
-// CS2 Web Audio Procedural Sound Synthesizer Engine
-// Provides authentic tactical shooter audio without requiring external audio asset downloads
+// CS2 Audio Engine with Authentic Sound Library & Procedural Fallback
+// Uses real CS2 weapon, bomb, and player audio samples uploaded in weapons/ and player/
 
 class CS2AudioSystem {
   constructor() {
@@ -11,6 +11,45 @@ class CS2AudioSystem {
     this.masterVol = 0.7;
     this.sfxVol = 0.8;
     this.c4Vol = 0.9;
+    this.audioCache = {};
+
+    // Audio file mappings
+    this.soundPaths = {
+      // Weapons
+      ak47: 'weapons/ak47/ak47_01.wav',
+      m4a1: 'weapons/m4a1/m4a1_01.wav',
+      m4a4: 'weapons/m4a1/m4a1_01.wav',
+      awp: 'weapons/awp/awp_01.wav',
+      deagle: 'weapons/deagle/deagle_01.wav',
+      glock: 'weapons/glock18/glock_01.wav',
+      usp: 'weapons/usp/usp_01.wav',
+      p90: 'weapons/p90/p90_01.wav',
+      xm1014: 'weapons/xm1014/xm1014-1.wav',
+      knife_slash: 'weapons/knife/knife_deploy1.wav',
+      knife_hit: 'weapons/knife/knife_hit1.wav',
+      reload_ak: 'weapons/ak47/ak47_clipin.wav',
+      reload_m4: 'weapons/m4a1/m4a1_clipin.wav',
+      reload_pistol: 'weapons/glock18/glock_clipin.wav',
+      zoom: 'weapons/awp/zoom.wav',
+
+      // C4 Bomb
+      c4_beep: 'weapons/c4/c4_beep2.wav',
+      c4_beep_urgent: 'weapons/c4/c4_beep2_10sec.wav',
+      c4_plant: 'weapons/c4/c4_plant.wav',
+      c4_disarm_start: 'weapons/c4/c4_disarmstart.wav',
+      c4_disarm_finish: 'weapons/c4/c4_disarmfinish.wav',
+      c4_explode: 'weapons/c4/c4_explode1.wav',
+      c4_key: 'weapons/c4/key_press1.wav',
+
+      // Player Damage & Foley
+      damage1: 'player/damage1.wav',
+      damage2: 'player/damage2.wav',
+      death: 'player/death1.wav',
+      headshot_armor: 'player/headshot_armor_01.wav',
+      footstep_sand: 'player/footsteps/sand_01.wav',
+      footstep_tile: 'player/footsteps/tile_01.wav',
+      footstep_wood: 'player/footsteps/wood_01.wav'
+    };
   }
 
   init() {
@@ -32,8 +71,17 @@ class CS2AudioSystem {
       this.c4Gain.connect(this.masterGain);
 
       this.initialized = true;
+
+      // Preload primary audio buffers
+      this.preloadSample('ak47', this.soundPaths.ak47);
+      this.preloadSample('awp', this.soundPaths.awp);
+      this.preloadSample('deagle', this.soundPaths.deagle);
+      this.preloadSample('usp', this.soundPaths.usp);
+      this.preloadSample('glock', this.soundPaths.glock);
+      this.preloadSample('c4_beep', this.soundPaths.c4_beep);
+      this.preloadSample('c4_explode', this.soundPaths.c4_explode);
     } catch (e) {
-      console.warn("AudioContext init delayed until user interaction", e);
+      console.warn("AudioContext init postponed", e);
     }
   }
 
@@ -59,339 +107,153 @@ class CS2AudioSystem {
     }
   }
 
-  // Gunfire sound synthesized via envelope shaping and filtered noise bursts
-  playGunshot(weaponType = 'rifle', isSilenced = false) {
+  preloadSample(key, url) {
+    if (this.audioCache[key] || !this.ctx) return;
+    fetch(url)
+      .then(res => res.arrayBuffer())
+      .then(buffer => this.ctx.decodeAudioData(buffer))
+      .then(decoded => {
+        this.audioCache[key] = decoded;
+      })
+      .catch(() => {
+        // Fallback procedural synthesizer active if fetch fails
+      });
+  }
+
+  playSound(key, targetGain = 'sfx', volume = 1.0) {
     this.ensureContext();
     if (!this.ctx) return;
 
-    const t = this.ctx.currentTime;
-    
-    // 1. Initial transient crack (Oscillator pitch drop)
-    const osc = this.ctx.createOscillator();
-    const oscGain = this.ctx.createGain();
-    
-    let baseFreq = 260;
-    let oscDecay = 0.08;
-    let noiseFilterFreq = 1600;
-    let noiseDecay = 0.18;
+    if (this.audioCache[key]) {
+      const source = this.ctx.createBufferSource();
+      source.buffer = this.audioCache[key];
+      const gainNode = this.ctx.createGain();
+      gainNode.gain.setValueAtTime(volume, this.ctx.currentTime);
+      source.connect(gainNode);
 
-    if (weaponType === 'sniper') { // AWP
-      baseFreq = 180;
-      oscDecay = 0.22;
-      noiseFilterFreq = 2800;
-      noiseDecay = 0.45;
-    } else if (weaponType === 'pistol') {
-      baseFreq = 340;
-      oscDecay = 0.05;
-      noiseFilterFreq = 1400;
-      noiseDecay = 0.12;
-    } else if (weaponType === 'shotgun') {
-      baseFreq = 120;
-      oscDecay = 0.14;
-      noiseFilterFreq = 2200;
-      noiseDecay = 0.28;
-    } else if (weaponType === 'smg') {
-      baseFreq = 380;
-      oscDecay = 0.04;
-      noiseFilterFreq = 1800;
-      noiseDecay = 0.10;
+      const dest = targetGain === 'c4' ? this.c4Gain : this.sfxGain;
+      gainNode.connect(dest);
+      source.start(0);
+      return;
     }
 
-    if (isSilenced) {
-      noiseFilterFreq = 900;
-      noiseDecay = 0.08;
+    // Attempt on-demand load or fallback to procedural
+    const url = this.soundPaths[key];
+    if (url) {
+      fetch(url)
+        .then(res => res.arrayBuffer())
+        .then(buffer => this.ctx.decodeAudioData(buffer))
+        .then(decoded => {
+          this.audioCache[key] = decoded;
+          const source = this.ctx.createBufferSource();
+          source.buffer = decoded;
+          const gainNode = this.ctx.createGain();
+          gainNode.gain.setValueAtTime(volume, this.ctx.currentTime);
+          source.connect(gainNode);
+          const dest = targetGain === 'c4' ? this.c4Gain : this.sfxGain;
+          gainNode.connect(dest);
+          source.start(0);
+        })
+        .catch(() => {
+          this.playProceduralFallback(key);
+        });
+    } else {
+      this.playProceduralFallback(key);
     }
-
-    osc.type = weaponType === 'sniper' ? 'sawtooth' : 'triangle';
-    osc.frequency.setValueAtTime(baseFreq, t);
-    osc.frequency.exponentialRampToValueAtTime(30, t + oscDecay);
-
-    oscGain.gain.setValueAtTime(0.7, t);
-    oscGain.gain.exponentialRampToValueAtTime(0.001, t + oscDecay);
-
-    osc.connect(oscGain);
-    oscGain.connect(this.sfxGain);
-    osc.start(t);
-    osc.stop(t + oscDecay);
-
-    // 2. Gunpowder explosion / White Noise tail
-    const bufferSize = Math.floor(this.ctx.sampleRate * noiseDecay);
-    const noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
-    const output = noiseBuffer.getChannelData(0);
-    for (let i = 0; i < bufferSize; i++) {
-      output[i] = Math.random() * 2 - 1;
-    }
-
-    const whiteNoise = this.ctx.createBufferSource();
-    whiteNoise.buffer = noiseBuffer;
-
-    const filter = this.ctx.createBiquadFilter();
-    filter.type = isSilenced ? 'lowpass' : 'bandpass';
-    filter.frequency.setValueAtTime(noiseFilterFreq, t);
-    filter.Q.setValueAtTime(isSilenced ? 1.0 : 2.5, t);
-
-    const noiseGain = this.ctx.createGain();
-    noiseGain.gain.setValueAtTime(isSilenced ? 0.3 : 0.85, t);
-    noiseGain.gain.exponentialRampToValueAtTime(0.001, t + noiseDecay);
-
-    whiteNoise.connect(filter);
-    filter.connect(noiseGain);
-    noiseGain.connect(this.sfxGain);
-
-    whiteNoise.start(t);
-    whiteNoise.stop(t + noiseDecay);
   }
 
-  // Knife slash
+  playProceduralFallback(key) {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    if (key.includes('gun') || key === 'ak47' || key === 'm4a1' || key === 'awp') {
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(240, t);
+      osc.frequency.exponentialRampToValueAtTime(30, t + 0.12);
+      gain.gain.setValueAtTime(0.7, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+      osc.connect(gain);
+      gain.connect(this.sfxGain);
+      osc.start(t);
+      osc.stop(t + 0.12);
+    }
+  }
+
+  // Gunfire
+  playGunshot(weaponType = 'rifle', weaponId = 'ak47', isSilenced = false) {
+    if (weaponId === 'ak47') this.playSound('ak47', 'sfx');
+    else if (weaponId === 'awp' || weaponType === 'sniper') this.playSound('awp', 'sfx');
+    else if (weaponId === 'deagle') this.playSound('deagle', 'sfx');
+    else if (weaponId === 'usp' || isSilenced) this.playSound('usp', 'sfx', 0.6);
+    else if (weaponId === 'glock') this.playSound('glock', 'sfx');
+    else if (weaponType === 'shotgun') this.playSound('xm1014', 'sfx');
+    else if (weaponType === 'smg') this.playSound('p90', 'sfx');
+    else this.playSound('m4a1', 'sfx');
+  }
+
   playKnifeSlash() {
-    this.ensureContext();
-    if (!this.ctx) return;
-    const t = this.ctx.currentTime;
-    const osc = this.ctx.createOscillator();
-    const gain = this.ctx.createGain();
-
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(1200, t);
-    osc.frequency.exponentialRampToValueAtTime(200, t + 0.1);
-
-    gain.gain.setValueAtTime(0.4, t);
-    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
-
-    osc.connect(gain);
-    gain.connect(this.sfxGain);
-    osc.start(t);
-    osc.stop(t + 0.1);
+    this.playSound('knife_slash', 'sfx');
   }
 
-  // Knife hit
   playKnifeHit() {
-    this.ensureContext();
-    if (!this.ctx) return;
-    const t = this.ctx.currentTime;
-    const osc = this.ctx.createOscillator();
-    const gain = this.ctx.createGain();
-
-    osc.type = 'sawtooth';
-    osc.frequency.setValueAtTime(300, t);
-    osc.frequency.exponentialRampToValueAtTime(50, t + 0.15);
-
-    gain.gain.setValueAtTime(0.6, t);
-    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.15);
-
-    osc.connect(gain);
-    gain.connect(this.sfxGain);
-    osc.start(t);
-    osc.stop(t + 0.15);
+    this.playSound('knife_hit', 'sfx');
   }
 
-  // Headshot "dink" ping
   playHeadshotDink() {
-    this.ensureContext();
-    if (!this.ctx) return;
-    const t = this.ctx.currentTime;
-    const osc = this.ctx.createOscillator();
-    const gain = this.ctx.createGain();
-
-    osc.type = 'triangle';
-    osc.frequency.setValueAtTime(2400, t);
-    osc.frequency.exponentialRampToValueAtTime(1400, t + 0.18);
-
-    gain.gain.setValueAtTime(0.8, t);
-    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
-
-    osc.connect(gain);
-    gain.connect(this.sfxGain);
-    osc.start(t);
-    osc.stop(t + 0.18);
+    this.playSound('headshot_armor', 'sfx', 1.2);
   }
 
-  // Reload clack
   playReload() {
-    this.ensureContext();
-    if (!this.ctx) return;
-    const t = this.ctx.currentTime;
-    // Magazine drop
-    this.createMechanicalClick(t, 600, 0.05);
-    // Magazine insert
-    this.createMechanicalClick(t + 0.45, 900, 0.06);
-    // Bolt rack
-    this.createMechanicalClick(t + 1.1, 1400, 0.08);
+    this.playSound('reload_ak', 'sfx');
   }
 
-  createMechanicalClick(time, freq, dur) {
-    const osc = this.ctx.createOscillator();
-    const gain = this.ctx.createGain();
-    osc.type = 'square';
-    osc.frequency.setValueAtTime(freq, time);
-    osc.frequency.exponentialRampToValueAtTime(100, time + dur);
-    gain.gain.setValueAtTime(0.4, time);
-    gain.gain.exponentialRampToValueAtTime(0.001, time + dur);
-    osc.connect(gain);
-    gain.connect(this.sfxGain);
-    osc.start(time);
-    osc.stop(time + dur);
+  playZoom() {
+    this.playSound('zoom', 'sfx');
   }
 
-  // C4 Beep with accelerating pitch and tempo
   playC4Beep(urgency = 1) {
-    this.ensureContext();
-    if (!this.ctx) return;
-    const t = this.ctx.currentTime;
-    const osc = this.ctx.createOscillator();
-    const gain = this.ctx.createGain();
-
-    // Urgency scales frequency higher as bomb reaches 0s
-    const pitch = 950 + urgency * 180;
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(pitch, t);
-
-    const dur = 0.08;
-    gain.gain.setValueAtTime(0.6, t);
-    gain.gain.exponentialRampToValueAtTime(0.001, t + dur);
-
-    osc.connect(gain);
-    gain.connect(this.c4Gain);
-    osc.start(t);
-    osc.stop(t + dur);
-  }
-
-  // C4 Arming code keystroke
-  playC4CodeBeep() {
-    this.ensureContext();
-    if (!this.ctx) return;
-    const t = this.ctx.currentTime;
-    const osc = this.ctx.createOscillator();
-    const gain = this.ctx.createGain();
-
-    const freq = 1200 + Math.random() * 400;
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(freq, t);
-    gain.gain.setValueAtTime(0.3, t);
-    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.06);
-
-    osc.connect(gain);
-    gain.connect(this.c4Gain);
-    osc.start(t);
-    osc.stop(t + 0.06);
-  }
-
-  // Defuse kit snipping sound
-  playDefuseKitSnip() {
-    this.ensureContext();
-    if (!this.ctx) return;
-    const t = this.ctx.currentTime;
-    const osc = this.ctx.createOscillator();
-    const gain = this.ctx.createGain();
-
-    osc.type = 'triangle';
-    osc.frequency.setValueAtTime(2200, t);
-    osc.frequency.exponentialRampToValueAtTime(800, t + 0.08);
-    gain.gain.setValueAtTime(0.4, t);
-    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.08);
-
-    osc.connect(gain);
-    gain.connect(this.sfxGain);
-    osc.start(t);
-    osc.stop(t + 0.08);
-  }
-
-  // C4 Massive Bomb Explosion
-  playExplosion() {
-    this.ensureContext();
-    if (!this.ctx) return;
-    const t = this.ctx.currentTime;
-
-    // Sub-bass rumble
-    const subOsc = this.ctx.createOscillator();
-    const subGain = this.ctx.createGain();
-    subOsc.type = 'sine';
-    subOsc.frequency.setValueAtTime(140, t);
-    subOsc.frequency.exponentialRampToValueAtTime(25, t + 2.5);
-
-    subGain.gain.setValueAtTime(1.0, t);
-    subGain.gain.exponentialRampToValueAtTime(0.001, t + 2.5);
-
-    subOsc.connect(subGain);
-    subGain.connect(this.sfxGain);
-    subOsc.start(t);
-    subOsc.stop(t + 2.5);
-
-    // Blast wave noise
-    const bufferSize = Math.floor(this.ctx.sampleRate * 3.0);
-    const noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
-    const output = noiseBuffer.getChannelData(0);
-    for (let i = 0; i < bufferSize; i++) {
-      output[i] = Math.random() * 2 - 1;
+    if (urgency > 0.75) {
+      this.playSound('c4_beep_urgent', 'c4', 1.0);
+    } else {
+      this.playSound('c4_beep', 'c4', 0.9);
     }
-
-    const blastNoise = this.ctx.createBufferSource();
-    blastNoise.buffer = noiseBuffer;
-
-    const filter = this.ctx.createBiquadFilter();
-    filter.type = 'lowpass';
-    filter.frequency.setValueAtTime(800, t);
-    filter.frequency.exponentialRampToValueAtTime(80, t + 3.0);
-
-    const blastGain = this.ctx.createGain();
-    blastGain.gain.setValueAtTime(1.0, t);
-    blastGain.gain.exponentialRampToValueAtTime(0.001, t + 3.0);
-
-    blastNoise.connect(filter);
-    filter.connect(blastGain);
-    blastGain.connect(this.sfxGain);
-
-    blastNoise.start(t);
-    blastNoise.stop(t + 3.0);
   }
 
-  // Footstep thud
+  playC4CodeBeep() {
+    this.playSound('c4_key', 'c4', 0.5);
+  }
+
+  playDefuseKitSnip() {
+    this.playSound('c4_disarm_start', 'sfx', 0.8);
+  }
+
+  playExplosion() {
+    this.playSound('c4_explode', 'sfx', 1.4);
+  }
+
   playFootstep() {
-    this.ensureContext();
-    if (!this.ctx) return;
-    const t = this.ctx.currentTime;
-    const osc = this.ctx.createOscillator();
-    const gain = this.ctx.createGain();
-
-    osc.type = 'triangle';
-    osc.frequency.setValueAtTime(100 + Math.random() * 30, t);
-    osc.frequency.exponentialRampToValueAtTime(40, t + 0.08);
-
-    gain.gain.setValueAtTime(0.25, t);
-    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.08);
-
-    osc.connect(gain);
-    gain.connect(this.sfxGain);
-    osc.start(t);
-    osc.stop(t + 0.08);
+    this.playSound('footstep_sand', 'sfx', 0.35);
   }
 
-  // Radio announcer voice chords (Tactical radio announcement tone)
+  playDamage() {
+    this.playSound('damage1', 'sfx', 0.7);
+  }
+
   playRadioTone(kind = 'beep') {
     this.ensureContext();
     if (!this.ctx) return;
     const t = this.ctx.currentTime;
     const osc = this.ctx.createOscillator();
     const gain = this.ctx.createGain();
-
-    if (kind === 'start') {
-      osc.frequency.setValueAtTime(520, t);
-      osc.frequency.setValueAtTime(650, t + 0.08);
-    } else if (kind === 'win') {
-      osc.frequency.setValueAtTime(440, t);
-      osc.frequency.setValueAtTime(880, t + 0.12);
-    } else {
-      osc.frequency.setValueAtTime(700, t);
-    }
-
-    gain.gain.setValueAtTime(0.3, t);
-    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
-
+    osc.frequency.setValueAtTime(kind === 'win' ? 520 : 650, t);
+    gain.gain.setValueAtTime(0.2, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.15);
     osc.connect(gain);
     gain.connect(this.sfxGain);
     osc.start(t);
-    osc.stop(t + 0.25);
+    osc.stop(t + 0.15);
   }
 }
 
-// Global audio singleton
 window.csAudio = new CS2AudioSystem();
