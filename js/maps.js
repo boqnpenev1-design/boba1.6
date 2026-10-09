@@ -1,5 +1,5 @@
 // CS2 Authentic Map Engine: Dust II (de_dust2) & Mirage (de_mirage)
-// Fully enclosed competitive layouts, solid walls, authentic textures, OBJ model loading & solid colliders
+// Native 3D Model Rendering: de_dust2.obj & untitled.glb with Solid Competitive Bounds
 
 class CS2MapBuilder {
   constructor(scene) {
@@ -134,7 +134,6 @@ class CS2MapBuilder {
   addBombsiteZone(id, x, y, z, radius = 9.0) {
     this.bombZones.push({ id, x, y, z, radius });
 
-    // Glowing plant circle
     const ringGeo = new THREE.RingGeometry(radius - 0.7, radius, 32);
     const ringMat = new THREE.MeshBasicMaterial({
       color: 0xff3322,
@@ -147,7 +146,6 @@ class CS2MapBuilder {
     ringMesh.position.set(x, y + 0.08, z);
     this.mapGroup.add(ringMesh);
 
-    // Site letter marker
     const canvas = document.createElement('canvas');
     canvas.width = 128;
     canvas.height = 128;
@@ -167,7 +165,6 @@ class CS2MapBuilder {
     this.mapGroup.add(textMesh);
   }
 
-  // Check if position is inside team buy zone
   isInBuyZone(team, pos) {
     const bz = this.buyZones[team];
     if (!bz) return false;
@@ -175,7 +172,7 @@ class CS2MapBuilder {
   }
 
   // ==============================================================
-  // MAP 1: DE_DUST2 (Fully Enclosed Solid Competitive Layout)
+  // MAP 1: DE_DUST2 (Native 3D OBJ Model & Solid Geometry)
   // ==============================================================
   buildDust2() {
     this.clear();
@@ -198,7 +195,7 @@ class CS2MapBuilder {
     floor.rotation.x = -Math.PI / 2;
     this.mapGroup.add(floor);
 
-    // If OBJLoader is available, load the 3D model exported by user
+    // Native 3D Dust 2 Model from source/de_dust2/
     if (typeof THREE.OBJLoader !== 'undefined') {
       const objLoader = new THREE.OBJLoader();
       if (typeof THREE.MTLLoader !== 'undefined') {
@@ -211,70 +208,69 @@ class CS2MapBuilder {
           objLoader.load('de_dust2.obj', (obj) => {
             obj.rotation.x = -Math.PI / 2;
             obj.scale.set(0.045, 0.045, 0.045);
-            obj.position.set(0, 0, 0);
+            // Center & ground level alignment
+            obj.position.set(14.4, 8.64, 50.4);
             this.mapGroup.add(obj);
           }, undefined, () => {});
-        }, undefined, () => {});
+        }, undefined, () => {
+          // If MTL fails, load OBJ directly
+          objLoader.load('source/de_dust2/de_dust2.obj', (obj) => {
+            obj.rotation.x = -Math.PI / 2;
+            obj.scale.set(0.045, 0.045, 0.045);
+            obj.position.set(14.4, 8.64, 50.4);
+            this.mapGroup.add(obj);
+          }, undefined, () => {});
+        });
       }
     }
 
-    // High Solid Boundary Walls (Enclosing the map completely)
-    this.addObstacle(0, 0, -125, 270, 22, 10, wallMat);  // North CT Back Wall
-    this.addObstacle(0, 0, 125, 270, 22, 10, wallMat);   // South T Back Wall
-    this.addObstacle(-130, 0, 0, 10, 22, 270, wallMat);  // West B Outer Wall
-    this.addObstacle(130, 0, 0, 10, 22, 270, wallMat);   // East Long A Outer Wall
+    // High Solid Boundary Walls
+    this.addObstacle(0, 0, -125, 270, 22, 10, wallMat);
+    this.addObstacle(0, 0, 125, 270, 22, 10, wallMat);
+    this.addObstacle(-130, 0, 0, 10, 22, 270, wallMat);
+    this.addObstacle(130, 0, 0, 10, 22, 270, wallMat);
 
-    // ============ T SPAWN (South: Z ~ +85 to +115) ============
+    // T Spawn
     this.addObstacle(0, 0, 102, 55, 1.2, 26, wallMat, true);
     this.addObstacle(-32, 0, 100, 6, 14, 34, wallMat);
     this.addObstacle(32, 0, 100, 6, 14, 34, wallMat);
 
-    // ============ MIDDLE LANE (Center: Z ~ -40 to +60) ============
+    // Mid
     this.addObstacle(-18, 0, 30, 5, 14, 75, wallMat);
     this.addObstacle(18, 0, 30, 5, 14, 75, wallMat);
     this.addObstacle(-7.5, 0, -15, 7, 12, 3, doorMat);
     this.addObstacle(7.5, 0, -15, 7, 12, 3, doorMat);
-    // Xbox Crate (Climbable to Short Catwalk)
     this.addObstacle(0, 0, 14, 4.4, 3.5, 4.4, crateMat, true);
 
-    // ============ SHORT A / CATWALK (Z ~ -20 to -60) ============
+    // Catwalk / Short
     this.addObstacle(24, 0, -35, 7, 3.5, 50, wallMat, true);
     this.addObstacle(20, 3.5, -35, 2.5, 5, 50, wallMat);
     this.addObstacle(30, 0, -58, 14, 3.0, 12, wallMat, true);
 
-    // ============ BOMBSITE A (East / North-East) ============
-    // A Site Raised Platform
+    // Bombsite A
     this.addObstacle(54, 0, -60, 36, 2.4, 36, wallMat, true);
-    // Back of A (Goose Wall)
     this.addObstacle(54, 2.4, -79, 38, 10, 4, wallMat);
-    // A Default Site Crates (Climbable)
     this.addObstacle(46, 2.4, -54, 4.0, 3.8, 4.0, crateMat, true);
     this.addObstacle(60, 2.4, -66, 4.0, 3.8, 4.0, crateMat, true);
-    // Long A Walls & Long Doors
     this.addObstacle(76, 0, -25, 5, 14, 55, wallMat);
     this.addObstacle(76, 0, 25, 5, 14, 55, wallMat);
     this.addObstacle(76, 0, 60, 22, 14, 5, doorMat);
     this.addObstacle(58, 0, 75, 5, 14, 28, wallMat);
 
-    // ============ B TUNNELS & BOMBSITE B (West / North-West) ============
-    // Upper & Lower Tunnels
+    // Bombsite B & Tunnels
     this.addObstacle(-58, 0, 40, 5, 14, 65, wallMat);
     this.addObstacle(-80, 0, 40, 5, 14, 65, wallMat);
-    // B Site Platform
     this.addObstacle(-64, 0, -50, 36, 2.0, 36, wallMat, true);
-    // B Back Wall
     this.addObstacle(-64, 2.0, -70, 38, 10, 4, wallMat);
-    // B Doors & Window
     this.addObstacle(-44, 0, -42, 16, 12, 4, doorMat);
     this.addObstacle(-82, 0, -35, 4, 14, 28, wallMat);
-    // B Site Crates (Climbable)
     this.addObstacle(-60, 2.0, -44, 4.2, 3.8, 4.2, crateMat, true);
     this.addObstacle(-70, 2.0, -56, 4.2, 3.8, 4.2, crateMat, true);
 
-    // ============ CT SPAWN (North: Z ~ -85 to -105) ============
+    // CT Spawn
     this.addObstacle(-16, 0, -108, 38, 14, 5, wallMat);
 
-    // Bombsite Plant Rings (A site Y=2.4 on platform, B site Y=2.0 on platform)
+    // Bombsite Plant Rings
     this.addBombsiteZone('A', 54, 2.4, -60, 9.0);
     this.addBombsiteZone('B', -64, 2.0, -50, 9.0);
 
@@ -301,7 +297,7 @@ class CS2MapBuilder {
   }
 
   // ==============================================================
-  // MAP 2: DE_MIRAGE (Fully Enclosed Moroccan Town Layout)
+  // MAP 2: DE_MIRAGE (Native 3D GLB Model & Moroccan Town)
   // ==============================================================
   buildMirage() {
     this.clear();
@@ -322,25 +318,37 @@ class CS2MapBuilder {
     floor.rotation.x = -Math.PI / 2;
     this.mapGroup.add(floor);
 
-    // Outer Walls (Enclosing Mirage completely)
+    // Native 3D Mirage Model from source/untitled.glb
+    if (typeof THREE.GLTFLoader !== 'undefined') {
+      const gltfLoader = new THREE.GLTFLoader();
+      gltfLoader.load('source/untitled.glb', (gltf) => {
+        const mapObj = gltf.scene;
+        mapObj.rotation.x = -Math.PI / 2;
+        mapObj.scale.set(0.045, 0.045, 0.045);
+        mapObj.position.set(23.2, 14.0, -37.2);
+        this.mapGroup.add(mapObj);
+      }, undefined, () => {});
+    }
+
+    // Outer Walls
     this.addObstacle(0, 0, -130, 270, 22, 10, stuccoMat);
     this.addObstacle(0, 0, 130, 270, 22, 10, stuccoMat);
     this.addObstacle(-130, 0, 0, 10, 22, 270, stuccoMat);
     this.addObstacle(130, 0, 0, 10, 22, 270, stuccoMat);
 
-    // ============ T SPAWN (South) ============
+    // T Spawn
     this.addObstacle(0, 0, 105, 45, 1.2, 24, stuccoMat, true);
     this.addObstacle(-28, 0, 105, 5, 14, 28, stuccoMat);
     this.addObstacle(28, 0, 105, 5, 14, 28, stuccoMat);
 
-    // ============ MID & SNIPER WINDOW ============
+    // Mid & Sniper Window
     this.addObstacle(0, 0, -32, 22, 8.0, 5, stuccoMat);
     this.addObstacle(0, 2.8, -32, 9, 1.4, 5, stuccoMat, true);
     this.addObstacle(18, 0, -18, 5, 12, 34, stuccoMat);
     this.addObstacle(-24, 0, -15, 5, 12, 38, stuccoMat);
     this.addObstacle(0, 0, 26, 4.2, 3.6, 4.2, crateMat, true);
 
-    // ============ BOMBSITE A ============
+    // Bombsite A
     this.addObstacle(58, 0, 20, 5, 14, 48, stuccoMat);
     this.addObstacle(68, 0, -15, 22, 4.4, 16, stuccoMat, true);
     this.addObstacle(78, 4.4, -15, 2.5, 7, 16, stuccoMat);
@@ -350,7 +358,7 @@ class CS2MapBuilder {
     this.addObstacle(52, 0, -48, 4.0, 4.0, 4.0, crateMat, true);
     this.addObstacle(28, 0, -64, 8, 6.5, 9, stuccoMat);
 
-    // ============ BOMBSITE B ============
+    // Bombsite B
     this.addObstacle(-68, 0, 5, 20, 4.6, 52, stuccoMat, true);
     this.addObstacle(-78, 4.6, 5, 2.5, 7, 52, stuccoMat);
     this.addObstacle(-46, 0, -38, 6, 3.4, 10, crateMat, true);

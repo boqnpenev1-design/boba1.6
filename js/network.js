@@ -1,4 +1,5 @@
-// CS2 WebRTC Multiplayer Engine with Automatic Public Matchmaking, 3D Character Models & State Sync
+// CS2 WebRTC Multiplayer Engine: Real-Time Gunfire Audio Sync, Footsteps Sync,
+// Mid-Round Spectator POV Join Sync, Round State Lockstep, and 3D Operator Models
 
 class CS2NetworkManager {
   constructor(gameManager) {
@@ -8,7 +9,7 @@ class CS2NetworkManager {
     this.connections = [];
     this.hostConnection = null;
     this.roomId = null;
-    this.remotePlayers = {}; // id -> { mesh, data, team, pos }
+    this.remotePlayers = {}; // id -> { mesh, data, team, pos, lastPos, lastStepTime }
     this.isConnected = false;
     this.gltfLoader = typeof THREE.GLTFLoader !== 'undefined' ? new THREE.GLTFLoader() : null;
   }
@@ -22,13 +23,10 @@ class CS2NetworkManager {
     return code;
   }
 
-  // Automatic Public Server Matchmaking:
-  // Players clicking Server 1 (Dust II) or Server 2 (Mirage) automatically join the same room.
   autoJoinPublicServer(mapName, onReady) {
     const targetRoom = `cs2-pub-${mapName.toLowerCase()}`;
     this.roomId = targetRoom;
 
-    // Try joining as a client first
     const clientPeer = new Peer({
       debug: 1,
       config: {
@@ -42,7 +40,6 @@ class CS2NetworkManager {
     let connectedAsClient = false;
     const timeout = setTimeout(() => {
       if (!connectedAsClient) {
-        // No host found, become the public host!
         clientPeer.destroy();
         this.hostPublicServer(targetRoom, onReady);
       }
@@ -115,14 +112,18 @@ class CS2NetworkManager {
       this.connections.push(conn);
       this.setupHostConnectionHandlers(conn);
 
-      // Send initial game state (C4 state, scores) to new player
-      if (this.gm.c4Planted && this.gm.c4Pos) {
-        conn.send({
-          type: 'plant_c4',
-          pos: this.gm.c4Pos,
-          site: this.gm.c4Site
-        });
-      }
+      // CRITICAL: Send live match state to joining player
+      conn.send({
+        type: 'match_sync',
+        phase: this.gm.phase,
+        phaseTimer: this.gm.phaseTimer,
+        ctScore: this.gm.ctScore,
+        tScore: this.gm.tScore,
+        round: this.gm.currentRound,
+        c4Planted: this.gm.c4Planted,
+        c4Pos: this.gm.c4Pos,
+        c4Site: this.gm.c4Site
+      });
     });
 
     this.peer.on('error', (err) => {
@@ -213,6 +214,8 @@ class CS2NetworkManager {
       this.updateRemotePlayer(data.id, data);
       this.broadcast(data, senderConn);
     } else if (data.type === 'shoot') {
+      // Play gunshot audio for host!
+      window.csAudio.playGunshot(data.weaponType || 'rifle', data.weaponId || 'ak47', data.isSilenced || false);
       this.broadcast(data, senderConn);
     } else if (data.type === 'damage') {
       if (data.targetId === 'host' || (this.peer && data.targetId === this.peer.id)) {
@@ -233,13 +236,32 @@ class CS2NetworkManager {
     if (data.type === 'player_update') {
       this.updateRemotePlayer(data.id, data);
     } else if (data.type === 'shoot') {
-      window.csAudio.playGunshot(data.weaponType || 'rifle', data.weaponId || 'ak47', false);
+      window.csAudio.playGunshot(data.weaponType || 'rifle', data.weaponId || 'ak47', data.isSilenced || false);
     } else if (data.type === 'damage' && this.peer && data.targetId === this.peer.id) {
       this.gm.player.takeDamage(data.amount, data.attacker, data.weapon);
     } else if (data.type === 'plant_c4') {
       this.gm.onC4Planted(data.pos, data.site);
     } else if (data.type === 'defuse_c4') {
       this.gm.onC4Defused();
+    } else if (data.type === 'match_sync') {
+      // Sync match state from host
+      this.gm.phase = data.phase;
+      this.gm.phaseTimer = data.phaseTimer;
+      this.gm.ctScore = data.ctScore;
+      this.gm.tScore = data.tScore;
+      this.gm.currentRound = data.round;
+      if (data.c4Planted && data.c4Pos) {
+        this.gm.onC4Planted(data.c4Pos, data.c4Site);
+      }
+      // If round is currently LIVE, joining player spectates until next round
+      if (data.phase === 'live') {
+        this.gm.player.enterSpectatorMode();
+      }
+    } else if (data.type === 'round_start') {
+      this.gm.currentRound = data.round;
+      this.gm.startRound();
+    } else if (data.type === 'round_end') {
+      this.gm.endRound(data.winner, data.reason);
     }
   }
 
@@ -249,6 +271,22 @@ class CS2NetworkManager {
       if (conn !== excludeConn && conn.open) {
         conn.send(data);
       }
+    }
+  }
+
+  sendShoot(weaponType, weaponId, isSilenced, pos) {
+    const packet = {
+      type: 'shoot',
+      shooterId: this.peer ? this.peer.id : 'local',
+      weaponType: weaponType,
+      weaponId: weaponId,
+      isSilenced: isSilenced,
+      pos: pos
+    };
+    if (this.isHost) {
+      this.broadcast(packet, null);
+    } else if (this.hostConnection && this.hostConnection.open) {
+      this.hostConnection.send(packet);
     }
   }
 
@@ -288,7 +326,6 @@ class CS2NetworkManager {
     }
   }
 
-  // Creates detailed 3D tactical player model for connected human players
   createTacticalCharacterModel(team) {
     const group = new THREE.Group();
 
@@ -356,11 +393,13 @@ class CS2NetworkManager {
       this.gm.scene.add(model);
       this.remotePlayers[id] = {
         mesh: model,
+        data: data,
         team: data.team,
-        pos: data.pos
+        pos: data.pos,
+        lastPos: null,
+        lastStepTime: 0
       };
 
-      // If SAS model is available for CT, upgrade asynchronously
       if (data.team === 'CT' && this.gltfLoader) {
         this.gltfLoader.load('source/sas_blue.glb', (gltf) => {
           const sas = gltf.scene;
@@ -375,11 +414,23 @@ class CS2NetworkManager {
     }
 
     const p = this.remotePlayers[id];
+    p.data = data;
     p.pos = data.pos;
     p.team = data.team;
     p.mesh.position.set(data.pos.x, data.pos.y - 1.8, data.pos.z);
     p.mesh.rotation.y = data.yaw;
     p.mesh.visible = data.health > 0;
+
+    // Real-time remote footsteps audio sync
+    const now = performance.now();
+    if (p.lastPos) {
+      const distMoved = Math.hypot(data.pos.x - p.lastPos.x, data.pos.z - p.lastPos.z);
+      if (distMoved > 0.12 && now - p.lastStepTime > 340) {
+        p.lastStepTime = now;
+        window.csAudio.playFootstep();
+      }
+    }
+    p.lastPos = { x: data.pos.x, y: data.pos.y, z: data.pos.z };
   }
 }
 

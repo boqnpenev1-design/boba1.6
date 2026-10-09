@@ -468,6 +468,9 @@ class CS2Player {
 
     this.clipAmmo.add(-1);
     window.csAudio.playGunshot(this.activeWeapon.audioType, this.activeWeapon.id, this.activeWeapon.isSilenced);
+    if (gameManager && gameManager.net) {
+      gameManager.net.sendShoot(this.activeWeapon.audioType, this.activeWeapon.id, this.activeWeapon.isSilenced, this.position);
+    }
 
     this.muzzleLight.intensity = 2.5;
     this.muzzleFlashMesh.visible = true;

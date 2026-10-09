@@ -160,7 +160,12 @@ class CS2GameManager {
     document.getElementById('hud').classList.remove('hidden');
     document.getElementById('game-canvas-container').requestPointerLock();
 
-    this.startRound();
+    // If joining client while round is currently LIVE, spectate until next round starts!
+    if (!this.net.isHost && this.phase === 'live') {
+      this.player.enterSpectatorMode();
+    } else {
+      this.startRound();
+    }
   }
 
   startRound() {
@@ -183,6 +188,14 @@ class CS2GameManager {
     const spawns = this.mapBuilder.spawnPoints[this.player.team];
     const s = spawns[Math.floor(Math.random() * spawns.length)];
     this.player.respawn(s);
+
+    // If host, notify all connected clients to start new round
+    if (this.net && this.net.isHost) {
+      this.net.broadcast({
+        type: 'round_start',
+        round: this.currentRound
+      });
+    }
 
     if (this.currentRound === 13) {
       this.handleHalftimeSwap();
@@ -291,6 +304,15 @@ class CS2GameManager {
     this.phase = 'round_over';
     this.phaseTimer = 5;
 
+    // Broadcast round end to all connected clients
+    if (this.net && this.net.isHost) {
+      this.net.broadcast({
+        type: 'round_end',
+        winner: winner,
+        reason: reason
+      });
+    }
+
     if (winner === 'CT') {
       this.ctScore++;
       this.consecutiveLosses.CT = 0;
@@ -335,6 +357,41 @@ class CS2GameManager {
       document.getElementById('main-menu').classList.remove('hidden');
       document.exitPointerLock();
     }, 6000);
+  }
+
+  // Automatic Team Elimination Check
+  checkRoundElimination() {
+    if (this.phase !== 'live') return;
+
+    let livingCT = 0;
+    let livingT = 0;
+
+    // Check local player
+    if (this.player.health.get() > 0 && !this.player.isSpectating) {
+      if (this.player.team === 'CT') livingCT++;
+      else livingT++;
+    }
+
+    // Check remote players
+    Object.values(this.net.remotePlayers).forEach(p => {
+      const hp = (p.data && p.data.health !== undefined) ? p.data.health : 100;
+      if (hp > 0) {
+        if (p.team === 'CT') livingCT++;
+        else livingT++;
+      }
+    });
+
+    const totalCT = (this.player.team === 'CT' ? 1 : 0) + Object.values(this.net.remotePlayers).filter(p => p.team === 'CT').length;
+    const totalT = (this.player.team === 'T' ? 1 : 0) + Object.values(this.net.remotePlayers).filter(p => p.team === 'T').length;
+
+    // When both teams have had players participating
+    if (totalCT > 0 && totalT > 0) {
+      if (livingT === 0 && !this.c4Planted) {
+        this.endRound('CT', 'TERRORISTS ELIMINATED');
+      } else if (livingCT === 0) {
+        this.endRound('T', 'COUNTER-TERRORISTS ELIMINATED');
+      }
+    }
   }
 
   handleObjectives(dt) {
@@ -582,6 +639,9 @@ class CS2GameManager {
         }
       }
     }
+
+    // Check for team elimination (All enemies killed)
+    this.checkRoundElimination();
 
     this.player.update(dt, currentTime, this);
     this.handleObjectives(dt);
