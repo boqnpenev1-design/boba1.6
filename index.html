@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Counter-Strike 2 Browser Edition | Dust II & Mirage</title>
+  <meta name="description" content="Play CS2 directly in your web browser! Features official Dust 2 and Mirage maps, complete weapon arsenal, MR12 competitive mode, cross-WiFi online multiplayer, and anti-cheat protection.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:ital,wght@0,400;0,600;0,700;1,700&family=Rajdhani:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  
+  <!-- Three.js (3D Engine) & PeerJS (Cross-WiFi WebRTC Multiplayer) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+</head>
+<body>
+  <!-- 3D Canvas Container -->
+  <div id="game-canvas-container"></div>
+
+  <!-- In-game Sniper / Scope Overlay -->
+  <div id="scope-overlay" class="hidden">
+    <div class="scope-crosshair"></div>
+    <div class="scope-lens"></div>
+  </div>
+
+  <!-- Hit / Flash / Damage Screen Overlays -->
+  <div id="damage-vignette"></div>
+  <div id="flash-overlay"></div>
+
+  <!-- HUD Interface (Visible in Match) -->
+  <div id="hud" class="hidden">
+    <!-- Top Header: Round Timer, Scores, Team Icons -->
+    <div class="hud-top">
+      <div class="team-score-card ct-score-card">
+        <div class="team-logo ct-logo">CT</div>
+        <div class="team-alive-count" id="ct-alive-count">5 ALIVE</div>
+        <div class="team-score" id="ct-score">0</div>
+      </div>
+
+      <div class="match-clock-box">
+        <div class="round-status-text" id="round-phase-label">COMPETITIVE MR12</div>
+        <div class="round-timer" id="round-timer">1:55</div>
+        <div class="bomb-carrier-indicator hidden" id="c4-planted-alert">
+          <span class="bomb-icon">💣</span>
+          <span class="bomb-clock" id="bomb-clock">40.0s</span>
+        </div>
+      </div>
+
+      <div class="team-score-card t-score-card">
+        <div class="team-score" id="t-score">0</div>
+        <div class="team-alive-count" id="t-alive-count">5 ALIVE</div>
+        <div class="team-logo t-logo">T</div>
+      </div>
+    </div>
+
+    <!-- Top Left: Radar / Minimap -->
+    <div class="radar-container">
+      <canvas id="radar-canvas" width="180" height="180"></canvas>
+      <div class="radar-label" id="radar-map-name">DE_DUST2</div>
+      <div class="radar-location" id="radar-location-callout">T SPAWN</div>
+    </div>
+
+    <!-- Top Right: Killfeed -->
+    <div class="killfeed" id="killfeed"></div>
+
+    <!-- Center Screen Alerts & Interaction Progress -->
+    <div class="center-notifications">
+      <div id="announcement-banner" class="announcement hidden"></div>
+      
+      <!-- Bomb Plant / Defuse Progress Bar -->
+      <div id="interaction-bar-container" class="hidden">
+        <div class="interaction-title" id="interaction-title">DEFUSING BOMB...</div>
+        <div class="interaction-progress-track">
+          <div class="interaction-progress-fill" id="interaction-progress-fill"></div>
+        </div>
+      </div>
+
+      <!-- Action Prompt (e.g. Press E to Defuse / Plant) -->
+      <div id="action-prompt" class="action-prompt hidden">
+        <span class="key-hint">E</span> <span id="action-prompt-text">PLANT BOMB</span>
+      </div>
+    </div>
+
+    <!-- Dynamic Crosshair -->
+    <div id="crosshair-container">
+      <div class="crosshair-ch ch-top"></div>
+      <div class="crosshair-ch ch-bottom"></div>
+      <div class="crosshair-ch ch-left"></div>
+      <div class="crosshair-ch ch-right"></div>
+      <div class="crosshair-dot"></div>
+    </div>
+
+    <!-- Bottom Left: Health, Armor, Kit & Money -->
+    <div class="hud-bottom-left">
+      <div class="hud-box health-box">
+        <span class="hud-icon">+</span>
+        <span class="hud-val" id="hud-health">100</span>
+      </div>
+
+      <div class="hud-box armor-box">
+        <span class="hud-icon" id="armor-icon">🛡</span>
+        <span class="hud-val" id="hud-armor">100</span>
+        <span class="helmet-indicator" id="hud-helmet">HELMET</span>
+      </div>
+
+      <div class="hud-box kit-box hidden" id="hud-kit">
+        <span class="kit-icon">✂</span>
+        <span class="kit-label">DEFUSER</span>
+      </div>
+
+      <div class="hud-money">
+        <span class="currency">$</span><span id="hud-money">800</span>
+      </div>
+    </div>
+
+    <!-- Bottom Right: Weapon, Firemode & Ammo -->
+    <div class="hud-bottom-right">
+      <div class="weapon-hud-display">
+        <div class="weapon-name" id="hud-weapon-name">AK-47</div>
+        <div class="weapon-firemode" id="hud-weapon-mode">AUTOMATIC</div>
+      </div>
+      <div class="hud-box ammo-box">
+        <span class="ammo-clip" id="hud-ammo-clip">30</span>
+        <span class="ammo-slash">/</span>
+        <span class="ammo-reserve" id="hud-ammo-reserve">90</span>
+      </div>
+    </div>
+
+    <!-- Weapon Inventory Slots Indicator -->
+    <div class="weapon-slots-hud" id="weapon-slots">
+      <div class="slot-item active" data-slot="1">1: PRIMARY</div>
+      <div class="slot-item" data-slot="2">2: SECONDARY</div>
+      <div class="slot-item" data-slot="3">3: KNIFE</div>
+      <div class="slot-item" data-slot="4">4: GRENADES</div>
+      <div class="slot-item" data-slot="5">5: C4 BOMB</div>
+    </div>
+  </div>
+
+  <!-- Buy Wheel / Buy Menu (Triggered with 'B' during Buy Phase) -->
+  <div id="buy-menu" class="overlay-modal hidden">
+    <div class="buy-modal-content">
+      <div class="buy-header">
+        <h2>CS2 REQUISITION / BUY MENU</h2>
+        <div class="buy-cash">AVAILABLE: <span class="cash-amount" id="buy-menu-cash">$800</span></div>
+        <button class="modal-close-btn" id="close-buy-menu">&times;</button>
+      </div>
+
+      <div class="buy-grid">
+        <!-- Categories Column -->
+        <div class="buy-categories">
+          <button class="buy-cat-btn active" data-cat="pistols">1. PISTOLS</button>
+          <button class="buy-cat-btn" data-cat="mid-tier">2. MID-TIER (SMG & SHOTGUNS)</button>
+          <button class="buy-cat-btn" data-cat="rifles">3. RIFLES & SNIPERS</button>
+          <button class="buy-cat-btn" data-cat="equipment">4. GEAR & GRENADES</button>
+        </div>
+
+        <!-- Weapon Items Grid -->
+        <div class="buy-items-grid" id="buy-items-grid">
+          <!-- Populated dynamically by weapons.js -->
+        </div>
+      </div>
+
+      <div class="buy-footer">
+        <span>PRESS <kbd>B</kbd> OR <kbd>ESC</kbd> TO RETURN TO MATCH</span>
+        <span id="buy-time-remaining">BUY TIME: 15s</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scoreboard (Hold TAB) -->
+  <div id="scoreboard" class="scoreboard-overlay hidden">
+    <div class="scoreboard-container">
+      <div class="scoreboard-header">
+        <div class="sb-match-title">COMPETITIVE MATCH &bull; <span id="sb-map-name">DUST II</span></div>
+        <div class="sb-server-status" id="sb-net-status">OFFLINE (LOCAL AI)</div>
+      </div>
+
+      <!-- CT Team Table -->
+      <div class="sb-team-section ct-section">
+        <div class="sb-team-header">
+          <span class="sb-team-tag ct-tag">COUNTER-TERRORISTS</span>
+          <span class="sb-team-rounds" id="sb-ct-score">0</span>
+        </div>
+        <table class="sb-table">
+          <thead>
+            <tr>
+              <th class="col-status"></th>
+              <th class="col-name">PLAYER</th>
+              <th class="col-ping">PING</th>
+              <th class="col-kills">K</th>
+              <th class="col-assists">A</th>
+              <th class="col-deaths">D</th>
+              <th class="col-mvp">MVP</th>
+              <th class="col-score">SCORE</th>
+              <th class="col-cash">$ CASH</th>
+            </tr>
+          </thead>
+          <tbody id="sb-ct-rows"></tbody>
+        </table>
+      </div>
+
+      <!-- T Team Table -->
+      <div class="sb-team-section t-section">
+        <div class="sb-team-header">
+          <span class="sb-team-tag t-tag">TERRORISTS</span>
+          <span class="sb-team-rounds" id="sb-t-score">0</span>
+        </div>
+        <table class="sb-table">
+          <thead>
+            <tr>
+              <th class="col-status"></th>
+              <th class="col-name">PLAYER</th>
+              <th class="col-ping">PING</th>
+              <th class="col-kills">K</th>
+              <th class="col-assists">A</th>
+              <th class="col-deaths">D</th>
+              <th class="col-mvp">MVP</th>
+              <th class="col-score">SCORE</th>
+              <th class="col-cash">$ CASH</th>
+            </tr>
+          </thead>
+          <tbody id="sb-t-rows"></tbody>
+        </table>
+      </div>
+
+      <div class="scoreboard-footer">
+        <span>MATCH MR12 &bull; FIRST TO 13 ROUNDS WINS</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Menu / Match Lobby -->
+  <div id="main-menu" class="main-menu-overlay">
+    <div class="cs2-backdrop"></div>
+    <div class="menu-container">
+      <div class="cs2-brand">
+        <div class="cs2-logo-badge">CS2</div>
+        <div class="cs2-titles">
+          <h1>COUNTER-STRIKE 2</h1>
+          <p class="cs2-subtitle">WEB GL EXPERIMENTAL &bull; COMPETITIVE MR12</p>
+        </div>
+      </div>
+
+      <div class="menu-nav-tabs">
+        <button class="nav-tab active" data-tab="play">PLAY COMPETITIVE</button>
+        <button class="nav-tab" data-tab="online">ONLINE MULTIPLAYER</button>
+        <button class="nav-tab" data-tab="settings">SETTINGS & CONTROLS</button>
+        <button class="nav-tab" data-tab="security">SECURITY & ANTI-TAMPER</button>
+        <button class="nav-tab" data-tab="about">ABOUT & GITHUB</button>
+      </div>
+
+      <!-- TAB 1: PLAY COMPETITIVE -->
+      <div class="tab-pane active" id="pane-play">
+        <div class="play-columns">
+          <!-- Map Selector -->
+          <div class="menu-card map-card">
+            <h3>SELECT MAP</h3>
+            <div class="map-selection-list">
+              <label class="map-option active">
+                <input type="radio" name="selected-map" value="dust2" checked>
+                <div class="map-preview dust2-preview">
+                  <div class="map-info">
+                    <h4>DUST II</h4>
+                    <span>Active Duty &bull; Middle East Desert &bull; Bombsites A & B</span>
+                  </div>
+                </div>
+              </label>
+
+              <label class="map-option">
+                <input type="radio" name="selected-map" value="mirage">
+                <div class="map-preview mirage-preview">
+                  <div class="map-info">
+                    <h4>MIRAGE</h4>
+                    <span>Active Duty &bull; Moroccan Town &bull; Bombsites A & B</span>
+                  </div>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          <!-- Side / Team Selector & Game Mode -->
+          <div class="menu-card team-card">
+            <h3>SELECT SIDE</h3>
+            <div class="team-selection-grid">
+              <label class="team-option ct-option active">
+                <input type="radio" name="selected-team" value="CT" checked>
+                <div class="team-box ct-box">
+                  <div class="team-avatar ct-avatar">🛡</div>
+                  <h4>COUNTER-TERRORISTS</h4>
+                  <p>Defend bombsites, defuse C4, eliminate Terrorist cell. Start with USP-S.</p>
+                </div>
+              </label>
+
+              <label class="team-option t-option">
+                <input type="radio" name="selected-team" value="T">
+                <div class="team-box t-box">
+                  <div class="team-avatar t-avatar">💣</div>
+                  <h4>TERRORISTS</h4>
+                  <p>Infiltrate sites, plant C4, guard detonation, eliminate CTs. Start with Glock-18.</p>
+                </div>
+              </label>
+            </div>
+
+            <div class="match-mode-box">
+              <h4>MATCH MODE: COMPETITIVE MR12</h4>
+              <ul>
+                <li>First team to 13 rounds wins</li>
+                <li>Halftime side swap at Round 12</li>
+                <li>Official economy rules ($800 starting, loss streak bonus)</li>
+                <li>15s Buy phase + 1m 55s round time</li>
+                <li>40s Bomb timer & defuse kit support</li>
+              </ul>
+            </div>
+
+            <button class="btn-play-primary" id="btn-start-match">
+              DEPLOY TO SERVER
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 2: ONLINE MULTIPLAYER (CROSS-WIFI PEER-TO-PEER) -->
+      <div class="tab-pane" id="pane-online">
+        <div class="online-setup-container">
+          <div class="menu-card">
+            <h3>HOST AN ONLINE MATCH (CROSS-WIFI)</h3>
+            <p>Create a WebRTC match lobby that friends can join from any Wi-Fi network with zero port forwarding!</p>
+            
+            <div class="net-action-group">
+              <button class="btn-primary" id="btn-create-lobby">CREATE ROOM</button>
+              <div id="host-room-info" class="room-info-display hidden">
+                <div class="room-code-tag">
+                  YOUR ROOM CODE: <strong id="host-room-code">GENERATING...</strong>
+                </div>
+                <button class="btn-secondary" id="btn-copy-code">COPY CODE</button>
+                <p class="small-hint">Share this 6-character room code with anyone on any Wi-Fi network!</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="menu-card">
+            <h3>JOIN AN ONLINE MATCH</h3>
+            <p>Enter the 6-character Room Code provided by the host:</p>
+            <div class="net-action-group">
+              <div class="input-with-button">
+                <input type="text" id="join-room-code-input" placeholder="e.g. CS-9X2K" maxlength="10">
+                <button class="btn-primary" id="btn-join-lobby">CONNECT</button>
+              </div>
+              <div id="join-status-text" class="status-indicator">READY</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 3: SETTINGS & CONTROLS -->
+      <div class="tab-pane" id="pane-settings">
+        <div class="settings-grid">
+          <!-- Mouse & Crosshair -->
+          <div class="menu-card">
+            <h3>MOUSE & SENSITIVITY</h3>
+            <div class="setting-row">
+              <label for="setting-sens">Mouse Sensitivity:</label>
+              <div class="slider-val-wrap">
+                <input type="range" id="setting-sens" min="0.2" max="6.0" step="0.1" value="1.8">
+                <span id="val-sens">1.8</span>
+              </div>
+            </div>
+
+            <div class="setting-row">
+              <label for="setting-fov">Field of View (FOV):</label>
+              <div class="slider-val-wrap">
+                <input type="range" id="setting-fov" min="65" max="105" step="1" value="85">
+                <span id="val-fov">85°</span>
+              </div>
+            </div>
+
+            <div class="setting-row">
+              <label for="setting-invert">Invert Mouse Y:</label>
+              <input type="checkbox" id="setting-invert">
+            </div>
+
+            <h3 style="margin-top:20px;">CROSSHAIR</h3>
+            <div class="setting-row">
+              <label for="setting-ch-color">Color:</label>
+              <input type="color" id="setting-ch-color" value="#00ff66">
+            </div>
+            <div class="setting-row">
+              <label for="setting-ch-size">Size:</label>
+              <input type="range" id="setting-ch-size" min="4" max="25" value="10">
+            </div>
+            <div class="setting-row">
+              <label for="setting-ch-gap">Gap:</label>
+              <input type="range" id="setting-ch-gap" min="1" max="15" value="4">
+            </div>
+            <div class="setting-row">
+              <label for="setting-ch-dot">Center Dot:</label>
+              <input type="checkbox" id="setting-ch-dot" checked>
+            </div>
+          </div>
+
+          <!-- Keybinds Configuration -->
+          <div class="menu-card">
+            <h3>KEYBINDINGS</h3>
+            <div class="keybinds-table" id="keybinds-table">
+              <!-- Populated by JavaScript -->
+            </div>
+            <button class="btn-secondary" id="btn-reset-keybinds" style="margin-top:10px;">RESET TO DEFAULT</button>
+          </div>
+
+          <!-- Audio & Video -->
+          <div class="menu-card">
+            <h3>AUDIO & PERFORMANCE</h3>
+            <div class="setting-row">
+              <label for="setting-master-vol">Master Volume:</label>
+              <input type="range" id="setting-master-vol" min="0" max="1" step="0.05" value="0.7">
+            </div>
+            <div class="setting-row">
+              <label for="setting-sfx-vol">Gunfire & SFX:</label>
+              <input type="range" id="setting-sfx-vol" min="0" max="1" step="0.05" value="0.8">
+            </div>
+            <div class="setting-row">
+              <label for="setting-c4-vol">C4 Beep & Alarm:</label>
+              <input type="range" id="setting-c4-vol" min="0" max="1" step="0.05" value="0.9">
+            </div>
+            <div class="setting-row">
+              <label for="setting-graphics">Render Quality:</label>
+              <select id="setting-graphics">
+                <option value="high" selected>High (Antialiasing + Shadows)</option>
+                <option value="medium">Medium (Standard)</option>
+                <option value="low">Low (Maximum Performance)</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 4: SECURITY & ANTI-TAMPER -->
+      <div class="tab-pane" id="pane-security">
+        <div class="menu-card security-overview-card">
+          <h3>CLIENT INTEGRITY & ANTI-DECOMPILE PROTECTION</h3>
+          <p>This browser version implements multi-tiered security defense mechanisms against client modification and script injection:</p>
+          
+          <div class="security-features-grid">
+            <div class="sec-feature">
+              <div class="sec-icon">🔒</div>
+              <h4>Memory Masking & Checksum Canaries</h4>
+              <p>Player health, armor, money, and ammo are XOR-masked in sealed closures. Any direct console manipulation triggers state mismatch and resets.</p>
+            </div>
+
+            <div class="sec-feature">
+              <div class="sec-icon">🛡</div>
+              <h4>DevTools Anti-Debugger Trap</h4>
+              <p>Detects debugger breakpoint pauses, console open states, and inspect keystrokes to prevent live variable extraction.</p>
+            </div>
+
+            <div class="sec-feature">
+              <div class="sec-icon">⚡</div>
+              <h4>Speedhack & Delta Clamping</h4>
+              <p>Player movement vectors and velocity deltas are validated per frame to reject modified position increments.</p>
+            </div>
+
+            <div class="sec-feature">
+              <div class="sec-icon">🌐</div>
+              <h4>Host-Authoritative Hit Registration</h4>
+              <p>In online matches, raycast line-of-sight and weapon cooldowns are verified on the Host server before applying damage.</p>
+            </div>
+          </div>
+
+          <div class="setting-row" style="margin-top: 20px;">
+            <label for="setting-devtools-guard">Enable DevTools & Shortcut Shield:</label>
+            <input type="checkbox" id="setting-devtools-guard" checked>
+          </div>
+          <p class="small-hint">Locks F12, Ctrl+Shift+I, and inspect shortcuts during gameplay.</p>
+        </div>
+      </div>
+
+      <!-- TAB 5: ABOUT & GITHUB -->
+      <div class="tab-pane" id="pane-about">
+        <div class="menu-card">
+          <h3>GITHUB REPOSITORY & PROJECT INFO</h3>
+          <p>Counter-Strike 2 Browser Edition is a zero-dependency 3D competitive tactical shooter engine designed to run seamlessly in any modern web browser.</p>
+          
+          <div class="github-instructions-box">
+            <h4>PUSH TO GITHUB & HOST ON GITHUB PAGES</h4>
+            <ol>
+              <li>Create a new repository on <a href="https://github.com" target="_blank" rel="noopener">GitHub</a> (e.g., <code>cs2-web-edition</code>).</li>
+              <li>Link your remote and push this repository:
+                <pre><code>git remote add origin https://github.com/YOUR_USERNAME/cs2-web-edition.git
+git branch -M main
+git push -u origin main</code></pre>
+              </li>
+              <li>Enable free hosting via <strong>GitHub Pages</strong>:
+                <br>Go to <strong>Settings</strong> &rarr; <strong>Pages</strong> &rarr; Source: <strong>Deploy from branch (main / root)</strong> &rarr; Click <strong>Save</strong>.
+              </li>
+              <li>Your game will be live for anyone to play across the globe!</li>
+            </ol>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pause / Escape Menu -->
+  <div id="pause-menu" class="overlay-modal hidden">
+    <div class="pause-box">
+      <h2>MATCH PAUSED</h2>
+      <button class="btn-play-primary" id="btn-resume">RESUME MATCH</button>
+      <button class="btn-secondary" id="btn-pause-settings">SETTINGS</button>
+      <button class="btn-secondary" id="btn-pause-buy">BUY MENU (B)</button>
+      <button class="btn-danger" id="btn-quit-to-menu">DISCONNECT TO MAIN MENU</button>
+    </div>
+  </div>
+
+  <!-- Game Scripts -->
+  <script src="js/audio.js"></script>
+  <script src="js/antiCheat.js"></script>
+  <script src="js/weapons.js"></script>
+  <script src="js/maps.js"></script>
+  <script src="js/player.js"></script>
+  <script src="js/bots.js"></script>
+  <script src="js/network.js"></script>
+  <script src="js/game.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>
