@@ -1,5 +1,4 @@
-// CS2 Cross-WiFi WebRTC Peer-to-Peer Multiplayer Engine (Powered by PeerJS)
-// Enables online competitive matches across different Wi-Fi networks with zero port-forwarding
+// CS2 WebRTC Multiplayer Engine with 3D Tactical Operator Models and Hit Sync
 
 class CS2NetworkManager {
   constructor(gameManager) {
@@ -9,11 +8,11 @@ class CS2NetworkManager {
     this.connections = [];
     this.hostConnection = null;
     this.roomId = null;
-    this.remotePlayers = {}; // id -> { mesh, data }
+    this.remotePlayers = {}; // id -> { mesh, data, team, pos }
     this.isConnected = false;
+    this.gltfLoader = typeof THREE.GLTFLoader !== 'undefined' ? new THREE.GLTFLoader() : null;
   }
 
-  // Generate 6-char Room Code for easy sharing
   generateRoomCode() {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
     let code = 'CS-';
@@ -23,13 +22,11 @@ class CS2NetworkManager {
     return code;
   }
 
-  // Host creates an online lobby
   createLobby(onReady) {
     const code = this.generateRoomCode();
     this.isHost = true;
     this.roomId = code;
 
-    // Initialize Peer with global cloud STUN
     this.peer = new Peer(code.toLowerCase(), {
       debug: 1,
       config: {
@@ -55,7 +52,6 @@ class CS2NetworkManager {
     });
   }
 
-  // Client joins an existing lobby via room code
   joinLobby(roomCode, onConnected, onError) {
     this.isHost = false;
     this.roomId = roomCode.toUpperCase();
@@ -95,7 +91,6 @@ class CS2NetworkManager {
 
   setupHostConnectionHandlers(conn) {
     conn.on('data', (data) => {
-      // Host validates and broadcasts state to all other connected peers
       this.handleHostReceivedPacket(conn, data);
     });
 
@@ -105,14 +100,18 @@ class CS2NetworkManager {
     });
   }
 
-  // Host receives packet from client
   handleHostReceivedPacket(senderConn, data) {
     if (data.type === 'player_update') {
       this.updateRemotePlayer(data.id, data);
-      // Broadcast to all other peers
       this.broadcast(data, senderConn);
     } else if (data.type === 'shoot') {
       this.broadcast(data, senderConn);
+    } else if (data.type === 'damage') {
+      if (data.targetId === 'host') {
+        this.gm.player.takeDamage(data.amount, data.attacker, data.weapon);
+      } else {
+        this.broadcast(data, null);
+      }
     } else if (data.type === 'plant_c4') {
       this.gm.onC4Planted(data.pos, data.site);
       this.broadcast(data, null);
@@ -122,20 +121,18 @@ class CS2NetworkManager {
     }
   }
 
-  // Client receives packet from host
   handleClientReceivedPacket(data) {
     if (data.type === 'player_update') {
       this.updateRemotePlayer(data.id, data);
     } else if (data.type === 'shoot') {
-      window.csAudio.playGunshot(data.weaponType || 'rifle', false);
-    } else if (data.type === 'c4_state') {
-      if (data.planted) {
-        this.gm.onC4Planted(data.pos, data.site);
-      }
+      window.csAudio.playGunshot(data.weaponType || 'rifle', data.weaponId || 'ak47', false);
+    } else if (data.type === 'damage' && data.targetId === this.peer.id) {
+      this.gm.player.takeDamage(data.amount, data.attacker, data.weapon);
+    } else if (data.type === 'c4_state' && data.planted) {
+      this.gm.onC4Planted(data.pos, data.site);
     }
   }
 
-  // Broadcast data packet to connected players
   broadcast(data, excludeConn = null) {
     for (const conn of this.connections) {
       if (conn !== excludeConn && conn.open) {
@@ -144,9 +141,23 @@ class CS2NetworkManager {
     }
   }
 
-  // Send local player state packet
+  sendDamage(targetId, amount, weapon) {
+    const packet = {
+      type: 'damage',
+      targetId: targetId,
+      attacker: 'Player',
+      amount: amount,
+      weapon: weapon
+    };
+    if (this.isHost) {
+      this.broadcast(packet, null);
+    } else if (this.hostConnection && this.hostConnection.open) {
+      this.hostConnection.send(packet);
+    }
+  }
+
   sendPlayerState(player) {
-    if (!this.isConnected) return;
+    if (!this.isConnected || !this.peer) return;
 
     const packet = {
       type: 'player_update',
@@ -166,28 +177,105 @@ class CS2NetworkManager {
     }
   }
 
+  // Creates detailed 3D tactical player model for connected human players
+  createTacticalCharacterModel(team) {
+    const group = new THREE.Group();
+
+    // Legs
+    const legGeo = new THREE.BoxGeometry(0.24, 0.9, 0.24);
+    const pantsMat = new THREE.MeshStandardMaterial({
+      color: team === 'CT' ? 0x1f2937 : 0x4a3c2c,
+      roughness: 0.8
+    });
+    const leftLeg = new THREE.Mesh(legGeo, pantsMat);
+    leftLeg.position.set(-0.16, 0.45, 0);
+    const rightLeg = new THREE.Mesh(legGeo, pantsMat);
+    rightLeg.position.set(0.16, 0.45, 0);
+    group.add(leftLeg);
+    group.add(rightLeg);
+
+    // Torso with Tactical Vest
+    const torsoGeo = new THREE.BoxGeometry(0.55, 0.75, 0.32);
+    const torsoMat = new THREE.MeshStandardMaterial({
+      color: team === 'CT' ? 0x243242 : 0x7a5b3a,
+      roughness: 0.7
+    });
+    const torso = new THREE.Mesh(torsoGeo, torsoMat);
+    torso.position.y = 1.25;
+    torso.castShadow = true;
+    group.add(torso);
+
+    // Kevlar Chest Rig
+    const vestGeo = new THREE.BoxGeometry(0.58, 0.5, 0.36);
+    const vestMat = new THREE.MeshStandardMaterial({
+      color: team === 'CT' ? 0x12171e : 0x2d3229,
+      roughness: 0.9
+    });
+    const vest = new THREE.Mesh(vestGeo, vestMat);
+    vest.position.y = 1.32;
+    group.add(vest);
+
+    // Head with Tactical Helmet / Balaclava
+    const headGeo = new THREE.BoxGeometry(0.32, 0.35, 0.32);
+    const headMat = new THREE.MeshStandardMaterial({
+      color: team === 'CT' ? 0x1e2733 : 0x9e7b56,
+      roughness: 0.6
+    });
+    const head = new THREE.Mesh(headGeo, headMat);
+    head.position.y = 1.78;
+    head.castShadow = true;
+    group.add(head);
+
+    // Goggles / Visor
+    const visorGeo = new THREE.BoxGeometry(0.26, 0.1, 0.08);
+    const visorMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.2, metalness: 0.8 });
+    const visor = new THREE.Mesh(visorGeo, visorMat);
+    visor.position.set(0, 1.8, -0.17);
+    group.add(visor);
+
+    // Weapon in hand
+    const weaponGeo = new THREE.BoxGeometry(0.08, 0.12, 0.6);
+    const weaponMat = new THREE.MeshStandardMaterial({
+      color: team === 'CT' ? 0x22262c : 0x5a3219,
+      metalness: 0.8
+    });
+    const gun = new THREE.Mesh(weaponGeo, weaponMat);
+    gun.position.set(0.24, 1.2, -0.35);
+    group.add(gun);
+
+    return group;
+  }
+
   updateRemotePlayer(id, data) {
     if (!this.remotePlayers[id]) {
-      // Spawn 3D avatar for remote player
-      const group = new THREE.Group();
-      const bodyMat = new THREE.MeshStandardMaterial({
-        color: data.team === 'CT' ? 0x2b4c6f : 0x82593b
-      });
-      const body = new THREE.Mesh(new THREE.BoxGeometry(0.7, 1.0, 0.4), bodyMat);
-      body.position.y = 1.0;
-      group.add(body);
+      const model = this.createTacticalCharacterModel(data.team);
+      this.gm.scene.add(model);
+      this.remotePlayers[id] = {
+        mesh: model,
+        team: data.team,
+        pos: data.pos
+      };
 
-      const head = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.4, 0.35), new THREE.MeshStandardMaterial({ color: 0x1f2937 }));
-      head.position.y = 1.7;
-      group.add(head);
-
-      this.gm.scene.add(group);
-      this.remotePlayers[id] = { mesh: group, team: data.team };
+      // If SAS model is available for CT, attempt asynchronous upgrade
+      if (data.team === 'CT' && this.gltfLoader) {
+        this.gltfLoader.load('source/sas_blue.glb', (gltf) => {
+          const sas = gltf.scene;
+          sas.scale.set(0.018, 0.018, 0.018);
+          sas.position.set(0, 0, 0);
+          while (model.children.length > 0) {
+            model.remove(model.children[0]);
+          }
+          model.add(sas);
+        }, undefined, () => {});
+      }
     }
 
     const p = this.remotePlayers[id];
+    p.pos = data.pos;
+    p.team = data.team;
     p.mesh.position.set(data.pos.x, data.pos.y - 1.8, data.pos.z);
     p.mesh.rotation.y = data.yaw;
+    p.mesh.visible = data.health > 0;
   }
 }
 

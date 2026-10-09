@@ -18,10 +18,10 @@ document.addEventListener('DOMContentLoaded', () => {
   container.appendChild(renderer.domElement);
 
   // Sunlight and Ambient Lighting
-  const ambientLight = new THREE.AmbientLight(0xfff5e6, 0.65);
+  const ambientLight = new THREE.AmbientLight(0xfff5e6, 0.7);
   scene.add(ambientLight);
 
-  const sunLight = new THREE.DirectionalLight(0xfffaed, 1.2);
+  const sunLight = new THREE.DirectionalLight(0xfffaed, 1.3);
   sunLight.position.set(60, 100, 40);
   sunLight.castShadow = true;
   sunLight.shadow.mapSize.width = 2048;
@@ -40,7 +40,7 @@ document.addEventListener('DOMContentLoaded', () => {
   window.__CS2_AC.initDevToolsGuard();
   const gameManager = new CS2GameManager(scene, camera);
 
-  // 3. Tab Navigation (Online Competitive, Custom Room, Settings)
+  // 3. Tab Navigation
   const navTabs = document.querySelectorAll('.nav-tab');
   navTabs.forEach(tab => {
     tab.addEventListener('click', () => {
@@ -349,37 +349,37 @@ document.addEventListener('DOMContentLoaded', () => {
       <td class="col-name">YOU (Player)</td>
       <td class="col-ping">5ms</td>
       <td class="col-kills">${gameManager.player.team === 'CT' ? gameManager.ctScore : gameManager.tScore}</td>
-      <td class="col-assists">1</td>
+      <td class="col-assists">0</td>
       <td class="col-deaths">0</td>
-      <td class="col-mvp">★ 2</td>
-      <td class="col-score">18</td>
+      <td class="col-mvp">★ 1</td>
+      <td class="col-score">10</td>
       <td class="col-cash">$${gameManager.player.money.get()}</td>
     `;
 
     if (gameManager.player.team === 'CT') ctTbody.appendChild(playerRow);
     else tTbody.appendChild(playerRow);
 
-    gameManager.bots.forEach(bot => {
+    // Render other connected human players
+    Object.entries(gameManager.net.remotePlayers).forEach(([id, p]) => {
       const row = document.createElement('tr');
-      row.className = bot.isAlive ? '' : 'is-dead';
       row.innerHTML = `
-        <td class="col-status">${bot.isAlive ? '●' : '💀'}</td>
-        <td class="col-name">${bot.name}</td>
-        <td class="col-ping">0ms</td>
-        <td class="col-kills">${bot.kills}</td>
-        <td class="col-assists">${bot.assists}</td>
-        <td class="col-deaths">${bot.deaths}</td>
-        <td class="col-mvp">★ ${Math.floor(bot.kills / 3)}</td>
-        <td class="col-score">${bot.kills * 2}</td>
-        <td class="col-cash">$${bot.cash}</td>
+        <td class="col-status">●</td>
+        <td class="col-name">Player_${id.substring(0, 5)}</td>
+        <td class="col-ping">24ms</td>
+        <td class="col-kills">0</td>
+        <td class="col-assists">0</td>
+        <td class="col-deaths">0</td>
+        <td class="col-mvp">★ 0</td>
+        <td class="col-score">0</td>
+        <td class="col-cash">$800</td>
       `;
 
-      if (bot.team === 'CT') ctTbody.appendChild(row);
+      if (p.team === 'CT') ctTbody.appendChild(row);
       else tTbody.appendChild(row);
     });
   }
 
-  // 10. Sensitivity & Crosshair Sliders
+  // 10. Sensitivity & Crosshair
   document.getElementById('setting-sens').addEventListener('input', (e) => {
     document.getElementById('val-sens').innerText = e.target.value;
     gameManager.player.sensitivity = Number(e.target.value);

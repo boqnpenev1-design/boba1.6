@@ -1,11 +1,11 @@
-// CS2 Competitive MR12 Game State Engine with Team Selection, Spectator POV & FPS Counter
+// CS2 Competitive MR12 Game State Engine with Team Selection, Real CS Spawns & Human Online Play
 
 class CS2GameManager {
   constructor(scene, camera) {
     this.scene = scene;
     this.camera = camera;
 
-    // Match Rules
+    // Match Rules: Competitive MR12
     this.maxRounds = 24;
     this.targetWins = 13;
     this.currentRound = 1;
@@ -14,7 +14,7 @@ class CS2GameManager {
     this.consecutiveLosses = { CT: 0, T: 0 };
 
     this.phase = 'freeze';
-    this.roundTime = 115; // 1:55
+    this.roundTime = 115;
     this.freezeTime = 15;
     this.phaseTimer = this.freezeTime;
 
@@ -29,7 +29,7 @@ class CS2GameManager {
     // Entities
     this.mapBuilder = new CS2MapBuilder(this.scene);
     this.player = new CS2Player(this.camera, this.scene, this.mapBuilder);
-    this.bots = [];
+    this.bots = []; // BOTS REMOVED FROM LOBBIES AS REQUESTED
     this.selectedMap = 'dust2';
     this.selectedTeam = 'CT';
 
@@ -70,11 +70,11 @@ class CS2GameManager {
     this.scene.add(this.c4Mesh);
   }
 
-  // Connect to competitive server
+  // Connect to competitive server (Dust 2 or Mirage)
   connectToServer(mapName) {
     this.selectedMap = mapName;
 
-    // Build map
+    // Build chosen map
     if (mapName === 'mirage') {
       this.mapBuilder.buildMirage();
       document.getElementById('radar-map-name').innerText = 'DE_MIRAGE';
@@ -85,59 +85,29 @@ class CS2GameManager {
       document.getElementById('sb-map-name').innerText = 'DUST II';
     }
 
-    // Pre-populate bots and start initial match state
-    this.spawnMatchBots();
-    this.phase = 'live'; // Server round is underway
-    this.phaseTimer = 85; // Active mid-round
-
-    // Open Split-Screen Team Selection
+    // Open Team Select Screen
     document.getElementById('main-menu').classList.add('hidden');
     document.getElementById('team-select-screen').classList.remove('hidden');
   }
 
-  // User selects side on team select screen
+  // Player chooses team on split screen
   chooseTeam(team) {
     this.selectedTeam = team;
     this.player.setTeam(team);
     document.getElementById('team-select-screen').classList.add('hidden');
     document.getElementById('hud').classList.remove('hidden');
 
-    // Request pointer lock
     document.getElementById('game-canvas-container').requestPointerLock();
 
-    // Check if round is in progress:
-    if (this.phase === 'live') {
-      // Put in spectator POV to spectate alive players
+    // Check if other players are active in a live round
+    const remotePlayersCount = Object.keys(this.net.remotePlayers).length;
+    if (this.phase === 'live' && remotePlayersCount > 0) {
       this.player.enterSpectatorMode();
       this.showAnnouncement('ROUND IN PROGRESS — SPECTATING (A / D TO CYCLE)', 'neutral');
     } else {
-      // Freeze or start of round: spawn right away
+      // Spawn immediately at authentic CS team spawn!
       this.startRound();
     }
-  }
-
-  spawnMatchBots() {
-    this.bots.forEach(b => this.scene.remove(b.mesh));
-    this.bots = [];
-
-    const ctNames = ['Vitaly', 'Dmitriy', 'Chris', 'Gabe', 'Sasha'];
-    const tNames = ['Ivan', 'Boris', 'Alexei', 'Yuri', 'Viktor'];
-
-    for (let i = 0; i < 5; i++) {
-      this.bots.push(new CS2Bot(`Bot ${ctNames[i]}`, 'CT', this.scene, this.mapBuilder));
-    }
-    for (let i = 0; i < 5; i++) {
-      this.bots.push(new CS2Bot(`Bot ${tNames[i]}`, 'T', this.scene, this.mapBuilder));
-    }
-
-    // Initial spawn positions
-    let ctIdx = 0;
-    let tIdx = 0;
-    this.bots.forEach(bot => {
-      const spawns = this.mapBuilder.spawnPoints[bot.team];
-      const s = bot.team === 'CT' ? spawns[ctIdx++ % spawns.length] : spawns[tIdx++ % spawns.length];
-      bot.spawn(s);
-    });
   }
 
   startRound() {
@@ -147,26 +117,17 @@ class CS2GameManager {
     this.c4Timer = 40.0;
     this.c4Mesh.visible = false;
 
-    // Reset HUD alerts & spectator HUD
+    // Reset HUD alerts
     document.getElementById('c4-planted-alert').classList.add('hidden');
     document.getElementById('announcement-banner').classList.add('hidden');
     document.getElementById('action-prompt').classList.add('hidden');
     document.getElementById('interaction-bar-container').classList.add('hidden');
     document.getElementById('spectator-hud').classList.add('hidden');
 
-    // If player was spectating, respawn them now!
-    const playerSpawns = this.mapBuilder.spawnPoints[this.player.team];
-    const spawnIndex = Math.floor(Math.random() * playerSpawns.length);
-    this.player.respawn(playerSpawns[spawnIndex]);
-
-    // Respawn Bots
-    let ctIdx = 0;
-    let tIdx = 0;
-    this.bots.forEach(bot => {
-      const spawns = this.mapBuilder.spawnPoints[bot.team];
-      const s = bot.team === 'CT' ? spawns[ctIdx++ % spawns.length] : spawns[tIdx++ % spawns.length];
-      bot.spawn(s);
-    });
+    // Spawn Player at authentic CS spawn point!
+    const spawns = this.mapBuilder.spawnPoints[this.player.team];
+    const spawnIndex = Math.floor(Math.random() * spawns.length);
+    this.player.respawn(spawns[spawnIndex]);
 
     if (this.currentRound === 13) {
       this.handleHalftimeSwap();
@@ -179,10 +140,6 @@ class CS2GameManager {
     const newTeam = this.player.team === 'CT' ? 'T' : 'CT';
     this.player.setTeam(newTeam);
     this.player.money.set(800);
-    this.bots.forEach(b => {
-      b.team = b.team === 'CT' ? 'T' : 'CT';
-      b.cash = 800;
-    });
     this.showAnnouncement('HALFTIME - SWITCHING SIDES', 'neutral');
   }
 
@@ -198,8 +155,6 @@ class CS2GameManager {
     document.getElementById('c4-planted-alert').classList.remove('hidden');
     this.showAnnouncement(`THE BOMB HAS BEEN PLANTED AT ${siteName}!`, 't-win');
     window.csAudio.playRadioTone('alert');
-
-    this.bots.forEach(b => b.chooseNextObjective(true, this.c4Pos));
   }
 
   onC4Defused() {
@@ -216,8 +171,6 @@ class CS2GameManager {
       const reward = (this.player.activeWeapon && this.player.activeWeapon.killReward) || 300;
       this.player.money.add(reward);
     }
-
-    this.checkEliminationVictory();
   }
 
   addToKillfeed(attacker, victim, weapon, isHeadshot, victimTeam) {
@@ -241,31 +194,6 @@ class CS2GameManager {
     setTimeout(() => {
       if (row.parentNode) row.parentNode.removeChild(row);
     }, 6000);
-  }
-
-  checkEliminationVictory() {
-    if (this.phase !== 'live') return;
-
-    let ctAlive = (this.player.team === 'CT' && !this.player.isSpectating && this.player.health.get() > 0) ? 1 : 0;
-    let tAlive = (this.player.team === 'T' && !this.player.isSpectating && this.player.health.get() > 0) ? 1 : 0;
-
-    this.bots.forEach(b => {
-      if (b.isAlive) {
-        if (b.team === 'CT') ctAlive++;
-        else tAlive++;
-      }
-    });
-
-    document.getElementById('ct-alive-count').innerText = `${ctAlive} ALIVE`;
-    document.getElementById('t-alive-count').innerText = `${tAlive} ALIVE`;
-
-    if (ctAlive === 0 && !this.c4Planted) {
-      this.endRound('T', 'COUNTER-TERRORISTS ELIMINATED');
-    } else if (tAlive === 0) {
-      if (!this.c4Planted) {
-        this.endRound('CT', 'TERRORISTS ELIMINATED');
-      }
-    }
   }
 
   endRound(winner, reason) {
@@ -432,6 +360,7 @@ class CS2GameManager {
     ctx.translate(cx, cy);
     ctx.rotate(-this.player.yaw);
 
+    // Draw Bombsite A and B markers
     this.mapBuilder.bombZones.forEach(site => {
       const rx = (site.x - this.player.position.x) * scale;
       const rz = (site.z - this.player.position.z) * scale;
@@ -455,13 +384,11 @@ class CS2GameManager {
       ctx.fill();
     }
 
-    this.bots.forEach(bot => {
-      if (!bot.isAlive) return;
-      const rx = (bot.position.x - this.player.position.x) * scale;
-      const rz = (bot.position.z - this.player.position.z) * scale;
-
-      const isFriendly = bot.team === this.player.team;
-      ctx.fillStyle = isFriendly ? (bot.team === 'CT' ? '#5b97d5' : '#d58936') : '#ff3b30';
+    // Draw other connected human players
+    Object.values(this.net.remotePlayers).forEach(p => {
+      const rx = (p.pos.x - this.player.position.x) * scale;
+      const rz = (p.pos.z - this.player.position.z) * scale;
+      ctx.fillStyle = p.team === this.player.team ? (p.team === 'CT' ? '#5b97d5' : '#d58936') : '#ff3b30';
       ctx.beginPath();
       ctx.arc(rx, rz, 4, 0, Math.PI * 2);
       ctx.fill();
@@ -487,7 +414,7 @@ class CS2GameManager {
 
       const fpsEl = document.getElementById('net-graph-fps');
       if (fpsEl) {
-        fpsEl.innerText = `${this.currentFPS} FPS`;
+        fpsEl.innerText = `${this.currentFPS} FPS | 12ms | TICK 64`;
       }
     }
   }
@@ -537,12 +464,8 @@ class CS2GameManager {
       }
     }
 
-    this.player.update(dt, currentTime, this.bots, this);
+    this.player.update(dt, currentTime, this);
     this.handleObjectives(dt);
-
-    this.bots.forEach(bot => {
-      bot.update(dt, currentTime, this.player, this.bots, this);
-    });
 
     this.updateHUD();
     this.renderRadar();

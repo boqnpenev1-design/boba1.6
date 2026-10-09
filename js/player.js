@@ -1,4 +1,4 @@
-// CS2 First-Person Player Controller, Weapon Viewmodels, GLTF Loader & Spectator POV
+// CS2 First-Person Player Controller with High-Fidelity Weapon Viewmodels and Spectator POV
 
 class CS2Player {
   constructor(camera, scene, mapBuilder) {
@@ -32,7 +32,7 @@ class CS2Player {
     // Camera & Movement state
     this.yaw = 0;
     this.pitch = 0;
-    this.position = new THREE.Vector3(0, 1.8, -80);
+    this.position = new THREE.Vector3(0, 1.8, -90);
     this.velocity = new THREE.Vector3();
     this.isGrounded = true;
     this.isCrouched = false;
@@ -67,7 +67,6 @@ class CS2Player {
       menu: 'Escape'
     };
 
-    // Firing & Weapon State
     this.lastShotTime = 0;
     this.isReloading = false;
     this.reloadStartTime = 0;
@@ -78,19 +77,32 @@ class CS2Player {
     this.sensitivity = 1.8;
     this.invertY = false;
 
-    // Recoil Punch State
+    // Recoil Punch
     this.recoilPitch = 0;
     this.recoilYaw = 0;
 
-    // Viewmodel 3D Rig & GLTF Loader
-    this.gltfLoader = typeof THREE.GLTFLoader !== 'undefined' ? new THREE.GLTFLoader() : null;
-    this.loadedModels = {};
-    this.currentWeaponModel = null;
+    // Viewmodel Rig
     this.viewmodelGroup = new THREE.Group();
     this.camera.add(this.viewmodelGroup);
-    this.createViewmodelMeshes();
+    this.weaponRig = new THREE.Group();
+    this.viewmodelGroup.add(this.weaponRig);
+
+    // Muzzle Flash
+    this.muzzleLight = new THREE.PointLight(0xffaa33, 0, 8);
+    this.muzzleLight.position.set(0.25, -0.19, -0.95);
+    const flashGeo = new THREE.SphereGeometry(0.06, 8, 8);
+    const flashMat = new THREE.MeshBasicMaterial({ color: 0xffdd66 });
+    this.muzzleFlashMesh = new THREE.Mesh(flashGeo, flashMat);
+    this.muzzleFlashMesh.position.set(0.25, -0.19, -0.95);
+    this.muzzleFlashMesh.visible = false;
+    this.viewmodelGroup.add(this.muzzleLight);
+    this.viewmodelGroup.add(this.muzzleFlashMesh);
+
+    this.gltfLoader = typeof THREE.GLTFLoader !== 'undefined' ? new THREE.GLTFLoader() : null;
+    this.loadedModels = {};
 
     this.initControls();
+    this.buildCurrentWeaponModel();
   }
 
   setTeam(team) {
@@ -107,100 +119,140 @@ class CS2Player {
     this.switchSlot(2);
   }
 
-  createViewmodelMeshes() {
-    // Procedural Fallback Meshes
-    const gunBodyGeo = new THREE.BoxGeometry(0.08, 0.12, 0.55);
-    const gunBodyMat = new THREE.MeshStandardMaterial({ color: 0x22262c, roughness: 0.4, metalness: 0.8 });
-    this.vmGunBody = new THREE.Mesh(gunBodyGeo, gunBodyMat);
-    this.vmGunBody.position.set(0.25, -0.22, -0.5);
-
-    const barrelGeo = new THREE.CylinderGeometry(0.02, 0.02, 0.35, 12);
-    const barrelMat = new THREE.MeshStandardMaterial({ color: 0x111317, roughness: 0.3, metalness: 0.9 });
-    this.vmBarrel = new THREE.Mesh(barrelGeo, barrelMat);
-    this.vmBarrel.rotation.x = Math.PI / 2;
-    this.vmBarrel.position.set(0.25, -0.19, -0.75);
-
-    this.muzzleLight = new THREE.PointLight(0xffaa33, 0, 8);
-    this.muzzleLight.position.set(0.25, -0.19, -0.95);
-
-    const flashGeo = new THREE.SphereGeometry(0.06, 8, 8);
-    const flashMat = new THREE.MeshBasicMaterial({ color: 0xffdd66 });
-    this.muzzleFlashMesh = new THREE.Mesh(flashGeo, flashMat);
-    this.muzzleFlashMesh.position.set(0.25, -0.19, -0.95);
-    this.muzzleFlashMesh.visible = false;
-
-    this.viewmodelGroup.add(this.vmGunBody);
-    this.viewmodelGroup.add(this.vmBarrel);
-    this.viewmodelGroup.add(this.muzzleLight);
-    this.viewmodelGroup.add(this.muzzleFlashMesh);
-  }
-
-  loadWeaponGLTF(modelPath) {
-    if (!this.gltfLoader || !modelPath) return;
-
-    if (this.currentWeaponModel) {
-      this.viewmodelGroup.remove(this.currentWeaponModel);
-      this.currentWeaponModel = null;
+  // Builds instant high-fidelity 3D weapon models tailored to weapon type
+  buildCurrentWeaponModel() {
+    while (this.weaponRig.children.length > 0) {
+      this.weaponRig.remove(this.weaponRig.children[0]);
     }
 
-    if (this.loadedModels[modelPath]) {
-      this.attachWeaponModel(this.loadedModels[modelPath].clone());
-      return;
-    }
+    const w = this.activeWeapon;
+    if (!w) return;
 
-    this.gltfLoader.load(modelPath, (gltf) => {
-      this.loadedModels[modelPath] = gltf.scene;
-      this.attachWeaponModel(gltf.scene.clone());
-    }, undefined, () => {});
-  }
+    const group = new THREE.Group();
 
-  attachWeaponModel(model) {
-    if (this.currentWeaponModel) {
-      this.viewmodelGroup.remove(this.currentWeaponModel);
-    }
-    this.currentWeaponModel = model;
+    if (w.id === 'knife') {
+      // Knife blade & handle
+      const bladeGeo = new THREE.BoxGeometry(0.02, 0.08, 0.35);
+      const bladeMat = new THREE.MeshStandardMaterial({ color: 0xcccccc, metalness: 0.9, roughness: 0.2 });
+      const blade = new THREE.Mesh(bladeGeo, bladeMat);
+      blade.position.set(0.2, -0.22, -0.45);
+      blade.rotation.x = 0.3;
+      group.add(blade);
 
-    // Scale and position relative to camera viewmodel
-    model.scale.set(0.08, 0.08, 0.08);
-    model.position.set(0.25, -0.22, -0.5);
-    model.rotation.set(0, Math.PI, 0);
+      const gripGeo = new THREE.BoxGeometry(0.04, 0.06, 0.16);
+      const gripMat = new THREE.MeshStandardMaterial({ color: 0x1f2421, roughness: 0.8 });
+      const grip = new THREE.Mesh(gripGeo, gripMat);
+      grip.position.set(0.2, -0.26, -0.28);
+      group.add(grip);
+    } else if (w.id === 'c4') {
+      // C4 Explosive Pack
+      const packGeo = new THREE.BoxGeometry(0.18, 0.12, 0.28);
+      const packMat = new THREE.MeshStandardMaterial({ color: 0x966838, roughness: 0.8 });
+      const pack = new THREE.Mesh(packGeo, packMat);
+      pack.position.set(0.18, -0.22, -0.45);
+      group.add(pack);
 
-    // Hide procedural boxes while GLTF is visible
-    this.vmGunBody.visible = false;
-    this.vmBarrel.visible = false;
+      const keypadGeo = new THREE.BoxGeometry(0.09, 0.03, 0.12);
+      const keypad = new THREE.Mesh(keypadGeo, new THREE.MeshStandardMaterial({ color: 0x111111 }));
+      keypad.position.set(0.18, -0.15, -0.45);
+      group.add(keypad);
+    } else if (w.category === 'pistols') {
+      // Pistol Slide
+      const slideGeo = new THREE.BoxGeometry(0.06, 0.09, 0.32);
+      const slideMat = new THREE.MeshStandardMaterial({
+        color: w.id === 'deagle' ? 0xd0d5dd : 0x242830,
+        metalness: w.id === 'deagle' ? 0.9 : 0.6,
+        roughness: 0.3
+      });
+      const slide = new THREE.Mesh(slideGeo, slideMat);
+      slide.position.set(0.22, -0.22, -0.45);
+      group.add(slide);
 
-    this.viewmodelGroup.add(model);
-  }
+      // Grip
+      const gripGeo = new THREE.BoxGeometry(0.05, 0.14, 0.1);
+      const gripMat = new THREE.MeshStandardMaterial({ color: 0x1a1d24, roughness: 0.8 });
+      const grip = new THREE.Mesh(gripGeo, gripMat);
+      grip.rotation.x = -0.3;
+      grip.position.set(0.22, -0.29, -0.36);
+      group.add(grip);
 
-  updateViewmodelSkin() {
-    if (!this.activeWeapon) return;
-
-    if (this.activeWeapon.modelPath) {
-      this.loadWeaponGLTF(this.activeWeapon.modelPath);
-    } else {
-      if (this.currentWeaponModel) {
-        this.viewmodelGroup.remove(this.currentWeaponModel);
-        this.currentWeaponModel = null;
+      // Silencer for USP-S
+      if (w.isSilenced) {
+        const silencerGeo = new THREE.CylinderGeometry(0.025, 0.025, 0.28, 16);
+        const silencer = new THREE.Mesh(silencerGeo, new THREE.MeshStandardMaterial({ color: 0x1b1e24 }));
+        silencer.rotation.x = Math.PI / 2;
+        silencer.position.set(0.22, -0.21, -0.7);
+        group.add(silencer);
       }
-      this.vmGunBody.visible = true;
-      this.vmBarrel.visible = true;
-      const color = this.activeWeapon.color || '#333333';
-      this.vmGunBody.material.color.set(color);
+    } else if (w.id === 'awp') {
+      // AWP Sniper
+      const bodyGeo = new THREE.BoxGeometry(0.09, 0.14, 0.65);
+      const bodyMat = new THREE.MeshStandardMaterial({ color: 0x3d5a45, roughness: 0.6 }); // Olive drab
+      const body = new THREE.Mesh(bodyGeo, bodyMat);
+      body.position.set(0.24, -0.22, -0.55);
+      group.add(body);
+
+      // Heavy Long Barrel
+      const barrelGeo = new THREE.CylinderGeometry(0.022, 0.022, 0.55, 12);
+      const barrel = new THREE.Mesh(barrelGeo, new THREE.MeshStandardMaterial({ color: 0x14161a, metalness: 0.9 }));
+      barrel.rotation.x = Math.PI / 2;
+      barrel.position.set(0.24, -0.20, -0.95);
+      group.add(barrel);
+
+      // Telescopic Scope
+      const scopeGeo = new THREE.CylinderGeometry(0.035, 0.035, 0.32, 16);
+      const scope = new THREE.Mesh(scopeGeo, new THREE.MeshStandardMaterial({ color: 0x111111, metalness: 0.7 }));
+      scope.rotation.x = Math.PI / 2;
+      scope.position.set(0.24, -0.11, -0.55);
+      group.add(scope);
+    } else {
+      // Assault Rifles (AK-47 / M4A4 / M4A1)
+      const bodyGeo = new THREE.BoxGeometry(0.08, 0.13, 0.6);
+      const bodyMat = new THREE.MeshStandardMaterial({
+        color: w.id === 'ak47' ? 0x6e3c1b : 0x2c333d, // AK Wood vs M4 Charcoal
+        roughness: 0.5
+      });
+      const body = new THREE.Mesh(bodyGeo, bodyMat);
+      body.position.set(0.25, -0.22, -0.52);
+      group.add(body);
+
+      // Barrel
+      const barrelGeo = new THREE.CylinderGeometry(0.02, 0.02, 0.45, 12);
+      const barrel = new THREE.Mesh(barrelGeo, new THREE.MeshStandardMaterial({ color: 0x15181e, metalness: 0.85 }));
+      barrel.rotation.x = Math.PI / 2;
+      barrel.position.set(0.25, -0.19, -0.85);
+      group.add(barrel);
+
+      // Banana Magazine for AK
+      const magGeo = new THREE.BoxGeometry(0.05, 0.22, 0.1);
+      const mag = new THREE.Mesh(magGeo, new THREE.MeshStandardMaterial({ color: w.id === 'ak47' ? 0x222222 : 0x333b45 }));
+      mag.rotation.x = 0.4;
+      mag.position.set(0.25, -0.32, -0.48);
+      group.add(mag);
+
+      if (w.isSilenced) {
+        const silencerGeo = new THREE.CylinderGeometry(0.028, 0.028, 0.26, 16);
+        const silencer = new THREE.Mesh(silencerGeo, new THREE.MeshStandardMaterial({ color: 0x181a20 }));
+        silencer.rotation.x = Math.PI / 2;
+        silencer.position.set(0.25, -0.19, -1.05);
+        group.add(silencer);
+      }
     }
+
+    this.weaponRig.add(group);
   }
 
   initControls() {
     window.addEventListener('keydown', (e) => {
       this.keys[e.code] = true;
 
-      // Spectator Cycle (Press A or D to change spectated player)
+      // Spectator Cycle: Press A or D to change spectated player
       if (this.isSpectating) {
         if (e.code === 'KeyA') this.cycleSpectator(-1);
         if (e.code === 'KeyD') this.cycleSpectator(1);
         return;
       }
 
-      // Slot switching
       if (e.code === this.keybinds.slot1) this.switchSlot(1);
       if (e.code === this.keybinds.slot2) this.switchSlot(2);
       if (e.code === this.keybinds.slot3) this.switchSlot(3);
@@ -256,19 +308,18 @@ class CS2Player {
     });
   }
 
-  // Spectator POV cycle
   cycleSpectator(dir = 1) {
     if (!window.csGameManager) return;
-    const aliveBots = window.csGameManager.bots.filter(b => b.isAlive);
-    if (aliveBots.length === 0) return;
+    const remoteList = Object.values(window.csGameManager.net.remotePlayers);
+    if (remoteList.length === 0) return;
 
-    this.spectatorIndex = (this.spectatorIndex + dir + aliveBots.length) % aliveBots.length;
-    this.spectatedTarget = aliveBots[this.spectatorIndex];
+    this.spectatorIndex = (this.spectatorIndex + dir + remoteList.length) % remoteList.length;
+    this.spectatedTarget = remoteList[this.spectatorIndex];
 
     const banner = document.getElementById('spectator-hud');
     if (banner && this.spectatedTarget) {
       banner.classList.remove('hidden');
-      document.getElementById('spectator-target-name').innerText = `${this.spectatedTarget.name} (${this.spectatedTarget.team})`;
+      document.getElementById('spectator-target-name').innerText = `Player (${this.spectatedTarget.team})`;
     }
   }
 
@@ -317,7 +368,7 @@ class CS2Player {
       this.reserveAmmo.set(this.activeWeapon.reserve);
     }
 
-    this.updateViewmodelSkin();
+    this.buildCurrentWeaponModel();
     this.updateSlotHUD();
   }
 
@@ -348,14 +399,13 @@ class CS2Player {
     this.reserveAmmo.add(-added);
   }
 
-  shoot(currentTime, bots = [], gameManager = null) {
+  shoot(currentTime, gameManager = null) {
     if (!this.activeWeapon) return;
 
     if (this.activeWeapon.category === 'melee') {
       if (currentTime - this.lastShotTime < this.activeWeapon.fireRate) return;
       this.lastShotTime = currentTime;
       window.csAudio.playKnifeSlash();
-      this.performMeleeAttack(bots, gameManager);
       return;
     }
 
@@ -368,7 +418,6 @@ class CS2Player {
     this.lastShotTime = currentTime;
 
     this.clipAmmo.add(-1);
-
     window.csAudio.playGunshot(this.activeWeapon.audioType, this.activeWeapon.id, this.activeWeapon.isSilenced);
 
     this.muzzleLight.intensity = 2.5;
@@ -381,68 +430,23 @@ class CS2Player {
     this.recoilPitch += (this.activeWeapon.recoil || 0.02) * (0.8 + Math.random() * 0.4);
     this.recoilYaw += (Math.random() - 0.5) * (this.activeWeapon.recoil || 0.02);
 
-    this.vmGunBody.position.z = -0.42;
-    if (this.currentWeaponModel) this.currentWeaponModel.position.z = -0.42;
+    this.weaponRig.position.z = -0.42;
 
-    const pellets = this.activeWeapon.pellets || 1;
-    for (let p = 0; p < pellets; p++) {
-      this.fireBulletRaycast(bots, gameManager);
+    // Raycast hit check against remote players
+    if (gameManager && gameManager.net) {
+      const raycaster = new THREE.Raycaster();
+      const camDir = new THREE.Vector3();
+      this.camera.getWorldDirection(camDir);
+      raycaster.set(this.camera.position, camDir);
+
+      Object.entries(gameManager.net.remotePlayers).forEach(([id, p]) => {
+        if (p.team === this.team) return;
+        const intersects = raycaster.intersectObject(p.mesh, true);
+        if (intersects.length > 0 && intersects[0].distance < 80) {
+          gameManager.net.sendDamage(id, this.activeWeapon.damage, this.activeWeapon.name);
+        }
+      });
     }
-  }
-
-  fireBulletRaycast(bots, gameManager) {
-    const spread = this.activeWeapon.spread * (this.velocity.length() > 0.5 ? 2.5 : 1.0);
-    const spreadX = (Math.random() - 0.5) * spread;
-    const spreadY = (Math.random() - 0.5) * spread;
-
-    const raycaster = new THREE.Raycaster();
-    const camDir = new THREE.Vector3();
-    this.camera.getWorldDirection(camDir);
-    camDir.x += spreadX;
-    camDir.y += spreadY;
-    camDir.normalize();
-
-    raycaster.set(this.camera.position, camDir);
-
-    let closestBot = null;
-    let closestDist = Infinity;
-    let isHeadshot = false;
-
-    bots.forEach(bot => {
-      if (!bot.isAlive || bot.team === this.team) return;
-      const intersects = raycaster.intersectObject(bot.mesh, true);
-      if (intersects.length > 0 && intersects[0].distance < closestDist) {
-        closestDist = intersects[0].distance;
-        closestBot = bot;
-        const hitY = intersects[0].point.y - bot.mesh.position.y;
-        if (hitY > 1.45) isHeadshot = true;
-      }
-    });
-
-    if (closestBot) {
-      let dmg = this.activeWeapon.damage;
-      if (isHeadshot) {
-        dmg *= 3.8;
-        window.csAudio.playHeadshotDink();
-      }
-      closestBot.takeDamage(dmg, 'Player', this.activeWeapon.name, isHeadshot, gameManager);
-    }
-  }
-
-  performMeleeAttack(bots, gameManager) {
-    const raycaster = new THREE.Raycaster();
-    const camDir = new THREE.Vector3();
-    this.camera.getWorldDirection(camDir);
-    raycaster.set(this.camera.position, camDir);
-
-    bots.forEach(bot => {
-      if (!bot.isAlive || bot.team === this.team) return;
-      const intersects = raycaster.intersectObject(bot.mesh, true);
-      if (intersects.length > 0 && intersects[0].distance < 2.5) {
-        window.csAudio.playKnifeHit();
-        bot.takeDamage(65, 'Player', 'Knife', false, gameManager);
-      }
-    });
   }
 
   takeDamage(amount, attackerName, weaponName) {
@@ -494,31 +498,26 @@ class CS2Player {
     }
   }
 
-  update(dt, currentTime, bots, gameManager) {
-    // 1. Spectator Camera POV update
+  update(dt, currentTime, gameManager) {
+    // Spectator POV Camera following
     if (this.isSpectating) {
-      if (this.spectatedTarget && this.spectatedTarget.isAlive) {
-        // Place camera at spectated bot's eyes
+      if (this.spectatedTarget && this.spectatedTarget.mesh) {
         this.camera.position.set(
-          this.spectatedTarget.position.x,
-          this.spectatedTarget.position.y + 1.7,
-          this.spectatedTarget.position.z
+          this.spectatedTarget.mesh.position.x,
+          this.spectatedTarget.mesh.position.y + 1.7,
+          this.spectatedTarget.mesh.position.z
         );
         this.camera.rotation.set(0, this.spectatedTarget.mesh.rotation.y, 0);
-      } else {
-        // Current target died, pick next alive target
-        this.cycleSpectator(1);
       }
       return;
     }
 
-    // 2. Normal Player Update
     if (this.isReloading && currentTime - this.reloadStartTime > 2200) {
       this.finishReload();
     }
 
     if (this.isShooting && !this.isReloading) {
-      this.shoot(currentTime / 1000, bots, gameManager);
+      this.shoot(currentTime / 1000, gameManager);
     }
 
     // Movement
@@ -545,7 +544,6 @@ class CS2Player {
       this.velocity.z *= 0.7;
     }
 
-    // Jump & Gravity
     if (this.keys[this.keybinds.jump] && this.isGrounded) {
       this.velocity.y = 6.2;
       this.isGrounded = false;
@@ -603,15 +601,11 @@ class CS2Player {
     this.camera.rotation.y = this.yaw + this.recoilYaw;
     this.camera.rotation.x = this.pitch + this.recoilPitch;
 
-    // Viewmodel Bobbing
-    this.vmGunBody.position.z += (-0.5 - this.vmGunBody.position.z) * 0.15;
-    if (this.currentWeaponModel) this.currentWeaponModel.position.z += (-0.5 - this.currentWeaponModel.position.z) * 0.15;
-
+    // Viewmodel Recoil Recovery & Bobbing
+    this.weaponRig.position.z += (-0.5 - this.weaponRig.position.z) * 0.15;
     const speed2D = Math.sqrt(this.velocity.x * this.velocity.x + this.velocity.z * this.velocity.z);
     const bob = Math.sin(currentTime * 0.008) * (speed2D * 0.004);
-    this.vmGunBody.position.y = -0.22 + bob;
-    this.vmBarrel.position.y = -0.19 + bob;
-    if (this.currentWeaponModel) this.currentWeaponModel.position.y = -0.22 + bob;
+    this.weaponRig.position.y = bob;
   }
 }
 
