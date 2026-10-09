@@ -115,11 +115,14 @@ class CS2MapBuilder {
     return tex;
   }
 
-  addObstacle(x, y, z, w, h, d, mat, isClimbable = false) {
-    const geo = new THREE.BoxGeometry(w, h, d);
-    const mesh = new THREE.Mesh(geo, mat);
-    mesh.position.set(x, y + h / 2, z);
-    this.mapGroup.add(mesh);
+  addObstacle(x, y, z, w, h, d, mat = null, isClimbable = false, isVisual = true) {
+    let mesh = null;
+    if (isVisual && mat) {
+      const geo = new THREE.BoxGeometry(w, h, d);
+      mesh = new THREE.Mesh(geo, mat);
+      mesh.position.set(x, y + h / 2, z);
+      this.mapGroup.add(mesh);
+    }
 
     const halfW = w / 2;
     const halfD = d / 2;
@@ -131,19 +134,23 @@ class CS2MapBuilder {
     return mesh;
   }
 
-  addBombsiteZone(id, x, y, z, radius = 9.0) {
+  addCollider(x, y, z, w, h, d, isClimbable = false) {
+    return this.addObstacle(x, y, z, w, h, d, null, isClimbable, false);
+  }
+
+  addBombsiteZone(id, x, y, z, radius = 6.5) {
     this.bombZones.push({ id, x, y, z, radius });
 
-    const ringGeo = new THREE.RingGeometry(radius - 0.7, radius, 32);
+    const ringGeo = new THREE.RingGeometry(radius - 0.5, radius, 32);
     const ringMat = new THREE.MeshBasicMaterial({
       color: 0xff3322,
       side: THREE.DoubleSide,
       transparent: true,
-      opacity: 0.9
+      opacity: 0.95
     });
     const ringMesh = new THREE.Mesh(ringGeo, ringMat);
     ringMesh.rotation.x = -Math.PI / 2;
-    ringMesh.position.set(x, y + 0.08, z);
+    ringMesh.position.set(x, y + 0.05, z);
     this.mapGroup.add(ringMesh);
 
     const canvas = document.createElement('canvas');
@@ -157,11 +164,11 @@ class CS2MapBuilder {
     ctx.fillText(id, 64, 64);
     const textTex = new THREE.CanvasTexture(canvas);
 
-    const planeGeo = new THREE.PlaneGeometry(4.0, 4.0);
+    const planeGeo = new THREE.PlaneGeometry(3.5, 3.5);
     const planeMat = new THREE.MeshBasicMaterial({ map: textTex, transparent: true });
     const textMesh = new THREE.Mesh(planeGeo, planeMat);
     textMesh.rotation.x = -Math.PI / 2;
-    textMesh.position.set(x, y + 0.1, z);
+    textMesh.position.set(x, y + 0.07, z);
     this.mapGroup.add(textMesh);
   }
 
@@ -179,23 +186,18 @@ class CS2MapBuilder {
 
     const groundTex = this.loadOrGenTexture('textures/de_dust2_material_5.png', 'sand_ground');
     groundTex.repeat.set(24, 24);
-    const wallTex = this.loadOrGenTexture('textures/de_dust2_material_1.png', 'sand_wall');
-    wallTex.repeat.set(4, 2);
     const crateTex = this.loadOrGenTexture('textures/de_dust2_material_2.png', 'wood_crate');
-    const doorTex = this.loadOrGenTexture('textures/de_dust2_material_15.png', 'metal_door');
-
     const groundMat = new THREE.MeshLambertMaterial({ map: groundTex });
-    const wallMat = new THREE.MeshLambertMaterial({ map: wallTex });
     const crateMat = new THREE.MeshLambertMaterial({ map: crateTex });
-    const doorMat = new THREE.MeshLambertMaterial({ map: doorTex });
 
-    // Main Ground
-    const floorGeo = new THREE.PlaneGeometry(280, 280);
+    // Main Ground (Fixed: Exactly at Y = 0)
+    const floorGeo = new THREE.PlaneGeometry(300, 300);
     const floor = new THREE.Mesh(floorGeo, groundMat);
     floor.rotation.x = -Math.PI / 2;
+    floor.position.set(0, 0, 0);
     this.mapGroup.add(floor);
 
-    // Native 3D Dust 2 Model from source/de_dust2/
+    // Native 3D Dust 2 Model from source/de_dust2/ (Floor aligned to Y = 0)
     if (typeof THREE.OBJLoader !== 'undefined') {
       const objLoader = new THREE.OBJLoader();
       if (typeof THREE.MTLLoader !== 'undefined') {
@@ -208,91 +210,98 @@ class CS2MapBuilder {
           objLoader.load('de_dust2.obj', (obj) => {
             obj.rotation.x = -Math.PI / 2;
             obj.scale.set(0.045, 0.045, 0.045);
-            // Center & ground level alignment
-            obj.position.set(14.4, 8.64, 50.4);
+            // Exactly align model walkable ground to Y = 0
+            obj.position.set(14.4, 0, 50.4);
             this.mapGroup.add(obj);
           }, undefined, () => {});
         }, undefined, () => {
-          // If MTL fails, load OBJ directly
           objLoader.load('source/de_dust2/de_dust2.obj', (obj) => {
             obj.rotation.x = -Math.PI / 2;
             obj.scale.set(0.045, 0.045, 0.045);
-            obj.position.set(14.4, 8.64, 50.4);
+            obj.position.set(14.4, 0, 50.4);
             this.mapGroup.add(obj);
           }, undefined, () => {});
         });
       }
     }
 
-    // High Solid Boundary Walls
-    this.addObstacle(0, 0, -125, 270, 22, 10, wallMat);
-    this.addObstacle(0, 0, 125, 270, 22, 10, wallMat);
-    this.addObstacle(-130, 0, 0, 10, 22, 270, wallMat);
-    this.addObstacle(130, 0, 0, 10, 22, 270, wallMat);
+    // ==========================================================
+    // SOLID IMPENETRABLE WALL COLLIDERS (Matching de_dust2.obj)
+    // ==========================================================
 
-    // T Spawn
-    this.addObstacle(0, 0, 102, 55, 1.2, 26, wallMat, true);
-    this.addObstacle(-32, 0, 100, 6, 14, 34, wallMat);
-    this.addObstacle(32, 0, 100, 6, 14, 34, wallMat);
+    // 1. Outer Map Boundaries (Never fall off the map)
+    this.addCollider(0, 0, -125, 270, 25, 10);
+    this.addCollider(0, 0, 125, 270, 25, 10);
+    this.addCollider(-115, 0, 0, 10, 25, 270);
+    this.addCollider(115, 0, 0, 10, 25, 270);
 
-    // Mid
-    this.addObstacle(-18, 0, 30, 5, 14, 75, wallMat);
-    this.addObstacle(18, 0, 30, 5, 14, 75, wallMat);
-    this.addObstacle(-7.5, 0, -15, 7, 12, 3, doorMat);
-    this.addObstacle(7.5, 0, -15, 7, 12, 3, doorMat);
-    this.addObstacle(0, 0, 14, 4.4, 3.5, 4.4, crateMat, true);
+    // 2. Mid Section
+    this.addCollider(-15, 0, 20, 8, 20, 65); // Mid West Wall
+    this.addCollider(17, 0, 22, 8, 20, 68);  // Mid East Wall
+    this.addCollider(-8, 0, -16, 7, 18, 5);  // Mid Double Door West
+    this.addCollider(8, 0, -16, 7, 18, 5);   // Mid Double Door East
+    this.addObstacle(0, 0, 14, 4.4, 3.4, 4.4, crateMat, true, false); // Xbox Crate (Climbable)
 
-    // Catwalk / Short
-    this.addObstacle(24, 0, -35, 7, 3.5, 50, wallMat, true);
-    this.addObstacle(20, 3.5, -35, 2.5, 5, 50, wallMat);
-    this.addObstacle(30, 0, -58, 14, 3.0, 12, wallMat, true);
+    // 3. Catwalk & Short A
+    this.addCollider(26, 0, -35, 10, 3.6, 50, true); // Short walkway
+    this.addCollider(20, 3.6, -35, 4, 15, 50);       // Short railing wall
+    this.addCollider(32, 0, -58, 14, 3.2, 12, true); // Short stairs to A
 
-    // Bombsite A
-    this.addObstacle(54, 0, -60, 36, 2.4, 36, wallMat, true);
-    this.addObstacle(54, 2.4, -79, 38, 10, 4, wallMat);
-    this.addObstacle(46, 2.4, -54, 4.0, 3.8, 4.0, crateMat, true);
-    this.addObstacle(60, 2.4, -66, 4.0, 3.8, 4.0, crateMat, true);
-    this.addObstacle(76, 0, -25, 5, 14, 55, wallMat);
-    this.addObstacle(76, 0, 25, 5, 14, 55, wallMat);
-    this.addObstacle(76, 0, 60, 22, 14, 5, doorMat);
-    this.addObstacle(58, 0, 75, 5, 14, 28, wallMat);
+    // 4. Long A Corridor & Doors
+    this.addCollider(86, 0, 10, 8, 20, 60);  // Long A East Wall
+    this.addCollider(63, 0, 26, 8, 20, 72);  // Long A West Wall
+    this.addCollider(74, 0, 64, 24, 20, 6);  // Long Double Doors Frame
 
-    // Bombsite B & Tunnels
-    this.addObstacle(-58, 0, 40, 5, 14, 65, wallMat);
-    this.addObstacle(-80, 0, 40, 5, 14, 65, wallMat);
-    this.addObstacle(-64, 0, -50, 36, 2.0, 36, wallMat, true);
-    this.addObstacle(-64, 2.0, -70, 38, 10, 4, wallMat);
-    this.addObstacle(-44, 0, -42, 16, 12, 4, doorMat);
-    this.addObstacle(-82, 0, -35, 4, 14, 28, wallMat);
-    this.addObstacle(-60, 2.0, -44, 4.2, 3.8, 4.2, crateMat, true);
-    this.addObstacle(-70, 2.0, -56, 4.2, 3.8, 4.2, crateMat, true);
+    // 5. Bombsite A (Platform and Back Walls)
+    this.addCollider(60, 0, -62, 34, 20, 6); // A Back Wall (Goose)
+    this.addCollider(82, 0, -40, 6, 20, 44); // A Long Corner Wall
+    this.addCollider(36, 0, -53, 6, 20, 20); // A CT Ramp Side Wall
+    this.addObstacle(50, 0, -54, 4.0, 3.6, 4.0, crateMat, true, false); // A Default Crates
+    this.addObstacle(62, 0, -46, 4.0, 3.6, 4.0, crateMat, true, false); // A Ninja Crates
 
-    // CT Spawn
-    this.addObstacle(-16, 0, -108, 38, 14, 5, wallMat);
+    // 6. Upper B Tunnels
+    this.addCollider(-78, 0, 42, 8, 20, 45); // Tunnels West Wall
+    this.addCollider(-57, 0, 40, 8, 20, 48); // Tunnels East Wall
+    this.addCollider(-68, 0, -34, 14, 20, 6); // Tunnels Exit to B Wall
 
-    // Bombsite Plant Rings
-    this.addBombsiteZone('A', 54, 2.4, -60, 9.0);
-    this.addBombsiteZone('B', -64, 2.0, -50, 9.0);
+    // 7. Bombsite B (Courtyard and Perimeter Walls)
+    this.addCollider(-63, 0, -72, 46, 20, 6); // B Back Wall
+    this.addCollider(-84, 0, -54, 6, 20, 36); // B Outer West Wall
+    this.addCollider(-42, 0, -63, 6, 20, 18); // B Window Platform Wall
+    this.addCollider(-46, 0, -34, 14, 20, 6); // B Doors Wall
+    this.addObstacle(-60, 0, -48, 4.2, 3.6, 4.2, crateMat, true, false); // B Site Crates
+
+    // 8. CT Spawn & T Spawn Walls
+    this.addCollider(-14, 0, -108, 44, 20, 6); // CT Spawn Back Wall
+    this.addCollider(-35, 0, -90, 6, 20, 38);  // CT Spawn West Wall
+    this.addCollider(10, 0, -90, 6, 20, 38);   // CT Spawn East Wall
+    this.addCollider(0, 0, 108, 70, 20, 6);    // T Spawn Back Wall
+    this.addCollider(-32, 0, 90, 6, 20, 38);   // T Spawn West Wall
+    this.addCollider(32, 0, 90, 6, 20, 38);    // T Spawn East Wall
+
+    // Clear Open Bombsite Plant Rings (Never inside walls)
+    this.addBombsiteZone('A', 56.0, 0.05, -50.0, 6.5);
+    this.addBombsiteZone('B', -63.0, 0.05, -52.0, 6.5);
 
     // Buy Zones
-    this.buyZones.T = { minX: -35, maxX: 35, minZ: 75, maxZ: 120 };
-    this.buyZones.CT = { minX: -40, maxX: 15, minZ: -120, maxZ: -75 };
+    this.buyZones.T = { minX: -30, maxX: 30, minZ: 70, maxZ: 110 };
+    this.buyZones.CT = { minX: -35, maxX: 10, minZ: -110, maxZ: -70 };
 
-    // Spawns
+    // Authentic Floor Spawns (Firmly on ground at Y = 1.8)
     this.spawnPoints.T = [
-      { x: 0, z: 98 },
-      { x: -6, z: 98 },
-      { x: 6, z: 98 },
-      { x: -12, z: 98 },
-      { x: 12, z: 98 }
+      { x: 5, y: 1.8, z: 84 },
+      { x: -2, y: 1.8, z: 86 },
+      { x: 12, y: 1.8, z: 86 },
+      { x: 2, y: 1.8, z: 78 },
+      { x: 8, y: 1.8, z: 78 }
     ];
 
     this.spawnPoints.CT = [
-      { x: -15, z: -90 },
-      { x: -22, z: -90 },
-      { x: -8, z: -90 },
-      { x: -15, z: -84 },
-      { x: -22, z: -84 }
+      { x: -14, y: 1.8, z: -86 },
+      { x: -8, y: 1.8, z: -86 },
+      { x: -20, y: 1.8, z: -86 },
+      { x: -11, y: 1.8, z: -80 },
+      { x: -17, y: 1.8, z: -80 }
     ];
   }
 
@@ -312,82 +321,80 @@ class CS2MapBuilder {
     const stuccoMat = new THREE.MeshLambertMaterial({ map: stuccoTex });
     const crateMat = new THREE.MeshLambertMaterial({ map: crateTex });
 
-    // Main Ground
-    const floorGeo = new THREE.PlaneGeometry(280, 280);
+    // Main Ground (Fixed: Exactly at Y = 0)
+    const floorGeo = new THREE.PlaneGeometry(300, 300);
     const floor = new THREE.Mesh(floorGeo, cobbleMat);
     floor.rotation.x = -Math.PI / 2;
+    floor.position.set(0, 0, 0);
     this.mapGroup.add(floor);
 
-    // Native 3D Mirage Model from source/untitled.glb
+    // Native 3D Mirage Model from source/untitled.glb (Aligned to Y = 0)
     if (typeof THREE.GLTFLoader !== 'undefined') {
       const gltfLoader = new THREE.GLTFLoader();
       gltfLoader.load('source/untitled.glb', (gltf) => {
         const mapObj = gltf.scene;
         mapObj.rotation.x = -Math.PI / 2;
         mapObj.scale.set(0.045, 0.045, 0.045);
-        mapObj.position.set(23.2, 14.0, -37.2);
+        // Correct Y offset (7.56) brings raw -168 Z floor to Y = 0
+        mapObj.position.set(23.2, 7.56, -37.2);
         this.mapGroup.add(mapObj);
       }, undefined, () => {});
     }
 
-    // Outer Walls
-    this.addObstacle(0, 0, -130, 270, 22, 10, stuccoMat);
-    this.addObstacle(0, 0, 130, 270, 22, 10, stuccoMat);
-    this.addObstacle(-130, 0, 0, 10, 22, 270, stuccoMat);
-    this.addObstacle(130, 0, 0, 10, 22, 270, stuccoMat);
+    // Outer Map Boundaries
+    this.addCollider(0, 0, -130, 270, 25, 10);
+    this.addCollider(0, 0, 130, 270, 25, 10);
+    this.addCollider(-130, 0, 0, 10, 25, 270);
+    this.addCollider(130, 0, 0, 10, 25, 270);
 
-    // T Spawn
-    this.addObstacle(0, 0, 105, 45, 1.2, 24, stuccoMat, true);
-    this.addObstacle(-28, 0, 105, 5, 14, 28, stuccoMat);
-    this.addObstacle(28, 0, 105, 5, 14, 28, stuccoMat);
+    // T Spawn Boundaries
+    this.addCollider(0, 0, 105, 50, 20, 6);
+    this.addCollider(-28, 0, 105, 6, 20, 30);
+    this.addCollider(28, 0, 105, 6, 20, 30);
 
     // Mid & Sniper Window
-    this.addObstacle(0, 0, -32, 22, 8.0, 5, stuccoMat);
-    this.addObstacle(0, 2.8, -32, 9, 1.4, 5, stuccoMat, true);
-    this.addObstacle(18, 0, -18, 5, 12, 34, stuccoMat);
-    this.addObstacle(-24, 0, -15, 5, 12, 38, stuccoMat);
-    this.addObstacle(0, 0, 26, 4.2, 3.6, 4.2, crateMat, true);
+    this.addCollider(0, 0, -32, 24, 18, 6);
+    this.addCollider(18, 0, -18, 6, 18, 36);
+    this.addCollider(-24, 0, -15, 6, 18, 40);
+    this.addObstacle(0, 0, 26, 4.2, 3.6, 4.2, crateMat, true, false); // Mid Boxes
 
     // Bombsite A
-    this.addObstacle(58, 0, 20, 5, 14, 48, stuccoMat);
-    this.addObstacle(68, 0, -15, 22, 4.4, 16, stuccoMat, true);
-    this.addObstacle(78, 4.4, -15, 2.5, 7, 16, stuccoMat);
-    this.addObstacle(40, 0, -26, 3.8, 3.8, 3.8, crateMat, true);
-    this.addObstacle(44, 0, -26, 3.8, 3.8, 3.8, crateMat, true);
-    this.addObstacle(48, 0, -48, 4.0, 4.0, 4.0, crateMat, true);
-    this.addObstacle(52, 0, -48, 4.0, 4.0, 4.0, crateMat, true);
-    this.addObstacle(28, 0, -64, 8, 6.5, 9, stuccoMat);
+    this.addCollider(58, 0, 20, 6, 20, 50);
+    this.addCollider(68, 0, -15, 24, 4.4, 18, true); // A Palace Ramp
+    this.addCollider(78, 4.4, -15, 4, 15, 18);
+    this.addObstacle(46, 0, -48, 4.0, 3.6, 4.0, crateMat, true, false); // Triple Box
+    this.addCollider(28, 0, -64, 10, 18, 10);
 
     // Bombsite B
-    this.addObstacle(-68, 0, 5, 20, 4.6, 52, stuccoMat, true);
-    this.addObstacle(-78, 4.6, 5, 2.5, 7, 52, stuccoMat);
-    this.addObstacle(-46, 0, -38, 6, 3.4, 10, crateMat, true);
-    this.addObstacle(-28, 0, -62, 28, 12, 5, stuccoMat);
-    this.addObstacle(-64, 0, -58, 5, 10, 5, stuccoMat);
+    this.addCollider(-68, 0, 5, 22, 4.6, 54, true); // B Apartments
+    this.addCollider(-78, 4.6, 5, 4, 15, 54);
+    this.addCollider(-28, 0, -62, 30, 18, 6);
+    this.addCollider(-64, 0, -58, 6, 18, 6);
+    this.addObstacle(-46, 0, -38, 5, 3.4, 8, crateMat, true, false);
 
-    // Bombsite Plant Rings
-    this.addBombsiteZone('A', 48, 0, -45, 9.0);
-    this.addBombsiteZone('B', -50, 0, -46, 9.0);
+    // Clear Open Bombsite Plant Rings
+    this.addBombsiteZone('A', 48.0, 0.05, -45.0, 7.0);
+    this.addBombsiteZone('B', -50.0, 0.05, -46.0, 7.0);
 
     // Buy Zones
     this.buyZones.T = { minX: -30, maxX: 30, minZ: 85, maxZ: 125 };
     this.buyZones.CT = { minX: 10, maxX: 50, minZ: -110, maxZ: -70 };
 
-    // Mirage Spawns
+    // Mirage Spawns (Firmly on ground at Y = 1.8)
     this.spawnPoints.T = [
-      { x: 0, z: 98 },
-      { x: -6, z: 98 },
-      { x: 6, z: 98 },
-      { x: -12, z: 98 },
-      { x: 12, z: 98 }
+      { x: 0, y: 1.8, z: 98 },
+      { x: -6, y: 1.8, z: 98 },
+      { x: 6, y: 1.8, z: 98 },
+      { x: -12, y: 1.8, z: 98 },
+      { x: 12, y: 1.8, z: 98 }
     ];
 
     this.spawnPoints.CT = [
-      { x: 30, z: -90 },
-      { x: 38, z: -90 },
-      { x: 22, z: -90 },
-      { x: 30, z: -84 },
-      { x: 38, z: -84 }
+      { x: 30, y: 1.8, z: -88 },
+      { x: 38, y: 1.8, z: -88 },
+      { x: 22, y: 1.8, z: -88 },
+      { x: 30, y: 1.8, z: -82 },
+      { x: 38, y: 1.8, z: -82 }
     ];
   }
 }

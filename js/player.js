@@ -490,13 +490,26 @@ class CS2Player {
     this.camera.getWorldDirection(camDir);
     raycaster.set(this.camera.position, camDir);
 
-    // Hit players
+    // Hit players with authentic headshot/body multiplier & hit sound
     if (gameManager && gameManager.net) {
       Object.entries(gameManager.net.remotePlayers).forEach(([id, p]) => {
         if (p.team === this.team) return;
+        if (!p.mesh || !p.mesh.visible) return;
         const intersects = raycaster.intersectObject(p.mesh, true);
-        if (intersects.length > 0 && intersects[0].distance < 80) {
-          gameManager.net.sendDamage(id, this.activeWeapon.damage, this.activeWeapon.name);
+        if (intersects.length > 0 && intersects[0].distance < 120) {
+          const hitPoint = intersects[0].point;
+          const relY = hitPoint.y - p.mesh.position.y;
+          const isHeadshot = relY >= 1.45;
+          const dmgMult = isHeadshot ? 2.5 : 1.0;
+          const finalDamage = Math.round(this.activeWeapon.damage * dmgMult);
+
+          if (isHeadshot) {
+            window.csAudio.playHeadshotDink();
+          } else {
+            window.csAudio.playSound('damage1');
+          }
+
+          gameManager.net.sendDamage(id, finalDamage, this.activeWeapon.name, isHeadshot);
         }
       });
     }
@@ -623,13 +636,19 @@ class CS2Player {
     document.getElementById('action-prompt').classList.add('hidden');
     document.getElementById('interaction-bar-container').classList.add('hidden');
     this.enterSpectatorMode();
+    if (window.csGameManager) {
+      window.csGameManager.onEntityKilled(attackerName || 'Enemy', 'You', weaponName || 'Weapon', false, this.team);
+    }
   }
 
   respawn(spawnPos) {
     this.exitSpectatorMode();
-    this.position.set(spawnPos.x, this.playerHeight, spawnPos.z);
+    const spawnY = (spawnPos && spawnPos.y !== undefined) ? spawnPos.y : this.playerHeight;
+    this.position.set(spawnPos.x, spawnY, spawnPos.z);
     this.velocity.set(0, 0, 0);
+    this.isGrounded = true;
     this.health.set(100);
+    this.armor.set(100);
     this.isReloading = false;
     this.isPlanting = false;
     this.isDefusing = false;
@@ -732,47 +751,76 @@ class CS2Player {
     const targetHeight = this.isCrouched ? 1.0 : 1.8;
     this.playerHeight += (targetHeight - this.playerHeight) * 0.2;
 
-    const oldPos = { x: this.position.x, y: this.position.y, z: this.position.z };
-    const newPos = {
-      x: this.position.x + this.velocity.x * dt,
-      y: this.position.y + this.velocity.y * dt,
-      z: this.position.z + this.velocity.z * dt
-    };
+    const oldX = this.position.x;
+    const oldZ = this.position.z;
+    const playerRadius = 0.52;
+    const colliders = this.map.colliders;
 
-    const validatedPos = window.__CS2_AC.validateMovementDelta(oldPos, newPos, dt);
-    this.position.x = validatedPos.x;
-    this.position.y = validatedPos.y;
-    this.position.z = validatedPos.z;
+    // Multi-Axis Impenetrable Collision Resolution:
+    // 1. Resolve X movement (enables sliding smoothly along walls)
+    this.position.x += this.velocity.x * dt;
+    for (let i = 0; i < colliders.length; i++) {
+      const c = colliders[i];
+      if (c.isClimbable) continue;
+      const box = c.box;
+      if (
+        this.position.y > box.min.y && (this.position.y - this.playerHeight) < box.max.y &&
+        this.position.x + playerRadius > box.min.x &&
+        this.position.x - playerRadius < box.max.x &&
+        oldZ + playerRadius > box.min.z &&
+        oldZ - playerRadius < box.max.z
+      ) {
+        this.position.x = oldX;
+        this.velocity.x = 0;
+        break;
+      }
+    }
 
+    // 2. Resolve Z movement
+    this.position.z += this.velocity.z * dt;
+    for (let i = 0; i < colliders.length; i++) {
+      const c = colliders[i];
+      if (c.isClimbable) continue;
+      const box = c.box;
+      if (
+        this.position.y > box.min.y && (this.position.y - this.playerHeight) < box.max.y &&
+        this.position.x + playerRadius > box.min.x &&
+        this.position.x - playerRadius < box.max.x &&
+        this.position.z + playerRadius > box.min.z &&
+        this.position.z - playerRadius < box.max.z
+      ) {
+        this.position.z = oldZ;
+        this.velocity.z = 0;
+        break;
+      }
+    }
+
+    // 3. Resolve Y movement & Ground clamping
+    this.position.y += this.velocity.y * dt;
     if (this.position.y <= this.playerHeight) {
       this.position.y = this.playerHeight;
       this.velocity.y = 0;
       this.isGrounded = true;
     }
 
-    // Fast Collisions Check (Fixed: Allows jumping on A and B sites when velocity.y > 0)
-    const px = this.position.x;
-    const pz = this.position.z;
-    const playerRadius = 0.6;
-    const colliders = this.map.colliders;
-
+    // 4. Climbable site platforms & crates
     for (let i = 0; i < colliders.length; i++) {
-      const collider = colliders[i];
-      const box = collider.box;
+      const c = colliders[i];
+      if (!c.isClimbable) continue;
+      const box = c.box;
       if (
-        px + playerRadius > box.min.x &&
-        px - playerRadius < box.max.x &&
-        pz + playerRadius > box.min.z &&
-        pz - playerRadius < box.max.z
+        this.position.x + playerRadius > box.min.x &&
+        this.position.x - playerRadius < box.max.x &&
+        this.position.z + playerRadius > box.min.z &&
+        this.position.z - playerRadius < box.max.z
       ) {
-        // If standing on or falling onto a platform: only snap when NOT jumping upwards!
-        if (collider.isClimbable && this.velocity.y <= 0 && this.position.y >= collider.topY + 0.1) {
-          this.position.y = collider.topY + this.playerHeight;
+        if (this.velocity.y <= 0 && this.position.y >= c.topY + 0.1) {
+          this.position.y = c.topY + this.playerHeight;
           this.velocity.y = 0;
           this.isGrounded = true;
-        } else if (this.position.y < collider.topY + 0.4) {
-          this.position.x = oldPos.x;
-          this.position.z = oldPos.z;
+        } else if (this.position.y < c.topY + 0.3) {
+          this.position.x = oldX;
+          this.position.z = oldZ;
         }
       }
     }

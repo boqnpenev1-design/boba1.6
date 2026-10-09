@@ -218,7 +218,10 @@ class CS2NetworkManager {
       window.csAudio.playGunshot(data.weaponType || 'rifle', data.weaponId || 'ak47', data.isSilenced || false);
       this.broadcast(data, senderConn);
     } else if (data.type === 'damage') {
-      if (data.targetId === 'host' || (this.peer && data.targetId === this.peer.id)) {
+      const isForHost = data.targetId === 'host' || 
+                        (this.peer && data.targetId.toLowerCase() === this.peer.id.toLowerCase()) || 
+                        (this.isHost && this.connections.length <= 1);
+      if (isForHost) {
         this.gm.player.takeDamage(data.amount, data.attacker, data.weapon);
       } else {
         this.broadcast(data, null);
@@ -237,8 +240,14 @@ class CS2NetworkManager {
       this.updateRemotePlayer(data.id, data);
     } else if (data.type === 'shoot') {
       window.csAudio.playGunshot(data.weaponType || 'rifle', data.weaponId || 'ak47', data.isSilenced || false);
-    } else if (data.type === 'damage' && this.peer && data.targetId === this.peer.id) {
-      this.gm.player.takeDamage(data.amount, data.attacker, data.weapon);
+    } else if (data.type === 'damage') {
+      const isForClient = !data.targetId || 
+                          data.targetId === 'client' || 
+                          (this.peer && data.targetId.toLowerCase() === this.peer.id.toLowerCase()) || 
+                          (!this.isHost);
+      if (isForClient) {
+        this.gm.player.takeDamage(data.amount, data.attacker, data.weapon);
+      }
     } else if (data.type === 'plant_c4') {
       this.gm.onC4Planted(data.pos, data.site);
     } else if (data.type === 'defuse_c4') {
@@ -290,13 +299,14 @@ class CS2NetworkManager {
     }
   }
 
-  sendDamage(targetId, amount, weapon) {
+  sendDamage(targetId, amount, weapon, isHeadshot = false) {
     const packet = {
       type: 'damage',
       targetId: targetId,
-      attacker: 'Player',
+      attacker: this.peer ? this.peer.id : 'Player',
       amount: amount,
-      weapon: weapon
+      weapon: weapon,
+      isHeadshot: isHeadshot
     };
     if (this.isHost) {
       this.broadcast(packet, null);
@@ -329,10 +339,18 @@ class CS2NetworkManager {
   createTacticalCharacterModel(team) {
     const group = new THREE.Group();
 
-    // Legs
+    // 1. Full-Body Hitbox Cylinder (Covers head to feet for 100% reliable bullet hits)
+    const hitboxGeo = new THREE.CylinderGeometry(0.5, 0.5, 1.85, 12);
+    const hitboxMat = new THREE.MeshBasicMaterial({ visible: false });
+    const hitbox = new THREE.Mesh(hitboxGeo, hitboxMat);
+    hitbox.position.y = 0.925;
+    hitbox.name = 'hitbox';
+    group.add(hitbox);
+
+    // 2. Legs
     const legGeo = new THREE.BoxGeometry(0.24, 0.9, 0.24);
     const pantsMat = new THREE.MeshLambertMaterial({
-      color: team === 'CT' ? 0x1f2937 : 0x4a3c2c
+      color: team === 'CT' ? 0x1a2634 : 0x423528
     });
     const leftLeg = new THREE.Mesh(legGeo, pantsMat);
     leftLeg.position.set(-0.16, 0.45, 0);
@@ -341,42 +359,42 @@ class CS2NetworkManager {
     group.add(leftLeg);
     group.add(rightLeg);
 
-    // Torso with Tactical Vest
-    const torsoGeo = new THREE.BoxGeometry(0.55, 0.75, 0.32);
+    // 3. Torso with Team Tactical Uniform
+    const torsoGeo = new THREE.BoxGeometry(0.56, 0.75, 0.34);
     const torsoMat = new THREE.MeshLambertMaterial({
-      color: team === 'CT' ? 0x243242 : 0x7a5b3a
+      color: team === 'CT' ? 0x22364c : 0x725539
     });
     const torso = new THREE.Mesh(torsoGeo, torsoMat);
     torso.position.y = 1.25;
     group.add(torso);
 
-    // Kevlar Chest Rig
-    const vestGeo = new THREE.BoxGeometry(0.58, 0.5, 0.36);
+    // 4. Tactical Armor / Kevlar Vest
+    const vestGeo = new THREE.BoxGeometry(0.6, 0.5, 0.38);
     const vestMat = new THREE.MeshLambertMaterial({
-      color: team === 'CT' ? 0x12171e : 0x2d3229
+      color: team === 'CT' ? 0x141a22 : 0x2b3026
     });
     const vest = new THREE.Mesh(vestGeo, vestMat);
     vest.position.y = 1.32;
     group.add(vest);
 
-    // Head with Tactical Helmet / Balaclava
-    const headGeo = new THREE.BoxGeometry(0.32, 0.35, 0.32);
+    // 5. Head with Team Helmet / Balaclava
+    const headGeo = new THREE.BoxGeometry(0.34, 0.36, 0.34);
     const headMat = new THREE.MeshLambertMaterial({
-      color: team === 'CT' ? 0x1e2733 : 0x9e7b56
+      color: team === 'CT' ? 0x1c2530 : 0x98734e
     });
     const head = new THREE.Mesh(headGeo, headMat);
     head.position.y = 1.78;
     group.add(head);
 
-    // Goggles / Visor
-    const visorGeo = new THREE.BoxGeometry(0.26, 0.1, 0.08);
+    // 6. Visor / Tactical Goggles
+    const visorGeo = new THREE.BoxGeometry(0.28, 0.1, 0.1);
     const visorMat = new THREE.MeshLambertMaterial({ color: 0x111111 });
     const visor = new THREE.Mesh(visorGeo, visorMat);
     visor.position.set(0, 1.8, -0.17);
     group.add(visor);
 
-    // Weapon in hand
-    const weaponGeo = new THREE.BoxGeometry(0.08, 0.12, 0.6);
+    // 7. Weapon in Hand
+    const weaponGeo = new THREE.BoxGeometry(0.08, 0.12, 0.65);
     const weaponMat = new THREE.MeshLambertMaterial({
       color: team === 'CT' ? 0x22262c : 0x5a3219
     });
@@ -399,18 +417,6 @@ class CS2NetworkManager {
         lastPos: null,
         lastStepTime: 0
       };
-
-      if (data.team === 'CT' && this.gltfLoader) {
-        this.gltfLoader.load('source/sas_blue.glb', (gltf) => {
-          const sas = gltf.scene;
-          sas.scale.set(0.018, 0.018, 0.018);
-          sas.position.set(0, 0, 0);
-          while (model.children.length > 0) {
-            model.remove(model.children[0]);
-          }
-          model.add(sas);
-        }, undefined, () => {});
-      }
     }
 
     const p = this.remotePlayers[id];
@@ -419,7 +425,7 @@ class CS2NetworkManager {
     p.team = data.team;
     p.mesh.position.set(data.pos.x, data.pos.y - 1.8, data.pos.z);
     p.mesh.rotation.y = data.yaw;
-    p.mesh.visible = data.health > 0;
+    p.mesh.visible = (data.health > 0);
 
     // Real-time remote footsteps audio sync
     const now = performance.now();
