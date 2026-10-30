@@ -466,11 +466,15 @@ class CS2Player {
     this.activeSlot = slot;
     this.activeWeapon = this.inventory[slot];
     this.isReloading = false;
+    this.isShooting = false; // Never carry firing state across weapon switches
     if (this.isScoped) this.toggleScope();
 
     if (this.activeWeapon.clip) {
       this.clipAmmo.set(this.activeWeapon.clip);
       this.reserveAmmo.set(this.activeWeapon.reserve);
+    } else {
+      this.clipAmmo.set(0);
+      this.reserveAmmo.set(0);
     }
 
     this.buildCurrentWeaponModel();
@@ -512,11 +516,18 @@ class CS2Player {
       return;
     }
 
+    // C4 Bomb or Objective items cannot shoot bullets
+    if (this.activeSlot === 5 || this.activeWeapon.id === 'c4' || this.activeWeapon.category === 'objective') {
+      this.isShooting = false;
+      return;
+    }
+
     // Grenade throwing
     if (this.activeSlot === 4 || this.activeWeapon.category === 'equipment') {
       if (currentTime - this.lastShotTime < 1.0) return;
       this.lastShotTime = currentTime;
       this.throwGrenade();
+      this.isShooting = false;
       return;
     }
 
@@ -524,6 +535,7 @@ class CS2Player {
     if (this.activeWeapon.category === 'melee') {
       if (currentTime - this.lastShotTime < this.activeWeapon.fireRate) return;
       this.lastShotTime = currentTime;
+      this.isShooting = false;
       window.csAudio.playKnifeSlash();
       this.weaponRig.position.z = -0.35;
       this.weaponRig.rotation.y = 0.4;
@@ -551,11 +563,20 @@ class CS2Player {
 
     if (this.clipAmmo.get() <= 0) {
       this.startReload();
+      this.isShooting = false;
       return;
     }
 
     if (currentTime - this.lastShotTime < this.activeWeapon.fireRate) return;
     this.lastShotTime = currentTime;
+
+    // Semi-automatic trigger (Pistols except CZ-75 require a distinct click per bullet)
+    const isSemiAuto = (this.activeWeapon.category === 'pistols' && this.activeWeapon.id !== 'cz75') ||
+                       (this.activeWeapon.category === 'snipers' && this.activeWeapon.id !== 'scar20' && this.activeWeapon.id !== 'g3sg1') ||
+                       (this.activeWeapon.category === 'heavy' && this.activeWeapon.id !== 'negev' && this.activeWeapon.id !== 'm249');
+    if (isSemiAuto) {
+      this.isShooting = false;
+    }
 
     this.clipAmmo.add(-1);
     window.csAudio.playGunshot(this.activeWeapon.audioType, this.activeWeapon.id, this.activeWeapon.isSilenced);
