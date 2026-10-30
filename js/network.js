@@ -219,6 +219,9 @@ class CS2NetworkManager {
       // Play gunshot audio for host!
       window.csAudio.playGunshot(data.weaponType || 'rifle', data.weaponId || 'ak47', data.isSilenced || false);
       this.broadcast(data, senderConn);
+    } else if (data.type === 'player_death') {
+      this.gm.onEntityKilled(data.attacker, data.victim, data.weapon, data.isHeadshot, data.victimTeam);
+      this.broadcast(data, senderConn);
     } else if (data.type === 'damage') {
       const isForHost = data.targetId === 'host' || 
                         (this.peer && data.targetId.toLowerCase() === this.peer.id.toLowerCase()) || 
@@ -242,6 +245,9 @@ class CS2NetworkManager {
       this.updateRemotePlayer(data.id, data);
     } else if (data.type === 'shoot') {
       window.csAudio.playGunshot(data.weaponType || 'rifle', data.weaponId || 'ak47', data.isSilenced || false);
+    } else if (data.type === 'player_death') {
+      this.gm.onEntityKilled(data.attacker, data.victim, data.weapon, data.isHeadshot, data.victimTeam);
+      this.broadcast(data, senderConn);
     } else if (data.type === 'damage') {
       const isForClient = !data.targetId || 
                           data.targetId === 'client' || 
@@ -307,6 +313,22 @@ class CS2NetworkManager {
     }
   }
 
+  sendDeath(attacker, victim, weapon, isHeadshot, victimTeam) {
+    const packet = {
+      type: 'player_death',
+      attacker: attacker,
+      victim: victim,
+      weapon: weapon,
+      isHeadshot: isHeadshot,
+      victimTeam: victimTeam
+    };
+    if (this.isHost) {
+      this.broadcast(packet, null);
+    } else if (this.hostConnection && this.hostConnection.open) {
+      this.hostConnection.send(packet);
+    }
+  }
+
   sendDamage(targetId, amount, weapon, isHeadshot = false) {
     const packet = {
       type: 'damage',
@@ -358,8 +380,17 @@ class CS2NetworkManager {
     const modelHolder = new THREE.Group();
     group.add(modelHolder);
 
+    // Initial tactical fallback while GLB model loads
+    const fallback = this.createFallbackModel(team);
+    modelHolder.add(fallback);
+
     const applyModel = (sourceScene) => {
-      const charModel = sourceScene.clone(true);
+      let charModel;
+      if (typeof THREE.SkeletonUtils !== 'undefined') {
+        charModel = THREE.SkeletonUtils.clone(sourceScene);
+      } else {
+        charModel = sourceScene.clone(true);
+      }
       charModel.scale.set(0.95, 0.95, 0.95);
       charModel.position.set(0, 0, 0);
 
@@ -385,10 +416,6 @@ class CS2NetworkManager {
       this.gltfLoader.load('source/sas_blue.glb', (gltf) => {
         this.cachedSASModel = gltf.scene;
         applyModel(gltf.scene);
-      }, undefined, () => {
-        // Fallback procedural tactical figure if GLB fails to load
-        const fallback = this.createFallbackModel(team);
-        modelHolder.add(fallback);
       });
     }
 
@@ -414,6 +441,23 @@ class CS2NetworkManager {
     const head = new THREE.Mesh(new THREE.SphereGeometry(0.18, 10, 10), headMat);
     head.position.y = 1.78;
     fGroup.add(head);
+
+    // Operator Arms & Gun
+    const armMat = new THREE.MeshLambertMaterial({ color: team === 'CT' ? 0x22364c : 0x7a6348 });
+    const rArm = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.07, 0.65, 8), armMat);
+    rArm.rotation.set(Math.PI / 4, 0, -0.2);
+    rArm.position.set(0.32, 1.25, 0.2);
+    fGroup.add(rArm);
+
+    const lArm = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.07, 0.65, 8), armMat);
+    lArm.rotation.set(Math.PI / 4, 0, 0.35);
+    lArm.position.set(-0.25, 1.25, 0.25);
+    fGroup.add(lArm);
+
+    const gunMat = new THREE.MeshLambertMaterial({ color: 0x111111 });
+    const gun = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.12, 0.7), gunMat);
+    gun.position.set(0.15, 1.2, 0.45);
+    fGroup.add(gun);
 
     return fGroup;
   }

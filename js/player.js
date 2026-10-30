@@ -147,32 +147,54 @@ class CS2Player {
     const sleeveMat = new THREE.MeshLambertMaterial({ color: sleeveColor });
     const gloveMat = new THREE.MeshLambertMaterial({ color: gloveColor });
 
-    // Right Arm & Hand (Primary holding arm)
-    const rForearmGeo = new THREE.CylinderGeometry(0.045, 0.05, 0.42, 8);
-    const rForearm = new THREE.Mesh(rForearmGeo, sleeveMat);
-    rForearm.rotation.set(-1.1, 0.3, -0.4);
-    rForearm.position.set(0.26, -0.34, -0.32);
-    group.add(rForearm);
+    const createTacticalArm = (p1, p2) => {
+      const armGroup = new THREE.Group();
+      const v = new THREE.Vector3().subVectors(p2, p1);
+      const len = v.length();
+      const mid = new THREE.Vector3().addVectors(p1, p2).multiplyScalar(0.5);
+      const norm = v.clone().normalize();
 
-    const rHandGeo = new THREE.BoxGeometry(0.065, 0.07, 0.1);
-    const rHand = new THREE.Mesh(rHandGeo, gloveMat);
-    rHand.rotation.set(-0.9, 0.3, -0.3);
-    rHand.position.set(0.22, -0.24, -0.42);
-    group.add(rHand);
+      // Forearm sleeve originating from offscreen edge
+      const sleeveGeo = new THREE.CylinderGeometry(0.045, 0.052, len * 0.78, 12);
+      const sleeve = new THREE.Mesh(sleeveGeo, sleeveMat);
+      sleeve.position.copy(p1).addScaledVector(norm, len * 0.39);
+      sleeve.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), norm);
+      armGroup.add(sleeve);
 
-    // Left Arm & Hand (Support arm for rifles/two-handed)
+      // Wrist cuff
+      const cuffGeo = new THREE.CylinderGeometry(0.048, 0.048, 0.04, 12);
+      const cuff = new THREE.Mesh(cuffGeo, gloveMat);
+      cuff.position.copy(p1).addScaledVector(norm, len * 0.76);
+      cuff.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), norm);
+      armGroup.add(cuff);
+
+      // Tactical Glove Palm & Knuckle Guard
+      const handGeo = new THREE.BoxGeometry(0.065, 0.05, 0.08);
+      const hand = new THREE.Mesh(handGeo, gloveMat);
+      hand.position.copy(p2);
+      hand.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, -1), norm);
+      armGroup.add(hand);
+
+      return armGroup;
+    };
+
+    // Right Arm & Glove (Grips weapon from bottom-right corner)
+    const rStart = new THREE.Vector3(0.36, -0.48, -0.12);
+    const rGrip = (w.id === 'knife') 
+      ? new THREE.Vector3(0.20, -0.26, -0.30)
+      : new THREE.Vector3(0.20, -0.22, -0.38);
+    group.add(createTacticalArm(rStart, rGrip));
+
+    // Left Arm & Glove (Support arm for rifles/two-handed)
     if (w.category === 'rifles' || w.id === 'awp' || w.id === 'p90' || w.id === 'xm1014') {
-      const lForearmGeo = new THREE.CylinderGeometry(0.045, 0.05, 0.45, 8);
-      const lForearm = new THREE.Mesh(lForearmGeo, sleeveMat);
-      lForearm.rotation.set(-1.0, -0.5, 0.6);
-      lForearm.position.set(-0.06, -0.36, -0.42);
-      group.add(lForearm);
-
-      const lHandGeo = new THREE.BoxGeometry(0.065, 0.065, 0.09);
-      const lHand = new THREE.Mesh(lHandGeo, gloveMat);
-      lHand.rotation.set(-0.8, -0.4, 0.4);
-      lHand.position.set(0.12, -0.23, -0.62);
-      group.add(lHand);
+      const lStart = new THREE.Vector3(-0.32, -0.48, -0.16);
+      const lGuard = new THREE.Vector3(0.12, -0.22, -0.56);
+      group.add(createTacticalArm(lStart, lGuard));
+    } else if (w.category === 'pistols') {
+      // Support hand cup for tactical pistol stance
+      const lStart = new THREE.Vector3(-0.24, -0.48, -0.16);
+      const lCup = new THREE.Vector3(0.17, -0.26, -0.38);
+      group.add(createTacticalArm(lStart, lCup));
     }
 
     // 2. Weapon 3D Model: Use official GLB models if available
@@ -397,6 +419,23 @@ class CS2Player {
     window.addEventListener('mouseup', (e) => {
       if (e.button === 0) {
         this.isShooting = false;
+      }
+    });
+
+    window.addEventListener('wheel', (e) => {
+      if (!document.pointerLockElement) return;
+      if (this.isSpectating) return;
+      const slots = [1, 2, 3, 4, 5];
+      const available = slots.filter(s => this.inventory[s] !== null);
+      if (available.length <= 1) return;
+      let curIdx = available.indexOf(this.activeSlot);
+      if (curIdx === -1) curIdx = 0;
+      if (e.deltaY > 0) {
+        const nextIdx = (curIdx + 1) % available.length;
+        this.switchSlot(available[nextIdx]);
+      } else if (e.deltaY < 0) {
+        const prevIdx = (curIdx - 1 + available.length) % available.length;
+        this.switchSlot(available[prevIdx]);
       }
     });
 
@@ -863,6 +902,9 @@ class CS2Player {
     this.enterSpectatorMode();
     if (window.csGameManager) {
       window.csGameManager.onEntityKilled(attackerName || 'Enemy', 'You', weaponName || 'Weapon', false, this.team);
+      if (window.csGameManager.net) {
+        window.csGameManager.net.sendDeath(attackerName || 'Enemy', 'Player', weaponName || 'Weapon', false, this.team);
+      }
     }
   }
 

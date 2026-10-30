@@ -343,6 +343,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Tab opens Scoreboard
     if (e.code === 'Tab') {
       e.preventDefault();
+      if (e.repeat) return; // Prevent 60fps DOM thrashing while holding Tab
       if (!document.getElementById('hud').classList.contains('hidden')) {
         document.getElementById('scoreboard').classList.remove('hidden');
         renderScoreboardRows();
