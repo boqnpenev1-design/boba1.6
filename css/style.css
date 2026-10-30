@@ -853,10 +853,13 @@ body, html {
               radial-gradient(circle at 25% 80%, rgba(91, 151, 213, 0.1) 0%, transparent 60%),
               #080b10;
   opacity: 0.85;
+  pointer-events: none;
 }
 
 .menu-container {
   position: relative;
+  z-index: 10;
+  pointer-events: auto;
   width: 1060px;
   max-width: 95vw;
   height: 640px;
@@ -946,6 +949,8 @@ body, html {
   display: flex;
   flex-direction: column;
   transition: all 0.2s;
+  cursor: pointer;
+  pointer-events: auto;
 }
 
 .server-card:hover {

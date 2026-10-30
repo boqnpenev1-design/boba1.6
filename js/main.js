@@ -55,13 +55,16 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // 4. Server Connect Button (Dust II)
+  const connectDust2 = () => {
+    window.csAudio.ensureContext();
+    gameManager.connectToServer('dust2');
+  };
   const btnDust2 = document.getElementById('btn-connect-dust2');
-  if (btnDust2) {
-    btnDust2.addEventListener('click', () => {
-      window.csAudio.ensureContext();
-      gameManager.connectToServer('dust2');
-    });
-  }
+  if (btnDust2) btnDust2.addEventListener('click', connectDust2);
+  const cardDust2 = document.querySelector('.server-card');
+  if (cardDust2) cardDust2.addEventListener('click', (e) => {
+    if (e.target.id !== 'btn-connect-dust2') connectDust2();
+  });
 
   // 5. Team Selection (Terrorists | Line | Counter-Terrorists)
   const joinTerrorists = () => {
