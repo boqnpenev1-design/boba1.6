@@ -201,6 +201,28 @@ class CS2NetworkManager {
   }
 
   setupHostConnectionHandlers(conn) {
+    const sendSync = () => {
+      conn.send({
+        type: 'match_sync',
+        phase: this.gm.phase,
+        phaseTimer: this.gm.phaseTimer,
+        phaseEndTime: this.gm.phaseEndTime,
+        liveRoundStartTime: this.gm.liveRoundStartTime,
+        ctScore: this.gm.ctScore,
+        tScore: this.gm.tScore,
+        round: this.gm.currentRound,
+        c4Planted: this.gm.c4Planted,
+        c4Pos: this.gm.c4Pos,
+        c4Site: this.gm.c4Site
+      });
+    };
+
+    if (conn.open) {
+      sendSync();
+    } else {
+      conn.on('open', sendSync);
+    }
+
     conn.on('data', (data) => {
       this.handleHostReceivedPacket(conn, data);
     });
@@ -211,13 +233,27 @@ class CS2NetworkManager {
     });
   }
 
+  triggerRemoteShootVisuals(shooterId) {
+    const p = this.remotePlayers[shooterId];
+    if (p && p.rig) {
+      if (p.rig.muzzleFlash) p.rig.muzzleFlash.visible = true;
+      if (p.rig.muzzleLight) p.rig.muzzleLight.intensity = 2.5;
+      if (p.rig.weapon) p.rig.weapon.position.z -= 0.12;
+      setTimeout(() => {
+        if (p.rig.muzzleFlash) p.rig.muzzleFlash.visible = false;
+        if (p.rig.muzzleLight) p.rig.muzzleLight.intensity = 0;
+      }, 65);
+    }
+  }
+
   handleHostReceivedPacket(senderConn, data) {
     if (data.type === 'player_update') {
       this.updateRemotePlayer(data.id, data);
       this.broadcast(data, senderConn);
     } else if (data.type === 'shoot') {
-      // Play gunshot audio for host!
+      // Play gunshot audio for host and trigger remote operator muzzle flash/recoil
       window.csAudio.playGunshot(data.weaponType || 'rifle', data.weaponId || 'ak47', data.isSilenced || false);
+      this.triggerRemoteShootVisuals(data.shooterId);
       this.broadcast(data, senderConn);
     } else if (data.type === 'player_death') {
       this.gm.onEntityKilled(data.attacker, data.victim, data.weapon, data.isHeadshot, data.victimTeam);
@@ -245,6 +281,7 @@ class CS2NetworkManager {
       this.updateRemotePlayer(data.id, data);
     } else if (data.type === 'shoot') {
       window.csAudio.playGunshot(data.weaponType || 'rifle', data.weaponId || 'ak47', data.isSilenced || false);
+      this.triggerRemoteShootVisuals(data.shooterId);
     } else if (data.type === 'player_death') {
       this.gm.onEntityKilled(data.attacker, data.victim, data.weapon, data.isHeadshot, data.victimTeam);
     } else if (data.type === 'damage') {
@@ -259,6 +296,16 @@ class CS2NetworkManager {
       this.gm.onC4Planted(data.pos, data.site);
     } else if (data.type === 'defuse_c4') {
       this.gm.onC4Defused();
+    } else if (data.type === 'timer_sync') {
+      this.gm.phase = data.phase;
+      this.gm.phaseEndTime = data.phaseEndTime;
+      this.gm.liveRoundStartTime = data.liveRoundStartTime;
+      this.gm.ctScore = data.ctScore;
+      this.gm.tScore = data.tScore;
+      this.gm.currentRound = data.round;
+      if (data.phase === 'live' && this.gm.player.health.get() <= 0 && !this.gm.player.isSpectating) {
+        this.gm.player.enterSpectatorMode();
+      }
     } else if (data.type === 'match_sync') {
       // Sync match state from host
       this.gm.phase = data.phase;
@@ -271,12 +318,15 @@ class CS2NetworkManager {
       if (data.c4Planted && data.c4Pos) {
         this.gm.onC4Planted(data.c4Pos, data.c4Site);
       }
-      // If round is currently LIVE, joining player spectates until next round
+      // If round is currently LIVE, mid-round joining player MUST enter spectator mode until next round!
       if (data.phase === 'live') {
         this.gm.player.enterSpectatorMode();
       }
     } else if (data.type === 'round_start') {
       this.gm.currentRound = data.round;
+      if (this.gm.player.isSpectating) {
+        this.gm.player.exitSpectatorMode();
+      }
       this.gm.startRound();
       if (data.phaseEndTime) {
         this.gm.phaseEndTime = data.phaseEndTime;
@@ -367,97 +417,215 @@ class CS2NetworkManager {
   createTacticalCharacterModel(team) {
     const group = new THREE.Group();
 
-    // 1. Full-Body Hitbox Cylinder (Covers head to feet for 100% reliable bullet hits)
-    const hitboxGeo = new THREE.CylinderGeometry(0.5, 0.5, 1.85, 12);
+    // 1. Full-Body Hitbox Cylinder (Covers head to feet for reliable bullet hits)
+    const hitboxGeo = new THREE.CylinderGeometry(0.48, 0.48, 1.85, 12);
     const hitboxMat = new THREE.MeshBasicMaterial({ visible: false });
     const hitbox = new THREE.Mesh(hitboxGeo, hitboxMat);
     hitbox.position.y = 0.925;
     hitbox.name = 'hitbox';
     group.add(hitbox);
 
-    const modelHolder = new THREE.Group();
-    group.add(modelHolder);
+    const texLoader = new THREE.TextureLoader();
 
-    // Initial tactical fallback while GLB model loads
-    const fallback = this.createFallbackModel(team);
-    modelHolder.add(fallback);
+    // Palette & Textures
+    const isCT = (team === 'CT');
+    const pantsColor = isCT ? 0x182432 : 0x4a4235; // CT Navy vs Phoenix Tan/Brown cargo
+    const shirtColor = isCT ? 0x1d2e42 : 0x6e5239; // CT SAS Jacket vs Phoenix Flight Jacket
+    const vestColor  = isCT ? 0x141a22 : 0x362e24; // Kevlar tactical vest
+    const bootColor  = 0x111317;
 
-    const applyModel = (sourceScene) => {
-      let charModel;
-      if (typeof THREE.SkeletonUtils !== 'undefined') {
-        charModel = THREE.SkeletonUtils.clone(sourceScene);
-      } else {
-        charModel = sourceScene.clone(true);
-      }
-      charModel.scale.set(0.95, 0.95, 0.95);
-      charModel.position.set(0, 0, 0);
+    const pantsMat = new THREE.MeshLambertMaterial({ color: pantsColor });
+    const shirtMat = new THREE.MeshLambertMaterial({ color: shirtColor });
+    const vestMat  = new THREE.MeshLambertMaterial({ color: vestColor });
+    const bootMat  = new THREE.MeshLambertMaterial({ color: bootColor });
+    const gloveMat = new THREE.MeshLambertMaterial({ color: 0x16181c });
 
-      if (team === 'T') {
-        // Authentic Phoenix Terrorist Uniform Palette
-        charModel.traverse((child) => {
-          if (child.isMesh && child.material) {
-            child.material = child.material.clone();
-            child.material.color.setHex(0x7a6348); // Desert Tan / Olive
-          }
-        });
-      }
-
-      while (modelHolder.children.length > 0) {
-        modelHolder.remove(modelHolder.children[0]);
-      }
-      modelHolder.add(charModel);
-    };
-
-    if (this.cachedSASModel) {
-      applyModel(this.cachedSASModel);
-    } else if (this.gltfLoader) {
-      this.gltfLoader.load('source/sas_blue.glb', (gltf) => {
-        this.cachedSASModel = gltf.scene;
-        applyModel(gltf.scene);
-      });
+    if (isCT) {
+      texLoader.load('textures/armor_diffuse_color_psd_25fc1cb_2.png', (tex) => {
+        vestMat.map = tex;
+        vestMat.needsUpdate = true;
+      }, undefined, () => {});
     }
 
+    // Left Leg Anchor & Mesh
+    const leftLegGroup = new THREE.Group();
+    leftLegGroup.position.set(-0.16, 0.90, 0);
+    const lLegUpper = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.08, 0.45, 8), pantsMat);
+    lLegUpper.position.y = -0.225;
+    leftLegGroup.add(lLegUpper);
+    const lKneePad = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.09, 0.06), bootMat);
+    lKneePad.position.set(0, -0.42, 0.05);
+    leftLegGroup.add(lKneePad);
+    const lLegLower = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.07, 0.45, 8), pantsMat);
+    lLegLower.position.y = -0.65;
+    leftLegGroup.add(lLegLower);
+    const lBoot = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, 0.22), bootMat);
+    lBoot.position.set(0, -0.84, 0.04);
+    leftLegGroup.add(lBoot);
+    group.add(leftLegGroup);
+
+    // Right Leg Anchor & Mesh
+    const rightLegGroup = new THREE.Group();
+    rightLegGroup.position.set(0.16, 0.90, 0);
+    const rLegUpper = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.08, 0.45, 8), pantsMat);
+    rLegUpper.position.y = -0.225;
+    rightLegGroup.add(rLegUpper);
+    const rKneePad = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.09, 0.06), bootMat);
+    rKneePad.position.set(0, -0.42, 0.05);
+    rightLegGroup.add(rKneePad);
+    const rLegLower = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.07, 0.45, 8), pantsMat);
+    rLegLower.position.y = -0.65;
+    rightLegGroup.add(rLegLower);
+    const rBoot = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, 0.22), bootMat);
+    rBoot.position.set(0, -0.84, 0.04);
+    rightLegGroup.add(rBoot);
+    group.add(rightLegGroup);
+
+    // Torso Group (Hips anchor at Y=0.95, pivots for pitch aiming)
+    const torsoGroup = new THREE.Group();
+    torsoGroup.position.set(0, 0.95, 0);
+
+    // Combat Shirt / Jacket Torso
+    const torsoMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.20, 0.62, 8), shirtMat);
+    torsoMesh.position.y = 0.31;
+    torsoGroup.add(torsoMesh);
+
+    // Kevlar Tactical Assault Vest
+    const vestMesh = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.48, 0.32), vestMat);
+    vestMesh.position.y = 0.33;
+    torsoGroup.add(vestMesh);
+
+    // Molle / Ammo pouches on vest
+    const pouchColor = isCT ? 0x1c242c : 0x7c6448;
+    const pouchMat = new THREE.MeshLambertMaterial({ color: pouchColor });
+    for (let pIdx = -1; pIdx <= 1; pIdx++) {
+      const pouch = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.14, 0.08), pouchMat);
+      pouch.position.set(pIdx * 0.12, 0.22, 0.18);
+      torsoGroup.add(pouch);
+    }
+
+    // Head & Helmet / Balaclava
+    const headGroup = new THREE.Group();
+    headGroup.position.set(0, 0.68, 0);
+
+    if (isCT) {
+      // SAS CT: Tactical Balaclava & Ballistic Helmet with Visor
+      const maskMat = new THREE.MeshLambertMaterial({ color: 0x161c24 });
+      const mask = new THREE.Mesh(new THREE.SphereGeometry(0.16, 12, 12), maskMat);
+      headGroup.add(mask);
+
+      const helmetMat = new THREE.MeshLambertMaterial({ color: 0x1f2936 });
+      texLoader.load('textures/helmet_diffuse_color_psd_aaf82f80_5.png', (tex) => {
+        helmetMat.map = tex;
+        helmetMat.needsUpdate = true;
+      }, undefined, () => {});
+      const helmet = new THREE.Mesh(new THREE.SphereGeometry(0.18, 12, 12), helmetMat);
+      helmet.scale.set(1.05, 0.95, 1.1);
+      helmet.position.set(0, 0.05, -0.02);
+      headGroup.add(helmet);
+
+      const visor = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.08, 0.10), new THREE.MeshStandardMaterial({ color: 0x05070a, roughness: 0.1, metalness: 0.8 }));
+      visor.position.set(0, 0.02, 0.13);
+      headGroup.add(visor);
+    } else {
+      // Phoenix Connexion Terrorist: Desert Off-White Balaclava
+      const maskMat = new THREE.MeshLambertMaterial({ color: 0xd6cbb8 });
+      const mask = new THREE.Mesh(new THREE.SphereGeometry(0.17, 12, 12), maskMat);
+      headGroup.add(mask);
+
+      const eyeSlit = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.05, 0.06), new THREE.MeshBasicMaterial({ color: 0x111111 }));
+      eyeSlit.position.set(0, 0.03, 0.145);
+      headGroup.add(eyeSlit);
+
+      const collar = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.18, 0.12, 8), new THREE.MeshLambertMaterial({ color: 0x483a2a }));
+      collar.position.set(0, -0.10, 0);
+      headGroup.add(collar);
+    }
+    torsoGroup.add(headGroup);
+
+    // Left Arm Group
+    const leftArmGroup = new THREE.Group();
+    leftArmGroup.position.set(-0.28, 0.50, 0);
+    const lUpperArm = new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.055, 0.32, 8), shirtMat);
+    lUpperArm.position.set(0.06, -0.12, 0.08);
+    lUpperArm.rotation.set(Math.PI / 4, 0, -0.2);
+    leftArmGroup.add(lUpperArm);
+    const lForearm = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.05, 0.32, 8), shirtMat);
+    lForearm.position.set(0.14, -0.20, 0.26);
+    lForearm.rotation.set(Math.PI / 3, 0, -0.5);
+    leftArmGroup.add(lForearm);
+    const lGlove = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.05, 0.08), gloveMat);
+    lGlove.position.set(0.20, -0.24, 0.38);
+    leftArmGroup.add(lGlove);
+    torsoGroup.add(leftArmGroup);
+
+    // Right Arm Group
+    const rightArmGroup = new THREE.Group();
+    rightArmGroup.position.set(0.28, 0.50, 0);
+    const rUpperArm = new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.055, 0.32, 8), shirtMat);
+    rUpperArm.position.set(-0.06, -0.12, 0.08);
+    rUpperArm.rotation.set(Math.PI / 4, 0, 0.2);
+    rightArmGroup.add(rUpperArm);
+    const rForearm = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.05, 0.32, 8), shirtMat);
+    rForearm.position.set(-0.08, -0.20, 0.26);
+    rForearm.rotation.set(Math.PI / 3.5, 0, 0.35);
+    rightArmGroup.add(rForearm);
+    const rGlove = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.05, 0.08), gloveMat);
+    rGlove.position.set(-0.10, -0.24, 0.38);
+    rightArmGroup.add(rGlove);
+    torsoGroup.add(rightArmGroup);
+
+    // Operator Weapon Model
+    const weaponGroup = new THREE.Group();
+    weaponGroup.position.set(0.08, 0.28, 0.38);
+
+    const gunMat = new THREE.MeshLambertMaterial({ color: 0x181a1e });
+    const woodMat = new THREE.MeshLambertMaterial({ color: 0x6e3b1c });
+
+    const gunBody = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.09, 0.55), gunMat);
+    weaponGroup.add(gunBody);
+    const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.016, 0.35, 8), gunMat);
+    barrel.rotation.x = Math.PI / 2;
+    barrel.position.set(0, 0.02, 0.38);
+    weaponGroup.add(barrel);
+
+    const stock = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.12, 0.26), isCT ? gunMat : woodMat);
+    stock.position.set(0, -0.04, -0.32);
+    weaponGroup.add(stock);
+
+    const mag = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.20, 0.08), gunMat);
+    mag.rotation.x = -0.3;
+    mag.position.set(0, -0.12, 0.08);
+    weaponGroup.add(mag);
+
+    // Muzzle Flash Mesh & Light
+    const flashGeo = new THREE.SphereGeometry(0.09, 8, 8);
+    const flashMat = new THREE.MeshBasicMaterial({ color: 0xffcc33 });
+    const muzzleFlash = new THREE.Mesh(flashGeo, flashMat);
+    muzzleFlash.position.set(0, 0.02, 0.58);
+    muzzleFlash.visible = false;
+    weaponGroup.add(muzzleFlash);
+
+    const muzzleLight = new THREE.PointLight(0xffaa22, 0, 8);
+    muzzleLight.position.set(0, 0.02, 0.58);
+    weaponGroup.add(muzzleLight);
+
+    torsoGroup.add(weaponGroup);
+    group.add(torsoGroup);
+
+    group.rig = {
+      leftLeg: leftLegGroup,
+      rightLeg: rightLegGroup,
+      torso: torsoGroup,
+      head: headGroup,
+      leftArm: leftArmGroup,
+      rightArm: rightArmGroup,
+      weapon: weaponGroup,
+      muzzleFlash: muzzleFlash,
+      muzzleLight: muzzleLight
+    };
+
     return group;
-  }
-
-  createFallbackModel(team) {
-    const fGroup = new THREE.Group();
-    const pantsMat = new THREE.MeshLambertMaterial({ color: team === 'CT' ? 0x1a2634 : 0x3a4032 });
-    const leftLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.11, 0.9, 8), pantsMat);
-    leftLeg.position.set(-0.16, 0.45, 0);
-    const rightLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.11, 0.9, 8), pantsMat);
-    rightLeg.position.set(0.16, 0.45, 0);
-    fGroup.add(leftLeg);
-    fGroup.add(rightLeg);
-
-    const torsoMat = new THREE.MeshLambertMaterial({ color: team === 'CT' ? 0x22364c : 0x7a6348 });
-    const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.22, 0.75, 8), torsoMat);
-    torso.position.y = 1.25;
-    fGroup.add(torso);
-
-    const headMat = new THREE.MeshLambertMaterial({ color: team === 'CT' ? 0x1c2530 : 0x232420 });
-    const head = new THREE.Mesh(new THREE.SphereGeometry(0.18, 10, 10), headMat);
-    head.position.y = 1.78;
-    fGroup.add(head);
-
-    // Operator Arms & Gun
-    const armMat = new THREE.MeshLambertMaterial({ color: team === 'CT' ? 0x22364c : 0x7a6348 });
-    const rArm = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.07, 0.65, 8), armMat);
-    rArm.rotation.set(Math.PI / 4, 0, -0.2);
-    rArm.position.set(0.32, 1.25, 0.2);
-    fGroup.add(rArm);
-
-    const lArm = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.07, 0.65, 8), armMat);
-    lArm.rotation.set(Math.PI / 4, 0, 0.35);
-    lArm.position.set(-0.25, 1.25, 0.25);
-    fGroup.add(lArm);
-
-    const gunMat = new THREE.MeshLambertMaterial({ color: 0x111111 });
-    const gun = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.12, 0.7), gunMat);
-    gun.position.set(0.15, 1.2, 0.45);
-    fGroup.add(gun);
-
-    return fGroup;
   }
 
   updateRemotePlayer(id, data) {
@@ -466,10 +634,12 @@ class CS2NetworkManager {
       this.gm.scene.add(model);
       this.remotePlayers[id] = {
         mesh: model,
+        rig: model.rig,
         data: data,
         team: data.team,
         pos: data.pos,
         lastPos: null,
+        walkCycle: 0,
         lastStepTime: 0
       };
     }
@@ -482,15 +652,50 @@ class CS2NetworkManager {
     p.mesh.rotation.y = data.yaw;
     p.mesh.visible = (data.health > 0);
 
-    // Real-time remote footsteps audio sync
     const now = performance.now();
-    if (p.lastPos) {
-      const distMoved = Math.hypot(data.pos.x - p.lastPos.x, data.pos.z - p.lastPos.z);
-      if (distMoved > 0.12 && now - p.lastStepTime > 340) {
-        p.lastStepTime = now;
-        window.csAudio.playFootstep();
+    const dt = p.lastTime ? Math.max(0.001, Math.min(0.1, (now - p.lastTime) / 1000)) : 0.016;
+    p.lastTime = now;
+
+    if (p.rig) {
+      // 1. Aim Pitch
+      if (data.pitch !== undefined) {
+        p.rig.torso.rotation.x = Math.max(-0.6, Math.min(0.6, -data.pitch));
+      }
+
+      // 2. Movement & Leg Animation
+      if (p.lastPos) {
+        const distMoved = Math.hypot(data.pos.x - p.lastPos.x, data.pos.z - p.lastPos.z);
+
+        if (distMoved > 0.005) {
+          p.walkCycle += distMoved * 4.2;
+          p.rig.leftLeg.rotation.x = Math.sin(p.walkCycle) * 0.65;
+          p.rig.rightLeg.rotation.x = -Math.sin(p.walkCycle) * 0.65;
+          p.rig.torso.position.y = 0.95 + Math.abs(Math.sin(p.walkCycle * 2)) * 0.04;
+
+          if (distMoved > 0.10 && now - p.lastStepTime > 340) {
+            p.lastStepTime = now;
+            window.csAudio.playFootstep();
+          }
+        } else {
+          // Idle breathing pose
+          p.rig.leftLeg.rotation.x *= 0.82;
+          p.rig.rightLeg.rotation.x *= 0.82;
+          p.rig.torso.position.y = 0.95 + Math.sin(now * 0.003) * 0.012;
+        }
+
+        // Airborne jumping pose
+        if (Math.abs(data.pos.y - p.lastPos.y) > 0.08) {
+          p.rig.leftLeg.rotation.x = -0.32;
+          p.rig.rightLeg.rotation.x = -0.22;
+        }
+      }
+
+      // 3. Gun recoil recovery
+      if (p.rig.weapon.position.z < 0.38) {
+        p.rig.weapon.position.z += (0.38 - p.rig.weapon.position.z) * 0.25;
       }
     }
+
     p.lastPos = { x: data.pos.x, y: data.pos.y, z: data.pos.z };
   }
 }

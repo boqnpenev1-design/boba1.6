@@ -157,80 +157,48 @@ class CS2MapBuilder {
     }
 
     // ==========================================================
-    // SOLID BOUNDARY COLLIDERS (Matching de_dust2.obj at 0, 0, 0)
+    // MAP BOUNDARIES & OBSTACLES (Outer Perimeter Limits)
     // ==========================================================
-
-    // Outer Boundaries
-    this.addCollider(0, -10, -170, 260, 35, 10); // Far North (CT & A bounds)
-    this.addCollider(0, -10, 75, 260, 35, 10);   // Far South (T bounds)
-    this.addCollider(-118, -10, -50, 10, 35, 260); // Far West (B bounds)
-    this.addCollider(90, -10, -50, 10, 35, 260);  // Far East (Long A bounds)
-
-    // Mid Corridor Boundaries
-    this.addCollider(-30, -5, -45, 8, 25, 90);  // Mid West Wall
-    this.addCollider(-5, -5, -45, 8, 25, 90);   // Mid East Wall
-    this.addCollider(-22, -5, -85, 7, 20, 5);   // Mid Double Door West
-    this.addCollider(-13, -5, -85, 7, 20, 5);   // Mid Double Door East
-
-    // Long A Boundaries & Double Doors
-    this.addCollider(48, -5, -45, 8, 25, 95);   // Long A West Wall
-    this.addCollider(78, -5, -45, 8, 25, 95);   // Long A East Wall
-    this.addCollider(63, -5, 15, 25, 20, 6);    // Long Double Doors Frame
-
-    // Upper B Tunnels & Clear Exit Doorway
-    this.addCollider(-95, -5, -25, 8, 25, 75);    // Tunnels Outer Wall
-    this.addCollider(-74, -5, -25, 8, 25, 75);    // Tunnels Inner Wall
-    this.addCollider(-98, -5, -80, 12, 20, 6);   // Tunnel Exit Left Wall Frame
-    this.addCollider(-79, -5, -80, 14, 20, 6);   // Tunnel Exit Right Wall Frame (Door opening -92 to -86 is clear)
-
-    // Bombsite A Back Wall & Ramp
-    this.addCollider(58, 0, -125, 45, 25, 8);
-    this.addCollider(80, 0, -105, 8, 25, 45);
-
-    // Bombsite B Back Wall & Door
-    this.addCollider(-70, 0, -125, 45, 25, 8);
-    this.addCollider(-92, 0, -95, 8, 25, 45);
-
-    // CT Spawn Back Wall & Enclosure
-    this.addCollider(-15, 0, -165, 50, 25, 8);
-
-    // T Spawn Back Wall
-    this.addCollider(10, 0, 50, 50, 25, 8);
+    // Outer skybox boundaries preventing walking off into void
+    this.addCollider(0, -15, -165, 260, 45, 12); // North limit
+    this.addCollider(0, -15, 68, 260, 45, 12);   // South limit
+    this.addCollider(-115, -15, -50, 12, 45, 260); // West limit
+    this.addCollider(88, -15, -50, 12, 45, 260);  // East limit
 
     // ==========================================================
-    // BOMBSITES & BUY ZONES (100% Valve CS Alignment)
+    // BOMBSITES & BUY ZONES (100% Authentic Dust 2 Geometry)
     // ==========================================================
 
-    // Bombsite A (Platform & Ramp)
-    this.addBombsiteZone('A', 55.0, 2.4, -112.0, 8.0);
+    // Bombsite A (Platform at Y = 4.3)
+    this.addBombsiteZone('A', 28.0, 4.3, -118.0, 8.5);
 
-    // Bombsite B (Courtyard outside B Tunnels & Doors)
-    this.addBombsiteZone('B', -70.0, 0.5, -92.0, 8.0);
+    // Bombsite B (Courtyard at Y = 0.0)
+    this.addBombsiteZone('B', -72.0, 0.0, -98.0, 8.5);
 
     // Authentic Buy Zones matching CT & T Spawns
-    this.buyZones.CT = { minX: -35, maxX: 10, minZ: -160, maxZ: -130 };
-    this.buyZones.T = { minX: -15, maxX: 25, minZ: 20, maxZ: 50 };
+    this.buyZones.CT = { minX: -25, maxX: 15, minZ: -115, maxZ: -85 };
+    this.buyZones.T = { minX: -90, maxX: -40, minZ: 20, maxZ: 50 };
 
     // ==========================================================
-    // AUTHENTIC VALVE SPAWN POINTS
+    // AUTHENTIC DUST 2 SPAWN POINTS
     // ==========================================================
 
-    // CT Spawns: Standing firmly on CT spawn ground behind mid doors
+    // CT Spawns: Standing on CT Spawn ground (Y = -5.8, eyes at Y = -4.0) facing South
     this.spawnPoints.CT = [
-      { x: -15.0, y: 1.8, z: -145.0, yaw: 0 },
-      { x: -12.0, y: 1.8, z: -142.0, yaw: 0 },
-      { x: -18.0, y: 1.8, z: -142.0, yaw: 0 },
-      { x: -15.0, y: 1.8, z: -148.0, yaw: 0 },
-      { x: -10.0, y: 1.8, z: -146.0, yaw: 0 }
+      { x: -5.0, y: -4.0, z: -98.0, yaw: Math.PI },
+      { x: -2.0, y: -4.0, z: -96.0, yaw: Math.PI },
+      { x: -8.0, y: -4.0, z: -96.0, yaw: Math.PI },
+      { x: -5.0, y: -4.0, z: -101.0, yaw: Math.PI },
+      { x: -1.0, y: -4.0, z: -100.0, yaw: Math.PI }
     ];
 
-    // T Spawns: Standing in T spawn courtyard on solid ground
+    // T Spawns: Standing in T Spawn Courtyard (Y = 5.8, eyes at Y = 7.6) facing North
     this.spawnPoints.T = [
-      { x: 8.0, y: 1.8, z: 35.0, yaw: Math.PI },
-      { x: 5.0, y: 1.8, z: 33.0, yaw: Math.PI },
-      { x: 11.0, y: 1.8, z: 33.0, yaw: Math.PI },
-      { x: 8.0, y: 1.8, z: 38.0, yaw: Math.PI },
-      { x: 4.0, y: 1.8, z: 36.0, yaw: Math.PI }
+      { x: -65.0, y: 7.6, z: 35.0, yaw: 0 },
+      { x: -61.0, y: 7.6, z: 33.0, yaw: 0 },
+      { x: -69.0, y: 7.6, z: 33.0, yaw: 0 },
+      { x: -65.0, y: 7.6, z: 38.0, yaw: 0 },
+      { x: -58.0, y: 7.6, z: 36.0, yaw: 0 }
     ];
   }
 }

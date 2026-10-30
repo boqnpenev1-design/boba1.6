@@ -32,12 +32,20 @@ class CS2Player {
     this.clipAmmo = window.__CS2_AC.createProtectedValue(12);
     this.reserveAmmo = window.__CS2_AC.createProtectedValue(24);
 
+    // Persistent Ammo Storage per Weapon (Prevents free reload exploit on weapon switch)
+    this.weaponAmmo = {};
+    this.weaponAmmo[CS2_WEAPONS.usp.id] = {
+      clip: CS2_WEAPONS.usp.clip,
+      reserve: CS2_WEAPONS.usp.reserve
+    };
+
     // Camera & Movement state
     this.yaw = 0;
     this.pitch = 0;
     this.position = new THREE.Vector3(0, 1.8, -90);
     this.velocity = new THREE.Vector3();
     this.isGrounded = true;
+    this.lastGroundY = -5.8;
     this.isCrouched = false;
     this.isScoped = false;
     this.playerHeight = 1.8;
@@ -127,6 +135,13 @@ class CS2Player {
       this.inventory[5] = CS2_WEAPONS.c4;
       this.hasDefuseKit = false;
     }
+    this.weaponAmmo = {};
+    if (this.inventory[2]) {
+      this.weaponAmmo[this.inventory[2].id] = {
+        clip: this.inventory[2].clip,
+        reserve: this.inventory[2].reserve
+      };
+    }
     this.switchSlot(2);
   }
 
@@ -180,12 +195,15 @@ class CS2Player {
 
     // Right Arm & Glove (Grips weapon from bottom-right corner)
     const rStart = new THREE.Vector3(0.36, -0.48, -0.12);
-    const rGrip = (w.id === 'knife') 
+    let rGrip = (w.id === 'knife') 
       ? new THREE.Vector3(0.20, -0.26, -0.30)
       : new THREE.Vector3(0.20, -0.22, -0.38);
+    if (w.id === 'c4') {
+      rGrip = new THREE.Vector3(0.12, -0.25, -0.28);
+    }
     group.add(createTacticalArm(rStart, rGrip));
 
-    // Left Arm & Glove (Support arm for rifles/two-handed)
+    // Left Arm & Glove (Support arm for rifles/two-handed/C4)
     if (w.category === 'rifles' || w.id === 'awp' || w.id === 'p90' || w.id === 'xm1014') {
       const lStart = new THREE.Vector3(-0.32, -0.48, -0.16);
       const lGuard = new THREE.Vector3(0.12, -0.22, -0.56);
@@ -195,6 +213,11 @@ class CS2Player {
       const lStart = new THREE.Vector3(-0.24, -0.48, -0.16);
       const lCup = new THREE.Vector3(0.17, -0.26, -0.38);
       group.add(createTacticalArm(lStart, lCup));
+    } else if (w.id === 'c4') {
+      // Authentic dual-handed C4 chest carry
+      const lStart = new THREE.Vector3(-0.32, -0.48, -0.12);
+      const lGrip = new THREE.Vector3(-0.08, -0.25, -0.28);
+      group.add(createTacticalArm(lStart, lGrip));
     }
 
     // 2. Weapon 3D Model: Use official GLB models if available
@@ -251,8 +274,9 @@ class CS2Player {
       mesh.scale.set(0.9, 0.9, 0.9);
       mesh.position.set(0.18, -0.19, -0.38);
     } else if (weaponId === 'c4') {
-      mesh.scale.set(0.85, 0.85, 0.85);
-      mesh.position.set(0.16, -0.18, -0.38);
+      mesh.scale.set(0.28, 0.28, 0.28);
+      mesh.position.set(0.02, -0.26, -0.28);
+      mesh.rotation.set(-0.25, Math.PI, 0);
     }
   }
 
@@ -345,6 +369,24 @@ class CS2Player {
       const band = new THREE.Mesh(bandGeo, bandMat);
       band.position.set(0.2, -0.22, -0.44);
       group.add(band);
+    } else if (w.id === 'c4') {
+      const c4Mat = new THREE.MeshLambertMaterial({ color: 0x826c52 });
+      const c4Brick = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.16, 0.1), c4Mat);
+      c4Brick.position.set(0.02, -0.26, -0.28);
+      c4Brick.rotation.set(-0.25, 0, 0);
+      group.add(c4Brick);
+
+      const keypadMat = new THREE.MeshLambertMaterial({ color: 0x111111 });
+      const keypad = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.09, 0.02), keypadMat);
+      keypad.position.set(0.06, -0.24, -0.23);
+      keypad.rotation.set(-0.25, 0, 0);
+      group.add(keypad);
+
+      const wireMat = new THREE.MeshBasicMaterial({ color: 0xdd2222 });
+      const wire = new THREE.Mesh(new THREE.CylinderGeometry(0.005, 0.005, 0.15, 6), wireMat);
+      wire.position.set(-0.04, -0.22, -0.23);
+      wire.rotation.set(-0.25, 0, 0.4);
+      group.add(wire);
     } else if (w.category === 'equipment' || w.id === 'flashbang' || w.id === 'hegrenade') {
       const grenGeo = new THREE.CylinderGeometry(0.042, 0.042, 0.15, 12);
       const grenMat = new THREE.MeshLambertMaterial({ color: w.id === 'flashbang' ? 0x7a8a9a : 0x364230 });
@@ -502,15 +544,32 @@ class CS2Player {
 
   switchSlot(slot) {
     if (!this.inventory[slot]) return;
+
+    // Save previous weapon's persistent ammo before switching
+    if (this.activeWeapon && this.activeWeapon.clip) {
+      this.weaponAmmo[this.activeWeapon.id] = {
+        clip: this.clipAmmo.get(),
+        reserve: this.reserveAmmo.get()
+      };
+    }
+
     this.activeSlot = slot;
     this.activeWeapon = this.inventory[slot];
     this.isReloading = false;
     this.isShooting = false; // Never carry firing state across weapon switches
     if (this.isScoped) this.toggleScope();
 
+    // Restore saved persistent ammo for target weapon (prevents free reloads)
     if (this.activeWeapon.clip) {
-      this.clipAmmo.set(this.activeWeapon.clip);
-      this.reserveAmmo.set(this.activeWeapon.reserve);
+      if (!this.weaponAmmo[this.activeWeapon.id]) {
+        this.weaponAmmo[this.activeWeapon.id] = {
+          clip: this.activeWeapon.clip,
+          reserve: this.activeWeapon.reserve
+        };
+      }
+      const saved = this.weaponAmmo[this.activeWeapon.id];
+      this.clipAmmo.set(saved.clip);
+      this.reserveAmmo.set(saved.reserve);
     } else {
       this.clipAmmo.set(0);
       this.reserveAmmo.set(0);
@@ -545,6 +604,10 @@ class CS2Player {
     const added = Math.min(needed, available);
     this.clipAmmo.add(added);
     this.reserveAmmo.add(-added);
+    if (this.weaponAmmo[this.activeWeapon.id]) {
+      this.weaponAmmo[this.activeWeapon.id].clip = this.clipAmmo.get();
+      this.weaponAmmo[this.activeWeapon.id].reserve = this.reserveAmmo.get();
+    }
   }
 
   shoot(currentTime, gameManager = null) {
@@ -618,6 +681,9 @@ class CS2Player {
     }
 
     this.clipAmmo.add(-1);
+    if (this.weaponAmmo[this.activeWeapon.id]) {
+      this.weaponAmmo[this.activeWeapon.id].clip = this.clipAmmo.get();
+    }
     window.csAudio.playGunshot(this.activeWeapon.audioType, this.activeWeapon.id, this.activeWeapon.isSilenced);
     if (gameManager && gameManager.net) {
       gameManager.net.sendShoot(this.activeWeapon.audioType, this.activeWeapon.id, this.activeWeapon.isSilenced, this.position);
@@ -917,6 +983,7 @@ class CS2Player {
     }
     this.velocity.set(0, 0, 0);
     this.isGrounded = true;
+    this.lastGroundY = spawnY - this.playerHeight;
     this.health.set(100);
     this.armor.set(100);
     this.isReloading = false;
@@ -924,6 +991,14 @@ class CS2Player {
     this.isDefusing = false;
     if (this.isScoped) this.toggleScope();
 
+    // Reset fresh ammo for all loadout weapons on round respawn
+    this.weaponAmmo = {};
+    for (const slot of [1, 2]) {
+      const w = this.inventory[slot];
+      if (w && w.clip) {
+        this.weaponAmmo[w.id] = { clip: w.clip, reserve: w.reserve };
+      }
+    }
     if (this.activeWeapon && this.activeWeapon.clip) {
       this.clipAmmo.set(this.activeWeapon.clip);
       this.reserveAmmo.set(this.activeWeapon.reserve);
@@ -1027,6 +1102,28 @@ class CS2Player {
     const colliders = this.map.colliders;
 
     // Multi-Axis Impenetrable Collision Resolution:
+    // Helper: test horizontal feeler ray against 3D map mesh to detect solid walls & crates
+    const checkMeshWall = (dirX, dirZ, dist) => {
+      if (!this.map || !this.map.groundMeshes || this.map.groundMeshes.length === 0) return false;
+      if (!this.wallRaycaster) {
+        this.wallRaycaster = new THREE.Raycaster();
+        this.wallOrigin = new THREE.Vector3();
+        this.wallDir = new THREE.Vector3();
+      }
+      this.wallDir.set(dirX, 0, dirZ).normalize();
+      const testY = this.position.y - this.playerHeight * 0.45;
+      this.wallOrigin.set(oldX, testY, oldZ);
+      this.wallRaycaster.set(this.wallOrigin, this.wallDir);
+      this.wallRaycaster.far = dist;
+      const hits = this.wallRaycaster.intersectObjects(this.map.groundMeshes, false);
+      for (let i = 0; i < hits.length; i++) {
+        if (hits[i].point.y > (this.lastGroundY + 0.65)) {
+          return true;
+        }
+      }
+      return false;
+    };
+
     // 1. Resolve X movement (enables sliding smoothly along walls)
     this.position.x += this.velocity.x * dt;
     for (let i = 0; i < colliders.length; i++) {
@@ -1043,6 +1140,13 @@ class CS2Player {
         this.position.x = oldX;
         this.velocity.x = 0;
         break;
+      }
+    }
+    if (Math.abs(this.velocity.x) > 0.001) {
+      const dist = playerRadius + Math.abs(this.velocity.x * dt) + 0.05;
+      if (checkMeshWall(Math.sign(this.velocity.x), 0, dist)) {
+        this.position.x = oldX;
+        this.velocity.x = 0;
       }
     }
 
@@ -1064,26 +1168,40 @@ class CS2Player {
         break;
       }
     }
+    if (Math.abs(this.velocity.z) > 0.001) {
+      const dist = playerRadius + Math.abs(this.velocity.z * dt) + 0.05;
+      if (checkMeshWall(0, Math.sign(this.velocity.z), dist)) {
+        this.position.z = oldZ;
+        this.velocity.z = 0;
+      }
+    }
 
     // 3. Resolve Y movement & Downward 3D Terrain Raycasting
     this.position.y += this.velocity.y * dt;
 
-    let targetGroundY = 0;
+    let targetGroundY = (this.lastGroundY !== undefined) ? this.lastGroundY : -5.8;
     if (this.map && this.map.groundMeshes && this.map.groundMeshes.length > 0) {
       if (!this.downRaycaster) {
         this.downRaycaster = new THREE.Raycaster();
         this.downOrigin = new THREE.Vector3();
         this.downDir = new THREE.Vector3(0, -1, 0);
       }
-      this.downOrigin.set(this.position.x, this.position.y + 0.2, this.position.z);
+      this.downOrigin.set(this.position.x, this.position.y + 0.5, this.position.z);
       this.downRaycaster.set(this.downOrigin, this.downDir);
       this.downRaycaster.far = 40.0;
       const hits = this.downRaycaster.intersectObjects(this.map.groundMeshes, false);
+      let foundGround = false;
+      let highestGroundY = -999;
       for (let i = 0; i < hits.length; i++) {
-        if (hits[i].point.y <= this.position.y - this.playerHeight + 0.6) {
-          targetGroundY = hits[i].point.y;
-          break;
+        const ptY = hits[i].point.y;
+        if (ptY <= (this.position.y - this.playerHeight + 0.8) && ptY > highestGroundY) {
+          highestGroundY = ptY;
+          foundGround = true;
         }
+      }
+      if (foundGround) {
+        targetGroundY = highestGroundY;
+        this.lastGroundY = highestGroundY;
       }
     }
 

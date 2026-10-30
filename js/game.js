@@ -536,17 +536,17 @@ class CS2GameManager {
     // Authentic CS2 Dust 2 Radar Minimap Corridors & Layout
     const mapPaths = [
       // Long A Corridor
-      [{ x: 8, z: 35 }, { x: 50, z: 25 }, { x: 65, z: 10 }, { x: 65, z: -80 }, { x: 55, z: -112 }],
+      [{ x: -65, z: 35 }, { x: -20, z: 25 }, { x: 30, z: 20 }, { x: 65, z: 10 }, { x: 65, z: -80 }, { x: 28, z: -118 }],
       // Catwalk / Short A
-      [{ x: 0, z: -10 }, { x: 18, z: -40 }, { x: 30, z: -80 }, { x: 55, z: -112 }],
+      [{ x: -30, z: 10 }, { x: 0, z: -10 }, { x: 18, z: -40 }, { x: 28, z: -118 }],
       // Mid & Doors to CT Spawn
-      [{ x: 8, z: 35 }, { x: 0, z: -10 }, { x: -8, z: -80 }, { x: -15, z: -145 }],
+      [{ x: -65, z: 35 }, { x: -30, z: 10 }, { x: -18, z: -45 }, { x: -5, z: -98 }],
       // B Tunnels (Upper & Lower) to B Site
-      [{ x: 8, z: 35 }, { x: -35, z: 25 }, { x: -85, z: -10 }, { x: -85, z: -80 }, { x: -70, z: -92 }],
+      [{ x: -65, z: 35 }, { x: -85, z: 10 }, { x: -85, z: -70 }, { x: -72, z: -98 }],
       // CT Spawn to B Site & Doors
-      [{ x: -15, z: -145 }, { x: -45, z: -125 }, { x: -70, z: -92 }],
+      [{ x: -5, z: -98 }, { x: -45, z: -98 }, { x: -72, z: -98 }],
       // CT Spawn to A Site
-      [{ x: -15, z: -145 }, { x: 25, z: -135 }, { x: 55, z: -112 }]
+      [{ x: -5, z: -98 }, { x: 15, z: -98 }, { x: 28, z: -118 }]
     ];
 
     ctx.lineCap = 'round';
@@ -723,6 +723,22 @@ class CS2GameManager {
         if (now >= this.phaseEndTime) {
           this.endRound('CT', 'TIME RAN OUT');
         }
+      }
+    }
+
+    // Periodic authoritative timer sync to all clients (prevents desync on alt-tab or menu pause)
+    if (this.net && this.net.isHost && this.net.connections.length > 0) {
+      if (!this.lastTimerSync || (currentTime - this.lastTimerSync > 1500)) {
+        this.lastTimerSync = currentTime;
+        this.net.broadcast({
+          type: 'timer_sync',
+          phase: this.phase,
+          phaseEndTime: this.phaseEndTime,
+          liveRoundStartTime: this.liveRoundStartTime,
+          ctScore: this.ctScore,
+          tScore: this.tScore,
+          round: this.currentRound
+        });
       }
     }
 
