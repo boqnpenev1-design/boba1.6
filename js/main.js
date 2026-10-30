@@ -54,16 +54,14 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // 4. Server Connect Buttons (Dust II & Mirage)
-  document.getElementById('btn-connect-dust2').addEventListener('click', () => {
-    window.csAudio.ensureContext();
-    gameManager.connectToServer('dust2');
-  });
-
-  document.getElementById('btn-connect-mirage').addEventListener('click', () => {
-    window.csAudio.ensureContext();
-    gameManager.connectToServer('mirage');
-  });
+  // 4. Server Connect Button (Dust II)
+  const btnDust2 = document.getElementById('btn-connect-dust2');
+  if (btnDust2) {
+    btnDust2.addEventListener('click', () => {
+      window.csAudio.ensureContext();
+      gameManager.connectToServer('dust2');
+    });
+  }
 
   // 5. Team Selection (Terrorists | Line | Counter-Terrorists)
   document.getElementById('btn-select-t').addEventListener('click', () => {

@@ -338,6 +338,7 @@ class CS2NetworkManager {
 
   createTacticalCharacterModel(team) {
     const group = new THREE.Group();
+    const texLoader = new THREE.TextureLoader();
 
     // 1. Full-Body Hitbox Cylinder (Covers head to feet for 100% reliable bullet hits)
     const hitboxGeo = new THREE.CylinderGeometry(0.5, 0.5, 1.85, 12);
@@ -347,11 +348,15 @@ class CS2NetworkManager {
     hitbox.name = 'hitbox';
     group.add(hitbox);
 
-    // 2. Legs
+    // 2. Legs with Team Textures
     const legGeo = new THREE.BoxGeometry(0.24, 0.9, 0.24);
-    const pantsMat = new THREE.MeshLambertMaterial({
-      color: team === 'CT' ? 0x1a2634 : 0x423528
-    });
+    let pantsMat;
+    if (team === 'CT') {
+      const ctLegsTex = texLoader.load('textures/ctm_sas_legs_color_psd_ae899bf2_5.png');
+      pantsMat = new THREE.MeshLambertMaterial({ map: ctLegsTex });
+    } else {
+      pantsMat = new THREE.MeshLambertMaterial({ color: 0x42382c });
+    }
     const leftLeg = new THREE.Mesh(legGeo, pantsMat);
     leftLeg.position.set(-0.16, 0.45, 0);
     const rightLeg = new THREE.Mesh(legGeo, pantsMat);
@@ -359,29 +364,41 @@ class CS2NetworkManager {
     group.add(leftLeg);
     group.add(rightLeg);
 
-    // 3. Torso with Team Tactical Uniform
+    // 3. Torso with Team Uniform Texture
     const torsoGeo = new THREE.BoxGeometry(0.56, 0.75, 0.34);
-    const torsoMat = new THREE.MeshLambertMaterial({
-      color: team === 'CT' ? 0x22364c : 0x725539
-    });
+    let torsoMat;
+    if (team === 'CT') {
+      const ctTorsoTex = texLoader.load('textures/ctm_sas_body_color_psd_d02da1ae_8.png');
+      torsoMat = new THREE.MeshLambertMaterial({ map: ctTorsoTex });
+    } else {
+      torsoMat = new THREE.MeshLambertMaterial({ color: 0x6e5238 });
+    }
     const torso = new THREE.Mesh(torsoGeo, torsoMat);
     torso.position.y = 1.25;
     group.add(torso);
 
     // 4. Tactical Armor / Kevlar Vest
     const vestGeo = new THREE.BoxGeometry(0.6, 0.5, 0.38);
-    const vestMat = new THREE.MeshLambertMaterial({
-      color: team === 'CT' ? 0x141a22 : 0x2b3026
-    });
+    let vestMat;
+    if (team === 'CT') {
+      const ctVestTex = texLoader.load('textures/armor_diffuse_color_psd_25fc1cb_2.png');
+      vestMat = new THREE.MeshLambertMaterial({ map: ctVestTex });
+    } else {
+      vestMat = new THREE.MeshLambertMaterial({ color: 0x2b3026 });
+    }
     const vest = new THREE.Mesh(vestGeo, vestMat);
     vest.position.y = 1.32;
     group.add(vest);
 
-    // 5. Head with Team Helmet / Balaclava
+    // 5. Head with Team Helmet / Balaclava Texture
     const headGeo = new THREE.BoxGeometry(0.34, 0.36, 0.34);
-    const headMat = new THREE.MeshLambertMaterial({
-      color: team === 'CT' ? 0x1c2530 : 0x98734e
-    });
+    let headMat;
+    if (team === 'CT') {
+      const ctHeadTex = texLoader.load('textures/ctm_sas_head_gasmask_color_psd_52d38e2c_11.png');
+      headMat = new THREE.MeshLambertMaterial({ map: ctHeadTex });
+    } else {
+      headMat = new THREE.MeshLambertMaterial({ color: 0x232420 }); // Terrorist Black Balaclava
+    }
     const head = new THREE.Mesh(headGeo, headMat);
     head.position.y = 1.78;
     group.add(head);
@@ -393,11 +410,10 @@ class CS2NetworkManager {
     visor.position.set(0, 1.8, -0.17);
     group.add(visor);
 
-    // 7. Weapon in Hand
+    // 7. Weapon in Hand with Authentic Texture
     const weaponGeo = new THREE.BoxGeometry(0.08, 0.12, 0.65);
-    const weaponMat = new THREE.MeshLambertMaterial({
-      color: team === 'CT' ? 0x22262c : 0x5a3219
-    });
+    const weaponTex = texLoader.load(team === 'CT' ? 'textures/w_pist_glock18.png' : 'textures/w_knife_t.png');
+    const weaponMat = new THREE.MeshLambertMaterial({ map: weaponTex });
     const gun = new THREE.Mesh(weaponGeo, weaponMat);
     gun.position.set(0.24, 1.2, -0.35);
     group.add(gun);

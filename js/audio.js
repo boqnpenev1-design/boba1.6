@@ -27,9 +27,37 @@ class CS2AudioSystem {
       xm1014: 'weapons/xm1014/xm1014-1.wav',
       knife_slash: 'weapons/knife/knife_deploy1.wav',
       knife_hit: 'weapons/knife/knife_hit1.wav',
-      reload_ak: 'weapons/ak47/ak47_clipin.wav',
-      reload_m4: 'weapons/m4a1/m4a1_clipin.wav',
-      reload_pistol: 'weapons/glock18/glock_clipin.wav',
+
+      // Authentic CS2 Weapon Reload Sounds
+      ak47_clipout: 'weapons/ak47/ak47_clipout.wav',
+      ak47_clipin: 'weapons/ak47/ak47_clipin.wav',
+      ak47_boltpull: 'weapons/ak47/ak47_boltpull.wav',
+
+      m4a1_clipout: 'weapons/m4a1/m4a1_clipout.wav',
+      m4a1_clipin: 'weapons/m4a1/m4a1_clipin.wav',
+      m4a1_boltpull: 'weapons/m4a1/m4a1_boltpull.wav',
+
+      awp_clipout: 'weapons/awp/awp_clipout.wav',
+      awp_clipin: 'weapons/awp/awp_clipin.wav',
+      awp_boltforward: 'weapons/awp/awp_boltforward.wav',
+
+      deagle_clipout: 'weapons/deagle/de_clipout.wav',
+      deagle_clipin: 'weapons/deagle/de_clipin.wav',
+      deagle_slide: 'weapons/deagle/de_slideforward.wav',
+
+      usp_clipout: 'weapons/usp/usp_clipout.wav',
+      usp_clipin: 'weapons/usp/usp_clipin.wav',
+      usp_slide: 'weapons/usp/usp_sliderelease.wav',
+
+      glock_clipout: 'weapons/glock18/glock_clipout.wav',
+      glock_clipin: 'weapons/glock18/glock_clipin.wav',
+      glock_slide: 'weapons/glock18/glock_sliderelease.wav',
+
+      p90_clipout: 'weapons/p90/p90_clipout.wav',
+      p90_clipin: 'weapons/p90/p90_clipin.wav',
+      p90_boltpull: 'weapons/p90/p90_boltpull.wav',
+
+      xm1014_shell: 'weapons/xm1014/xm1014_insertshell_01.wav',
       zoom: 'weapons/awp/zoom.wav',
 
       // C4 Bomb
@@ -204,8 +232,43 @@ class CS2AudioSystem {
     this.playSound('headshot_armor', 'sfx', 1.2);
   }
 
-  playReload() {
-    this.playSound('reload_ak', 'sfx');
+  playReload(weaponId = 'ak47') {
+    const wid = (weaponId || 'ak47').toLowerCase();
+    if (wid === 'ak47') {
+      this.playSound('ak47_clipout', 'sfx', 0.9);
+      setTimeout(() => this.playSound('ak47_clipin', 'sfx', 0.9), 900);
+      setTimeout(() => this.playSound('ak47_boltpull', 'sfx', 0.9), 1700);
+    } else if (wid === 'm4a1' || wid === 'm4a4') {
+      this.playSound('m4a1_clipout', 'sfx', 0.9);
+      setTimeout(() => this.playSound('m4a1_clipin', 'sfx', 0.9), 850);
+      setTimeout(() => this.playSound('m4a1_boltpull', 'sfx', 0.9), 1650);
+    } else if (wid === 'awp') {
+      this.playSound('awp_clipout', 'sfx', 0.9);
+      setTimeout(() => this.playSound('awp_clipin', 'sfx', 0.9), 1100);
+      setTimeout(() => this.playSound('awp_boltforward', 'sfx', 0.9), 2000);
+    } else if (wid === 'deagle') {
+      this.playSound('deagle_clipout', 'sfx', 0.85);
+      setTimeout(() => this.playSound('deagle_clipin', 'sfx', 0.85), 750);
+      setTimeout(() => this.playSound('deagle_slide', 'sfx', 0.85), 1500);
+    } else if (wid === 'usp') {
+      this.playSound('usp_clipout', 'sfx', 0.8);
+      setTimeout(() => this.playSound('usp_clipin', 'sfx', 0.8), 700);
+      setTimeout(() => this.playSound('usp_slide', 'sfx', 0.8), 1400);
+    } else if (wid === 'glock') {
+      this.playSound('glock_clipout', 'sfx', 0.8);
+      setTimeout(() => this.playSound('glock_clipin', 'sfx', 0.8), 700);
+      setTimeout(() => this.playSound('glock_slide', 'sfx', 0.8), 1400);
+    } else if (wid === 'p90') {
+      this.playSound('p90_clipout', 'sfx', 0.9);
+      setTimeout(() => this.playSound('p90_clipin', 'sfx', 0.9), 900);
+      setTimeout(() => this.playSound('p90_boltpull', 'sfx', 0.9), 1700);
+    } else if (wid === 'xm1014') {
+      this.playSound('xm1014_shell', 'sfx', 0.8);
+      setTimeout(() => this.playSound('xm1014_shell', 'sfx', 0.8), 500);
+      setTimeout(() => this.playSound('xm1014_shell', 'sfx', 0.8), 1000);
+    } else {
+      this.playSound('ak47_clipin', 'sfx', 0.8);
+    }
   }
 
   playZoom() {

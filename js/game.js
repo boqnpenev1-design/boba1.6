@@ -108,6 +108,19 @@ class CS2GameManager {
     pad.position.y = 0.13;
     group.add(pad);
 
+    // Official CS2 C4 3D GLB Model
+    if (typeof THREE.GLTFLoader !== 'undefined') {
+      const loader = new THREE.GLTFLoader();
+      loader.load('source/C4.glb', (gltf) => {
+        const c4Model = gltf.scene;
+        c4Model.scale.set(0.9, 0.9, 0.9);
+        c4Model.position.set(0, 0.05, 0);
+        pack.visible = false;
+        pad.visible = false;
+        group.add(c4Model);
+      }, undefined, () => {});
+    }
+
     // Blinking LED Indicator
     const ledGeo = new THREE.SphereGeometry(0.05, 8, 8);
     this.c4LedMat = new THREE.MeshBasicMaterial({ color: 0xff0000 });
@@ -125,26 +138,18 @@ class CS2GameManager {
     this.scene.add(this.c4Mesh);
   }
 
-  connectToServer(mapName) {
-    this.selectedMap = mapName;
+  connectToServer(mapName = 'dust2') {
+    this.selectedMap = 'dust2';
 
-    if (mapName === 'mirage') {
-      this.mapBuilder.buildMirage();
-      const rMap = document.getElementById('radar-map-name');
-      const sbMap = document.getElementById('sb-map-name');
-      if (rMap) rMap.innerText = 'DE_MIRAGE';
-      if (sbMap) sbMap.innerText = 'MIRAGE';
-    } else {
-      this.mapBuilder.buildDust2();
-      const rMap = document.getElementById('radar-map-name');
-      const sbMap = document.getElementById('sb-map-name');
-      if (rMap) rMap.innerText = 'DE_DUST2';
-      if (sbMap) sbMap.innerText = 'DUST II';
-    }
+    this.mapBuilder.buildDust2();
+    const rMap = document.getElementById('radar-map-name');
+    const sbMap = document.getElementById('sb-map-name');
+    if (rMap) rMap.innerText = 'DE_DUST2';
+    if (sbMap) sbMap.innerText = 'DUST II';
 
-    // Connect to shared multiplayer room for this map
-    this.net.autoJoinPublicServer(mapName, (role) => {
-      console.log(`Connected to online server ${mapName} as ${role}`);
+    // Connect to shared multiplayer room for Dust 2
+    this.net.autoJoinPublicServer('dust2', (role) => {
+      console.log(`Connected to online server dust2 as ${role}`);
     });
 
     // Open team selection split-screen

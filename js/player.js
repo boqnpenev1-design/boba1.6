@@ -129,7 +129,7 @@ class CS2Player {
     this.switchSlot(2);
   }
 
-  // Builds 3D weapon models with realistic tactical arms and hands
+  // Builds 3D weapon models with realistic tactical arms, hands, GLB models and authentic CS textures
   buildCurrentWeaponModel() {
     while (this.weaponRig.children.length > 0) {
       this.weaponRig.remove(this.weaponRig.children[0]);
@@ -141,68 +141,141 @@ class CS2Player {
     const group = new THREE.Group();
 
     // 1. Tactical Operator Sleeves & Gloves
-    const sleeveColor = this.team === 'CT' ? 0x223244 : 0x4a3b2b;
-    const gloveColor = 0x14181c;
+    const sleeveColor = this.team === 'CT' ? 0x22354c : 0x5a4836;
+    const gloveColor = 0x16191f;
     const sleeveMat = new THREE.MeshLambertMaterial({ color: sleeveColor });
     const gloveMat = new THREE.MeshLambertMaterial({ color: gloveColor });
 
     // Right Arm & Hand (Primary holding arm)
-    const rForearmGeo = new THREE.CylinderGeometry(0.05, 0.055, 0.42, 8);
+    const rForearmGeo = new THREE.CylinderGeometry(0.045, 0.05, 0.42, 8);
     const rForearm = new THREE.Mesh(rForearmGeo, sleeveMat);
     rForearm.rotation.set(-1.1, 0.3, -0.4);
-    rForearm.position.set(0.28, -0.38, -0.32);
+    rForearm.position.set(0.26, -0.34, -0.32);
     group.add(rForearm);
 
     const rHandGeo = new THREE.BoxGeometry(0.065, 0.07, 0.1);
     const rHand = new THREE.Mesh(rHandGeo, gloveMat);
     rHand.rotation.set(-0.9, 0.3, -0.3);
-    rHand.position.set(0.24, -0.27, -0.42);
+    rHand.position.set(0.22, -0.24, -0.42);
     group.add(rHand);
 
     // Left Arm & Hand (Support arm for rifles/two-handed)
-    if (w.category === 'rifles' || w.id === 'awp') {
-      const lForearmGeo = new THREE.CylinderGeometry(0.05, 0.055, 0.45, 8);
+    if (w.category === 'rifles' || w.id === 'awp' || w.id === 'p90' || w.id === 'xm1014') {
+      const lForearmGeo = new THREE.CylinderGeometry(0.045, 0.05, 0.45, 8);
       const lForearm = new THREE.Mesh(lForearmGeo, sleeveMat);
       lForearm.rotation.set(-1.0, -0.5, 0.6);
-      lForearm.position.set(-0.06, -0.39, -0.42);
+      lForearm.position.set(-0.06, -0.36, -0.42);
       group.add(lForearm);
 
       const lHandGeo = new THREE.BoxGeometry(0.065, 0.065, 0.09);
       const lHand = new THREE.Mesh(lHandGeo, gloveMat);
       lHand.rotation.set(-0.8, -0.4, 0.4);
-      lHand.position.set(0.12, -0.25, -0.62);
+      lHand.position.set(0.12, -0.23, -0.62);
       group.add(lHand);
     }
 
-    // 2. Weapon 3D Geometry
+    // 2. Weapon 3D Model: Use official GLB models if available
+    const glbMap = {
+      ak47: 'source/AK47.glb',
+      m4a1: 'source/M4A1.glb',
+      m4a4: 'source/M4A4.glb',
+      awp: 'source/AWP.glb',
+      deagle: 'source/DEAGLE.glb',
+      usp: 'source/USPS.glb',
+      c4: 'source/C4.glb'
+    };
+
+    if (glbMap[w.id] && this.gltfLoader) {
+      if (this.loadedModels[w.id]) {
+        const weaponMesh = this.loadedModels[w.id].clone();
+        this.positionWeaponModel(w.id, weaponMesh);
+        group.add(weaponMesh);
+      } else {
+        this.gltfLoader.load(glbMap[w.id], (gltf) => {
+          this.loadedModels[w.id] = gltf.scene;
+          const weaponMesh = gltf.scene.clone();
+          this.positionWeaponModel(w.id, weaponMesh);
+          group.add(weaponMesh);
+        }, undefined, () => {
+          this.buildTexturedWeaponFallback(w, group);
+        });
+      }
+    } else {
+      this.buildTexturedWeaponFallback(w, group);
+    }
+
+    this.weaponRig.add(group);
+  }
+
+  positionWeaponModel(weaponId, mesh) {
+    mesh.rotation.order = 'YXZ';
+    mesh.rotation.set(0, Math.PI, 0);
+
+    if (weaponId === 'ak47') {
+      mesh.scale.set(0.85, 0.85, 0.85);
+      mesh.position.set(0.18, -0.22, -0.44);
+    } else if (weaponId === 'm4a1' || weaponId === 'm4a4') {
+      mesh.scale.set(0.85, 0.85, 0.85);
+      mesh.position.set(0.18, -0.22, -0.44);
+    } else if (weaponId === 'awp') {
+      mesh.scale.set(0.82, 0.82, 0.82);
+      mesh.position.set(0.18, -0.24, -0.48);
+    } else if (weaponId === 'deagle') {
+      mesh.scale.set(0.9, 0.9, 0.9);
+      mesh.position.set(0.18, -0.19, -0.38);
+    } else if (weaponId === 'usp') {
+      mesh.scale.set(0.9, 0.9, 0.9);
+      mesh.position.set(0.18, -0.19, -0.38);
+    } else if (weaponId === 'c4') {
+      mesh.scale.set(0.85, 0.85, 0.85);
+      mesh.position.set(0.16, -0.18, -0.38);
+    }
+  }
+
+  buildTexturedWeaponFallback(w, group) {
+    const texLoader = new THREE.TextureLoader();
+
     if (w.id === 'knife') {
-      // Tactical Combat Knife
+      const knifeTex = texLoader.load('textures/w_knife_t.png');
+      const knifeMat = new THREE.MeshLambertMaterial({ map: knifeTex });
       const bladeGeo = new THREE.BoxGeometry(0.015, 0.07, 0.34);
-      const bladeMat = new THREE.MeshLambertMaterial({ color: 0xdde2e6 });
-      const blade = new THREE.Mesh(bladeGeo, bladeMat);
+      const blade = new THREE.Mesh(bladeGeo, knifeMat);
       blade.position.set(0.22, -0.21, -0.48);
       blade.rotation.x = 0.35;
       group.add(blade);
 
       const gripGeo = new THREE.BoxGeometry(0.035, 0.05, 0.16);
-      const gripMat = new THREE.MeshLambertMaterial({ color: 0x1f2421 });
-      const grip = new THREE.Mesh(gripGeo, gripMat);
+      const grip = new THREE.Mesh(gripGeo, knifeMat);
       grip.position.set(0.22, -0.25, -0.32);
       group.add(grip);
-    } else if (w.id === 'c4') {
-      // C4 Explosive Pack
-      const packGeo = new THREE.BoxGeometry(0.2, 0.13, 0.3);
-      const packMat = new THREE.MeshLambertMaterial({ color: 0x9a6c3a });
-      const pack = new THREE.Mesh(packGeo, packMat);
-      pack.position.set(0.19, -0.21, -0.48);
-      group.add(pack);
+    } else if (w.id === 'glock') {
+      const glockTex = texLoader.load('textures/w_pist_glock18.png');
+      const glockMat = new THREE.MeshLambertMaterial({ map: glockTex });
+      const slideGeo = new THREE.BoxGeometry(0.055, 0.08, 0.28);
+      const slide = new THREE.Mesh(slideGeo, glockMat);
+      slide.position.set(0.2, -0.2, -0.42);
+      group.add(slide);
 
-      const padGeo = new THREE.BoxGeometry(0.1, 0.03, 0.14);
-      const keypad = new THREE.Mesh(padGeo, new THREE.MeshLambertMaterial({ color: 0x111111 }));
-      keypad.position.set(0.19, -0.14, -0.48);
-      group.add(keypad);
+      const gripGeo = new THREE.BoxGeometry(0.045, 0.13, 0.09);
+      const grip = new THREE.Mesh(gripGeo, glockMat);
+      grip.rotation.x = -0.3;
+      grip.position.set(0.2, -0.27, -0.34);
+      group.add(grip);
+    } else if (w.id === 'p90') {
+      const p90Tex = texLoader.load('textures/w_smg_p90.png');
+      const p90Mat = new THREE.MeshLambertMaterial({ map: p90Tex });
+      const bodyGeo = new THREE.BoxGeometry(0.08, 0.16, 0.5);
+      const body = new THREE.Mesh(bodyGeo, p90Mat);
+      body.position.set(0.2, -0.22, -0.48);
+      group.add(body);
+    } else if (w.id === 'xm1014') {
+      const xmTex = texLoader.load('textures/w_shot_xm1014.png');
+      const xmMat = new THREE.MeshLambertMaterial({ map: xmTex });
+      const bodyGeo = new THREE.BoxGeometry(0.07, 0.12, 0.65);
+      const body = new THREE.Mesh(bodyGeo, xmMat);
+      body.position.set(0.2, -0.22, -0.52);
+      group.add(body);
     } else if (w.category === 'equipment' || w.id === 'flashbang' || w.id === 'hegrenade' || w.id === 'smoke') {
-      // Grenade Canister in Hand
       const grenGeo = new THREE.CylinderGeometry(0.04, 0.04, 0.16, 12);
       const grenMat = new THREE.MeshLambertMaterial({ color: w.id === 'flashbang' ? 0x6e8090 : 0x3d4a36 });
       const gren = new THREE.Mesh(grenGeo, grenMat);
@@ -213,81 +286,13 @@ class CS2Player {
       const pin = new THREE.Mesh(pinGeo, new THREE.MeshLambertMaterial({ color: 0xcccccc }));
       pin.position.set(0.2, -0.13, -0.46);
       group.add(pin);
-    } else if (w.category === 'pistols') {
-      // Pistols: Desert Eagle / Glock-18 / USP-S
-      const slideGeo = new THREE.BoxGeometry(0.06, 0.09, 0.32);
-      const slideMat = new THREE.MeshLambertMaterial({
-        color: w.id === 'deagle' ? 0xd0d5dd : 0x242830
-      });
-      const slide = new THREE.Mesh(slideGeo, slideMat);
-      slide.position.set(0.22, -0.22, -0.45);
-      group.add(slide);
-
-      const gripGeo = new THREE.BoxGeometry(0.05, 0.14, 0.1);
-      const gripMat = new THREE.MeshLambertMaterial({ color: 0x1a1d24 });
-      const grip = new THREE.Mesh(gripGeo, gripMat);
-      grip.rotation.x = -0.3;
-      grip.position.set(0.22, -0.29, -0.36);
-      group.add(grip);
-
-      if (w.isSilenced) {
-        const silencerGeo = new THREE.CylinderGeometry(0.025, 0.025, 0.28, 12);
-        const silencer = new THREE.Mesh(silencerGeo, new THREE.MeshLambertMaterial({ color: 0x1b1e24 }));
-        silencer.rotation.x = Math.PI / 2;
-        silencer.position.set(0.22, -0.21, -0.7);
-        group.add(silencer);
-      }
-    } else if (w.id === 'awp') {
-      // AWP Sniper Rifle
-      const bodyGeo = new THREE.BoxGeometry(0.09, 0.14, 0.65);
-      const bodyMat = new THREE.MeshLambertMaterial({ color: 0x3d5a45 }); // Olive drab
-      const body = new THREE.Mesh(bodyGeo, bodyMat);
-      body.position.set(0.24, -0.22, -0.55);
-      group.add(body);
-
-      const barrelGeo = new THREE.CylinderGeometry(0.022, 0.022, 0.55, 10);
-      const barrel = new THREE.Mesh(barrelGeo, new THREE.MeshLambertMaterial({ color: 0x14161a }));
-      barrel.rotation.x = Math.PI / 2;
-      barrel.position.set(0.24, -0.20, -0.95);
-      group.add(barrel);
-
-      const scopeGeo = new THREE.CylinderGeometry(0.035, 0.035, 0.32, 12);
-      const scope = new THREE.Mesh(scopeGeo, new THREE.MeshLambertMaterial({ color: 0x111111 }));
-      scope.rotation.x = Math.PI / 2;
-      scope.position.set(0.24, -0.11, -0.55);
-      group.add(scope);
     } else {
-      // Assault Rifles (AK-47 / M4A4 / M4A1)
-      const bodyGeo = new THREE.BoxGeometry(0.08, 0.13, 0.6);
-      const bodyMat = new THREE.MeshLambertMaterial({
-        color: w.id === 'ak47' ? 0x6e3c1b : 0x2c333d
-      });
-      const body = new THREE.Mesh(bodyGeo, bodyMat);
-      body.position.set(0.25, -0.22, -0.52);
+      const defMat = new THREE.MeshLambertMaterial({ color: 0x22262c });
+      const bodyGeo = new THREE.BoxGeometry(0.07, 0.12, 0.55);
+      const body = new THREE.Mesh(bodyGeo, defMat);
+      body.position.set(0.2, -0.22, -0.48);
       group.add(body);
-
-      const barrelGeo = new THREE.CylinderGeometry(0.02, 0.02, 0.45, 10);
-      const barrel = new THREE.Mesh(barrelGeo, new THREE.MeshLambertMaterial({ color: 0x15181e }));
-      barrel.rotation.x = Math.PI / 2;
-      barrel.position.set(0.25, -0.19, -0.85);
-      group.add(barrel);
-
-      const magGeo = new THREE.BoxGeometry(0.05, 0.22, 0.1);
-      const mag = new THREE.Mesh(magGeo, new THREE.MeshLambertMaterial({ color: w.id === 'ak47' ? 0x222222 : 0x333b45 }));
-      mag.rotation.x = 0.4;
-      mag.position.set(0.25, -0.32, -0.48);
-      group.add(mag);
-
-      if (w.isSilenced) {
-        const silencerGeo = new THREE.CylinderGeometry(0.028, 0.028, 0.26, 12);
-        const silencer = new THREE.Mesh(silencerGeo, new THREE.MeshLambertMaterial({ color: 0x181a20 }));
-        silencer.rotation.x = Math.PI / 2;
-        silencer.position.set(0.25, -0.19, -1.05);
-        group.add(silencer);
-      }
     }
-
-    this.weaponRig.add(group);
   }
 
   initControls() {
@@ -417,7 +422,7 @@ class CS2Player {
 
     this.isReloading = true;
     this.reloadStartTime = performance.now();
-    window.csAudio.playReload();
+    window.csAudio.playReload(this.activeWeapon.id);
   }
 
   finishReload() {
@@ -645,6 +650,9 @@ class CS2Player {
     this.exitSpectatorMode();
     const spawnY = (spawnPos && spawnPos.y !== undefined) ? spawnPos.y : this.playerHeight;
     this.position.set(spawnPos.x, spawnY, spawnPos.z);
+    if (spawnPos && spawnPos.yaw !== undefined) {
+      this.yaw = spawnPos.yaw;
+    }
     this.velocity.set(0, 0, 0);
     this.isGrounded = true;
     this.health.set(100);
@@ -795,12 +803,37 @@ class CS2Player {
       }
     }
 
-    // 3. Resolve Y movement & Ground clamping
+    // 3. Resolve Y movement & Downward 3D Terrain Raycasting
     this.position.y += this.velocity.y * dt;
-    if (this.position.y <= this.playerHeight) {
-      this.position.y = this.playerHeight;
+
+    let targetGroundY = 0;
+    if (this.map && this.map.groundMeshes && this.map.groundMeshes.length > 0) {
+      if (!this.downRaycaster) {
+        this.downRaycaster = new THREE.Raycaster();
+        this.downOrigin = new THREE.Vector3();
+        this.downDir = new THREE.Vector3(0, -1, 0);
+      }
+      this.downOrigin.set(this.position.x, this.position.y + 0.2, this.position.z);
+      this.downRaycaster.set(this.downOrigin, this.downDir);
+      this.downRaycaster.far = 40.0;
+      const hits = this.downRaycaster.intersectObjects(this.map.groundMeshes, false);
+      for (let i = 0; i < hits.length; i++) {
+        if (hits[i].point.y <= this.position.y - this.playerHeight + 0.6) {
+          targetGroundY = hits[i].point.y;
+          break;
+        }
+      }
+    }
+
+    if (this.position.y <= targetGroundY + this.playerHeight) {
+      this.position.y = targetGroundY + this.playerHeight;
       this.velocity.y = 0;
       this.isGrounded = true;
+    } else if (this.isGrounded && (targetGroundY + this.playerHeight - this.position.y) <= 0.45) {
+      this.position.y = targetGroundY + this.playerHeight;
+      this.velocity.y = 0;
+    } else {
+      this.isGrounded = false;
     }
 
     // 4. Climbable site platforms & crates
