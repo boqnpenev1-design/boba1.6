@@ -247,7 +247,6 @@ class CS2NetworkManager {
       window.csAudio.playGunshot(data.weaponType || 'rifle', data.weaponId || 'ak47', data.isSilenced || false);
     } else if (data.type === 'player_death') {
       this.gm.onEntityKilled(data.attacker, data.victim, data.weapon, data.isHeadshot, data.victimTeam);
-      this.broadcast(data, senderConn);
     } else if (data.type === 'damage') {
       const isForClient = !data.targetId || 
                           data.targetId === 'client' || 
@@ -282,7 +281,6 @@ class CS2NetworkManager {
       if (data.phaseEndTime) {
         this.gm.phaseEndTime = data.phaseEndTime;
       }
-    }
     } else if (data.type === 'round_end') {
       this.gm.endRound(data.winner, data.reason);
     }
