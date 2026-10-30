@@ -233,11 +233,10 @@ body, html {
 .team-score-card {
   display: flex;
   align-items: center;
-  background: rgba(14, 18, 25, 0.85);
+  background: rgba(14, 18, 25, 0.94);
   border: 1px solid rgba(255, 255, 255, 0.1);
   padding: 6px 14px;
   border-radius: 4px;
-  backdrop-filter: blur(8px);
   min-width: 120px;
 }
 
@@ -562,8 +561,7 @@ body, html {
   width: 100vw;
   height: 100vh;
   z-index: 50;
-  background: rgba(5, 8, 12, 0.85);
-  backdrop-filter: blur(10px);
+  background: rgba(5, 8, 12, 0.94);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -635,8 +633,7 @@ body, html {
   width: 100vw;
   height: 100vh;
   z-index: 60;
-  background: rgba(6, 9, 14, 0.85);
-  backdrop-filter: blur(8px);
+  background: rgba(6, 9, 14, 0.94);
   display: flex;
   align-items: center;
   justify-content: center;

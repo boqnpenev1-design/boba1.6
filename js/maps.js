@@ -177,10 +177,11 @@ class CS2MapBuilder {
     this.addCollider(78, -5, -45, 8, 25, 95);   // Long A East Wall
     this.addCollider(63, -5, 15, 25, 20, 6);    // Long Double Doors Frame
 
-    // Upper B Tunnels & Exit
-    this.addCollider(-95, -5, -25, 8, 25, 75);  // Tunnels Outer Wall
-    this.addCollider(-74, -5, -25, 8, 25, 75);  // Tunnels Inner Wall
-    this.addCollider(-85, -5, -80, 15, 20, 6);  // Tunnels Exit to B
+    // Upper B Tunnels & Clear Exit Doorway
+    this.addCollider(-95, -5, -25, 8, 25, 75);    // Tunnels Outer Wall
+    this.addCollider(-74, -5, -25, 8, 25, 75);    // Tunnels Inner Wall
+    this.addCollider(-98, -5, -80, 12, 20, 6);   // Tunnel Exit Left Wall Frame
+    this.addCollider(-79, -5, -80, 14, 20, 6);   // Tunnel Exit Right Wall Frame (Door opening -92 to -86 is clear)
 
     // Bombsite A Back Wall & Ramp
     this.addCollider(58, 0, -125, 45, 25, 8);
@@ -191,45 +192,45 @@ class CS2MapBuilder {
     this.addCollider(-92, 0, -95, 8, 25, 45);
 
     // CT Spawn Back Wall & Enclosure
-    this.addCollider(-65, 0, -130, 50, 25, 8);
+    this.addCollider(-15, 0, -165, 50, 25, 8);
 
-    // T Spawn Back Wall & Platform
-    this.addCollider(-30, 5, 55, 60, 25, 8);
+    // T Spawn Back Wall
+    this.addCollider(10, 0, 50, 50, 25, 8);
 
     // ==========================================================
     // BOMBSITES & BUY ZONES (100% Valve CS Alignment)
     // ==========================================================
 
-    // Bombsite A (Catwalk / Long A Platform)
-    this.addBombsiteZone('A', 57.6, 2.88, -115.2, 7.5);
+    // Bombsite A (Platform & Ramp)
+    this.addBombsiteZone('A', 55.0, 2.4, -112.0, 8.0);
 
-    // Bombsite B (Open Courtyard outside B Tunnels & Doors)
-    this.addBombsiteZone('B', -69.5, 0.05, -91.5, 7.5);
+    // Bombsite B (Courtyard outside B Tunnels & Doors)
+    this.addBombsiteZone('B', -70.0, 0.5, -92.0, 8.0);
 
-    // Authentic Buy Zones
-    this.buyZones.CT = { minX: -85, maxX: -45, minZ: -125, maxZ: -95 };
-    this.buyZones.T = { minX: -45, maxX: -15, minZ: 30, maxZ: 60 };
+    // Authentic Buy Zones matching CT & T Spawns
+    this.buyZones.CT = { minX: -35, maxX: 10, minZ: -160, maxZ: -130 };
+    this.buyZones.T = { minX: -15, maxX: 25, minZ: 20, maxZ: 50 };
 
     // ==========================================================
     // AUTHENTIC VALVE SPAWN POINTS
     // ==========================================================
 
-    // CT Spawns: Standing firmly on CT spawn ground at Y = 1.8
+    // CT Spawns: Standing firmly on CT spawn ground behind mid doors
     this.spawnPoints.CT = [
-      { x: -65.0, y: 1.8, z: -112.5, yaw: 0 },
-      { x: -68.0, y: 1.8, z: -110.0, yaw: 0 },
-      { x: -62.0, y: 1.8, z: -110.0, yaw: 0 },
-      { x: -65.0, y: 1.8, z: -106.0, yaw: 0 },
-      { x: -68.0, y: 1.8, z: -106.0, yaw: 0 }
+      { x: -15.0, y: 1.8, z: -145.0, yaw: 0 },
+      { x: -12.0, y: 1.8, z: -142.0, yaw: 0 },
+      { x: -18.0, y: 1.8, z: -142.0, yaw: 0 },
+      { x: -15.0, y: 1.8, z: -148.0, yaw: 0 },
+      { x: -10.0, y: 1.8, z: -146.0, yaw: 0 }
     ];
 
-    // T Spawns: Standing on elevated T spawn platform at Y = 7.56 (5.76 + 1.8)
+    // T Spawns: Standing in T spawn courtyard on solid ground
     this.spawnPoints.T = [
-      { x: -31.5, y: 7.56, z: 45.0, yaw: Math.PI },
-      { x: -35.0, y: 7.56, z: 43.0, yaw: Math.PI },
-      { x: -28.0, y: 7.56, z: 43.0, yaw: Math.PI },
-      { x: -33.0, y: 7.56, z: 48.0, yaw: Math.PI },
-      { x: -30.0, y: 7.56, z: 48.0, yaw: Math.PI }
+      { x: 8.0, y: 1.8, z: 35.0, yaw: Math.PI },
+      { x: 5.0, y: 1.8, z: 33.0, yaw: Math.PI },
+      { x: 11.0, y: 1.8, z: 33.0, yaw: Math.PI },
+      { x: 8.0, y: 1.8, z: 38.0, yaw: Math.PI },
+      { x: 4.0, y: 1.8, z: 36.0, yaw: Math.PI }
     ];
   }
 }

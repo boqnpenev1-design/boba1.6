@@ -35,7 +35,7 @@ class CS2AudioSystem {
 
       m4a1_clipout: 'weapons/m4a1/m4a1_clipout.wav',
       m4a1_clipin: 'weapons/m4a1/m4a1_clipin.wav',
-      m4a1_boltpull: 'weapons/m4a1/m4a1_boltpull.wav',
+      m4a1_boltpull: 'weapons/m4a1/m4a1_boltback.wav',
 
       awp_clipout: 'weapons/awp/awp_clipout.wav',
       awp_clipin: 'weapons/awp/awp_clipin.wav',
@@ -59,6 +59,17 @@ class CS2AudioSystem {
 
       xm1014_shell: 'weapons/xm1014/xm1014_insertshell_01.wav',
       zoom: 'weapons/awp/zoom.wav',
+
+      // Authentic Grenade & Utility SFX
+      grenade_throw: 'weapons/hegrenade/grenade_throw.wav',
+      flash_explode: 'weapons/flashbang/flashbang_explode1.wav',
+      flash_ring: 'weapons/flashbang/explosion_ring.wav',
+      smoke_emit: 'weapons/smokegrenade/smoke_emit.wav',
+      smoke_clear: 'weapons/smokegrenade/smoke_clear.wav',
+      molotov_smash: 'weapons/molotov/molotov_smash_01.wav',
+      molotov_fire: 'weapons/molotov/fire_loop_1.wav',
+      he_detonate: 'weapons/hegrenade/hegrenade_detonate_02.wav',
+      he_bounce: 'weapons/hegrenade/he_bounce-1.wav',
 
       // C4 Bomb
       c4_beep: 'weapons/c4/c4_beep2.wav',
@@ -234,15 +245,15 @@ class CS2AudioSystem {
 
   playReload(weaponId = 'ak47') {
     const wid = (weaponId || 'ak47').toLowerCase();
-    if (wid === 'ak47') {
+    if (wid === 'ak47' || wid === 'galil' || wid === 'sg553') {
       this.playSound('ak47_clipout', 'sfx', 0.9);
       setTimeout(() => this.playSound('ak47_clipin', 'sfx', 0.9), 900);
       setTimeout(() => this.playSound('ak47_boltpull', 'sfx', 0.9), 1700);
-    } else if (wid === 'm4a1' || wid === 'm4a4') {
+    } else if (wid === 'm4a1' || wid === 'm4a1s' || wid === 'm4a4' || wid === 'famas' || wid === 'aug') {
       this.playSound('m4a1_clipout', 'sfx', 0.9);
       setTimeout(() => this.playSound('m4a1_clipin', 'sfx', 0.9), 850);
       setTimeout(() => this.playSound('m4a1_boltpull', 'sfx', 0.9), 1650);
-    } else if (wid === 'awp') {
+    } else if (wid === 'awp' || wid === 'ssg08' || wid === 'scar20' || wid === 'g3sg1') {
       this.playSound('awp_clipout', 'sfx', 0.9);
       setTimeout(() => this.playSound('awp_clipin', 'sfx', 0.9), 1100);
       setTimeout(() => this.playSound('awp_boltforward', 'sfx', 0.9), 2000);
@@ -250,25 +261,51 @@ class CS2AudioSystem {
       this.playSound('deagle_clipout', 'sfx', 0.85);
       setTimeout(() => this.playSound('deagle_clipin', 'sfx', 0.85), 750);
       setTimeout(() => this.playSound('deagle_slide', 'sfx', 0.85), 1500);
-    } else if (wid === 'usp') {
+    } else if (wid === 'usp' || wid === 'p250' || wid === 'fiveseven') {
       this.playSound('usp_clipout', 'sfx', 0.8);
       setTimeout(() => this.playSound('usp_clipin', 'sfx', 0.8), 700);
       setTimeout(() => this.playSound('usp_slide', 'sfx', 0.8), 1400);
-    } else if (wid === 'glock') {
+    } else if (wid === 'glock' || wid === 'tec9' || wid === 'cz75' || wid === 'dualberettas') {
       this.playSound('glock_clipout', 'sfx', 0.8);
       setTimeout(() => this.playSound('glock_clipin', 'sfx', 0.8), 700);
       setTimeout(() => this.playSound('glock_slide', 'sfx', 0.8), 1400);
-    } else if (wid === 'p90') {
+    } else if (wid === 'p90' || wid === 'bizon' || wid === 'mp7' || wid === 'mp9' || wid === 'mp5sd' || wid === 'mac10' || wid === 'ump45') {
       this.playSound('p90_clipout', 'sfx', 0.9);
       setTimeout(() => this.playSound('p90_clipin', 'sfx', 0.9), 900);
       setTimeout(() => this.playSound('p90_boltpull', 'sfx', 0.9), 1700);
-    } else if (wid === 'xm1014') {
+    } else if (wid === 'xm1014' || wid === 'nova' || wid === 'mag7' || wid === 'sawedoff') {
       this.playSound('xm1014_shell', 'sfx', 0.8);
       setTimeout(() => this.playSound('xm1014_shell', 'sfx', 0.8), 500);
       setTimeout(() => this.playSound('xm1014_shell', 'sfx', 0.8), 1000);
     } else {
       this.playSound('ak47_clipin', 'sfx', 0.8);
     }
+  }
+
+  playGrenadeThrow() {
+    this.playSound('grenade_throw', 'sfx', 1.0);
+  }
+
+  playFlashbangExplode() {
+    this.playSound('flash_explode', 'sfx', 1.0);
+    setTimeout(() => this.playSound('flash_ring', 'sfx', 0.8), 100);
+  }
+
+  playSmokeEmit() {
+    this.playSound('smoke_emit', 'sfx', 1.0);
+  }
+
+  playSmokeClear() {
+    this.playSound('smoke_clear', 'sfx', 0.8);
+  }
+
+  playMolotovDetonate() {
+    this.playSound('molotov_smash', 'sfx', 1.0);
+    setTimeout(() => this.playSound('molotov_fire', 'sfx', 0.9), 180);
+  }
+
+  playHEDetonate() {
+    this.playSound('he_detonate', 'sfx', 1.0);
   }
 
   playZoom() {

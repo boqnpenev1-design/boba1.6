@@ -241,6 +241,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function buyWeapon(weapon) {
+    if (!gameManager.canBuy()) return;
     const cash = gameManager.player.money.get();
     if (cash < weapon.cost) return;
 
@@ -254,7 +255,9 @@ document.addEventListener('DOMContentLoaded', () => {
         gameManager.player.hasHelmet = true;
       } else if (weapon.type === 'kit') {
         gameManager.player.hasDefuseKit = true;
-      } else if (weapon.type === 'grenade' || weapon.id === 'flashbang' || weapon.id === 'hegrenade' || weapon.id === 'smoke') {
+      } else if (weapon.slot === 4 || weapon.type === 'grenade' || weapon.id === 'flashbang' || weapon.id === 'hegrenade' || weapon.id === 'smokegrenade' || weapon.id === 'molotov') {
+        gameManager.player.grenades = gameManager.player.grenades || [];
+        gameManager.player.grenades.push(weapon);
         gameManager.player.inventory[4] = weapon;
         gameManager.player.switchSlot(4);
       }

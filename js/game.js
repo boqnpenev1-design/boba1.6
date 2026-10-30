@@ -121,17 +121,12 @@ class CS2GameManager {
       }, undefined, () => {});
     }
 
-    // Blinking LED Indicator
-    const ledGeo = new THREE.SphereGeometry(0.05, 8, 8);
+    // Highly Visible Blinking LED Indicator
+    const ledGeo = new THREE.SphereGeometry(0.06, 8, 8);
     this.c4LedMat = new THREE.MeshBasicMaterial({ color: 0xff0000 });
     const led = new THREE.Mesh(ledGeo, this.c4LedMat);
-    led.position.set(0.12, 0.16, 0.08);
+    led.position.set(0.12, 0.22, 0.08);
     group.add(led);
-
-    // Dynamic Point Light Beacon
-    this.c4BeaconLight = new THREE.PointLight(0xff0000, 1.5, 12);
-    this.c4BeaconLight.position.set(0.12, 0.25, 0.08);
-    group.add(this.c4BeaconLight);
 
     this.c4Mesh = group;
     this.c4Mesh.visible = false;
@@ -175,7 +170,9 @@ class CS2GameManager {
 
   startRound() {
     this.phase = 'freeze';
+    this.phaseEndTime = Date.now() + this.freezeTime * 1000;
     this.phaseTimer = this.freezeTime;
+    this.liveRoundStartTime = 0;
     this.c4Planted = false;
     this.c4Timer = 40.0;
     this.c4Mesh.visible = false;
@@ -198,7 +195,8 @@ class CS2GameManager {
     if (this.net && this.net.isHost) {
       this.net.broadcast({
         type: 'round_start',
-        round: this.currentRound
+        round: this.currentRound,
+        phaseEndTime: this.phaseEndTime
       });
     }
 
@@ -213,17 +211,18 @@ class CS2GameManager {
     this.player.money.set(800);
   }
 
-  // Authentic CS2 Buy Zone & Buy Time Rules
+  // Authentic CS2 Buy Zone & Buy Time Rules (Strict 20s Window in Buy Zone)
   canBuy() {
-    // 1. Freezetime: always allowed to buy
+    const inZone = this.mapBuilder.isInBuyZone(this.player.team, this.player.position);
+    if (!inZone) return false;
+
+    // 1. Freezetime: allowed within Buy Zone
     if (this.phase === 'freeze') return true;
 
-    // 2. Live Round: only allowed within the first 20 seconds AND inside buy zone
+    // 2. Live Round: strictly allowed only within the first 20.0 seconds
     if (this.phase === 'live') {
-      const liveSecondsElapsed = this.roundTime - this.phaseTimer;
-      if (liveSecondsElapsed <= 20.0) {
-        return this.mapBuilder.isInBuyZone(this.player.team, this.player.position);
-      }
+      const elapsed = this.liveRoundStartTime > 0 ? (Date.now() - this.liveRoundStartTime) / 1000 : (this.roundTime - this.phaseTimer);
+      return elapsed <= 20.0;
     }
     return false;
   }
@@ -512,58 +511,137 @@ class CS2GameManager {
     const h = this.radarCanvas.height;
     const cx = w / 2;
     const cy = h / 2;
-    const scale = 0.75;
+    const scale = 0.68;
 
     ctx.clearRect(0, 0, w, h);
-    ctx.save();
-    ctx.translate(cx, cy);
-    ctx.rotate(-this.player.yaw);
 
+    // Radar Background & Outer Ring
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(cx, cy, cx - 2, 0, Math.PI * 2);
+    ctx.clip();
+
+    ctx.fillStyle = '#0f141c';
+    ctx.fillRect(0, 0, w, h);
+
+    // World to Radar Transform: Straight ahead in direction of view is always UP (-Y)
+    const toRadar = (wx, wz) => {
+      const dx = wx - this.player.position.x;
+      const dz = wz - this.player.position.z;
+      const lx = (dx * Math.cos(this.player.yaw) - dz * Math.sin(this.player.yaw)) * scale;
+      const ly = (dx * Math.sin(this.player.yaw) + dz * Math.cos(this.player.yaw)) * scale;
+      return { x: cx + lx, y: cy + ly };
+    };
+
+    // Authentic CS2 Dust 2 Radar Minimap Corridors & Layout
+    const mapPaths = [
+      // Long A Corridor
+      [{ x: 8, z: 35 }, { x: 50, z: 25 }, { x: 65, z: 10 }, { x: 65, z: -80 }, { x: 55, z: -112 }],
+      // Catwalk / Short A
+      [{ x: 0, z: -10 }, { x: 18, z: -40 }, { x: 30, z: -80 }, { x: 55, z: -112 }],
+      // Mid & Doors to CT Spawn
+      [{ x: 8, z: 35 }, { x: 0, z: -10 }, { x: -8, z: -80 }, { x: -15, z: -145 }],
+      // B Tunnels (Upper & Lower) to B Site
+      [{ x: 8, z: 35 }, { x: -35, z: 25 }, { x: -85, z: -10 }, { x: -85, z: -80 }, { x: -70, z: -92 }],
+      // CT Spawn to B Site & Doors
+      [{ x: -15, z: -145 }, { x: -45, z: -125 }, { x: -70, z: -92 }],
+      // CT Spawn to A Site
+      [{ x: -15, z: -145 }, { x: 25, z: -135 }, { x: 55, z: -112 }]
+    ];
+
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    // Draw thick minimap roadway base
+    ctx.lineWidth = 10;
+    ctx.strokeStyle = '#222d3d';
+    for (const path of mapPaths) {
+      ctx.beginPath();
+      for (let i = 0; i < path.length; i++) {
+        const pt = toRadar(path[i].x, path[i].z);
+        if (i === 0) ctx.moveTo(pt.x, pt.y);
+        else ctx.lineTo(pt.x, pt.y);
+      }
+      ctx.stroke();
+    }
+
+    // Draw inner minimap corridor highlight
+    ctx.lineWidth = 5;
+    ctx.strokeStyle = '#324258';
+    for (const path of mapPaths) {
+      ctx.beginPath();
+      for (let i = 0; i < path.length; i++) {
+        const pt = toRadar(path[i].x, path[i].z);
+        if (i === 0) ctx.moveTo(pt.x, pt.y);
+        else ctx.lineTo(pt.x, pt.y);
+      }
+      ctx.stroke();
+    }
+
+    // Bombsites A & B
     const bZones = this.mapBuilder.bombZones;
     for (let i = 0; i < bZones.length; i++) {
       const site = bZones[i];
-      const rx = (site.x - this.player.position.x) * scale;
-      const rz = (site.z - this.player.position.z) * scale;
+      const pt = toRadar(site.x, site.z);
 
-      ctx.fillStyle = 'rgba(255, 59, 48, 0.4)';
+      ctx.fillStyle = 'rgba(235, 65, 45, 0.45)';
       ctx.beginPath();
-      ctx.arc(rx, rz, site.radius * scale, 0, Math.PI * 2);
+      ctx.arc(pt.x, pt.y, site.radius * scale, 0, Math.PI * 2);
       ctx.fill();
+
+      ctx.strokeStyle = '#eb412d';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
 
       ctx.fillStyle = '#ffcc00';
-      ctx.font = 'bold 12px sans-serif';
-      ctx.fillText(site.id, rx - 4, rz + 4);
+      ctx.font = 'bold 13px Chakra Petch, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(site.id, pt.x, pt.y);
     }
 
+    // C4 Planted Indicator on Radar
     if (this.c4Planted && this.c4Pos) {
-      const rx = (this.c4Pos.x - this.player.position.x) * scale;
-      const rz = (this.c4Pos.z - this.player.position.z) * scale;
-      ctx.fillStyle = '#ff0000';
+      const pt = toRadar(this.c4Pos.x, this.c4Pos.z);
+      const pulse = 1 + 0.3 * Math.sin(performance.now() * 0.008);
+      ctx.fillStyle = '#ff2211';
       ctx.beginPath();
-      ctx.arc(rx, rz, 6, 0, Math.PI * 2);
+      ctx.arc(pt.x, pt.y, 6 * pulse, 0, Math.PI * 2);
       ctx.fill();
     }
 
+    // Friendly Teammates (ENEMIES ARE HIDDEN ON RADAR)
     const remPlayers = Object.values(this.net.remotePlayers);
     for (let i = 0; i < remPlayers.length; i++) {
       const p = remPlayers[i];
-      const rx = (p.pos.x - this.player.position.x) * scale;
-      const rz = (p.pos.z - this.player.position.z) * scale;
-      ctx.fillStyle = p.team === this.player.team ? (p.team === 'CT' ? '#5b97d5' : '#d58936') : '#ff3b30';
+      if (p.team !== this.player.team) continue; // Only friendly teammates appear on radar
+
+      const pt = toRadar(p.pos.x, p.pos.z);
+      ctx.fillStyle = p.team === 'CT' ? '#5b97d5' : '#e5a035';
       ctx.beginPath();
-      ctx.arc(rx, rz, 4, 0, Math.PI * 2);
+      ctx.arc(pt.x, pt.y, 4.5, 0, Math.PI * 2);
       ctx.fill();
     }
 
-    ctx.restore();
-
+    // Player Directional Arrow (Center of Radar pointing UP)
     ctx.fillStyle = '#00ff66';
     ctx.beginPath();
-    ctx.moveTo(cx, cy - 6);
-    ctx.lineTo(cx - 5, cy + 5);
-    ctx.lineTo(cx + 5, cy + 5);
+    ctx.moveTo(cx, cy - 8);
+    ctx.lineTo(cx - 6, cy + 6);
+    ctx.lineTo(cx, cy + 3);
+    ctx.lineTo(cx + 6, cy + 6);
     ctx.closePath();
     ctx.fill();
+
+    // View Angle Cone
+    ctx.fillStyle = 'rgba(0, 255, 102, 0.08)';
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.arc(cx, cy, 32, -Math.PI / 2 - 0.5, -Math.PI / 2 + 0.5);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.restore();
   }
 
   updateFPSCounter(currentTime) {
@@ -582,31 +660,38 @@ class CS2GameManager {
   update(dt, currentTime) {
     this.updateFPSCounter(currentTime);
 
-    // Freezetime phase
+    const now = Date.now();
+
+    // Freezetime phase (Timestamp-backed, immune to alt-tab / menu pause)
     if (this.phase === 'freeze') {
-      this.phaseTimer -= dt;
+      const secsLeft = Math.max(0, Math.ceil((this.phaseEndTime - now) / 1000));
+      this.phaseTimer = secsLeft;
+
       if (this.lastPhaseText !== 'FREEZETIME') {
         this.lastPhaseText = 'FREEZETIME';
         this.hudEls.roundPhaseLabel.innerText = 'FREEZETIME';
       }
-      const secsLeft = Math.max(0, Math.ceil(this.phaseTimer));
       const timerStr = `0:${secsLeft.toString().padStart(2, '0')}`;
       if (this.lastTimerText !== timerStr) {
         this.lastTimerText = timerStr;
         this.hudEls.roundTimer.innerText = timerStr;
       }
 
-      if (this.phaseTimer <= 0) {
+      if (now >= this.phaseEndTime) {
         this.phase = 'live';
+        this.phaseEndTime = now + this.roundTime * 1000;
+        this.liveRoundStartTime = now;
         this.phaseTimer = this.roundTime;
         this.lastPhaseText = 'LIVE';
         this.hudEls.roundPhaseLabel.innerText = 'ROUND LIVE';
         window.csAudio.playRadioTone('start');
       }
     } else if (this.phase === 'live') {
-      this.phaseTimer -= dt;
-      const mins = Math.max(0, Math.floor(this.phaseTimer / 60));
-      const secs = Math.max(0, Math.floor(this.phaseTimer % 60));
+      const totalSecs = Math.max(0, Math.floor((this.phaseEndTime - now) / 1000));
+      this.phaseTimer = totalSecs;
+
+      const mins = Math.max(0, Math.floor(totalSecs / 60));
+      const secs = Math.max(0, totalSecs % 60);
       const timerStr = `${mins}:${secs.toString().padStart(2, '0')}`;
       if (this.lastTimerText !== timerStr) {
         this.lastTimerText = timerStr;
@@ -615,7 +700,6 @@ class CS2GameManager {
 
       if (this.c4Planted) {
         this.c4Timer -= dt;
-        this.hudEls.bombClock.innerText = `${Math.max(0, this.c4Timer).toFixed(1)}s`;
 
         const beepInterval = Math.max(0.12, this.c4Timer / 40.0);
         if (currentTime / 1000 - this.lastBeepTime > beepInterval) {
@@ -623,12 +707,9 @@ class CS2GameManager {
           const urgency = 1.0 - (this.c4Timer / 40.0);
           window.csAudio.playC4Beep(urgency);
 
-          // Flash light & LED
           if (this.c4LedMat) this.c4LedMat.color.set(0xffffff);
-          if (this.c4BeaconLight) this.c4BeaconLight.intensity = 3.5;
           setTimeout(() => {
             if (this.c4LedMat) this.c4LedMat.color.set(0xff0000);
-            if (this.c4BeaconLight) this.c4BeaconLight.intensity = 1.0;
           }, 60);
         }
 
@@ -639,7 +720,7 @@ class CS2GameManager {
           this.endRound('T', 'TARGET DESTROYED');
         }
       } else {
-        if (this.phaseTimer <= 0) {
+        if (now >= this.phaseEndTime) {
           this.endRound('CT', 'TIME RAN OUT');
         }
       }

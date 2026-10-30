@@ -24,6 +24,7 @@ class CS2Player {
       4: CS2_WEAPONS.flashbang,
       5: null
     };
+    this.grenades = [CS2_WEAPONS.flashbang, CS2_WEAPONS.hegrenade, CS2_WEAPONS.smokegrenade];
     this.activeSlot = 2;
     this.activeWeapon = CS2_WEAPONS.usp;
 
@@ -178,6 +179,7 @@ class CS2Player {
     const glbMap = {
       ak47: 'source/AK47.glb',
       m4a1: 'source/M4A1.glb',
+      m4a1s: 'source/M4A1.glb',
       m4a4: 'source/M4A4.glb',
       awp: 'source/AWP.glb',
       deagle: 'source/DEAGLE.glb',
@@ -214,7 +216,7 @@ class CS2Player {
     if (weaponId === 'ak47') {
       mesh.scale.set(0.85, 0.85, 0.85);
       mesh.position.set(0.18, -0.22, -0.44);
-    } else if (weaponId === 'm4a1' || weaponId === 'm4a4') {
+    } else if (weaponId === 'm4a1' || weaponId === 'm4a1s' || weaponId === 'm4a4') {
       mesh.scale.set(0.85, 0.85, 0.85);
       mesh.position.set(0.18, -0.22, -0.44);
     } else if (weaponId === 'awp') {
@@ -237,54 +239,100 @@ class CS2Player {
 
     if (w.id === 'knife') {
       const knifeTex = texLoader.load('textures/w_knife_t.png');
-      const knifeMat = new THREE.MeshLambertMaterial({ map: knifeTex });
-      const bladeGeo = new THREE.BoxGeometry(0.015, 0.07, 0.34);
+      const knifeMat = new THREE.MeshStandardMaterial({ map: knifeTex, roughness: 0.35, metalness: 0.65 });
+      const handleMat = new THREE.MeshLambertMaterial({ color: 0x1b1f24 });
+
+      // Curved Combat Knife Blade
+      const bladeGeo = new THREE.BoxGeometry(0.018, 0.065, 0.32);
       const blade = new THREE.Mesh(bladeGeo, knifeMat);
-      blade.position.set(0.22, -0.21, -0.48);
-      blade.rotation.x = 0.35;
+      blade.position.set(0.2, -0.22, -0.46);
+      blade.rotation.x = 0.32;
       group.add(blade);
 
-      const gripGeo = new THREE.BoxGeometry(0.035, 0.05, 0.16);
-      const grip = new THREE.Mesh(gripGeo, knifeMat);
-      grip.position.set(0.22, -0.25, -0.32);
+      // Knife Blade Tip Taper
+      const tipGeo = new THREE.ConeGeometry(0.032, 0.08, 4);
+      const tip = new THREE.Mesh(tipGeo, knifeMat);
+      tip.rotation.x = -Math.PI / 2 + 0.32;
+      tip.position.set(0.2, -0.18, -0.62);
+      group.add(tip);
+
+      // Crossguard
+      const guardGeo = new THREE.BoxGeometry(0.045, 0.085, 0.02);
+      const guard = new THREE.Mesh(guardGeo, handleMat);
+      guard.position.set(0.2, -0.25, -0.31);
+      guard.rotation.x = 0.32;
+      group.add(guard);
+
+      // Ergonomic Tactical Handle
+      const gripGeo = new THREE.CylinderGeometry(0.024, 0.022, 0.16, 8);
+      const grip = new THREE.Mesh(gripGeo, handleMat);
+      grip.rotation.x = 0.32;
+      grip.position.set(0.2, -0.28, -0.24);
       group.add(grip);
     } else if (w.id === 'glock') {
       const glockTex = texLoader.load('textures/w_pist_glock18.png');
-      const glockMat = new THREE.MeshLambertMaterial({ map: glockTex });
-      const slideGeo = new THREE.BoxGeometry(0.055, 0.08, 0.28);
-      const slide = new THREE.Mesh(slideGeo, glockMat);
-      slide.position.set(0.2, -0.2, -0.42);
+      const slideMat = new THREE.MeshStandardMaterial({ map: glockTex, roughness: 0.4, metalness: 0.5 });
+      const frameMat = new THREE.MeshLambertMaterial({ color: 0x1c1e22 });
+
+      // Steel Slide & Barrel Top
+      const slideGeo = new THREE.BoxGeometry(0.048, 0.055, 0.26);
+      const slide = new THREE.Mesh(slideGeo, slideMat);
+      slide.position.set(0.2, -0.21, -0.42);
       group.add(slide);
 
-      const gripGeo = new THREE.BoxGeometry(0.045, 0.13, 0.09);
-      const grip = new THREE.Mesh(gripGeo, glockMat);
-      grip.rotation.x = -0.3;
-      grip.position.set(0.2, -0.27, -0.34);
+      // Polymer Lower Frame & Trigger Guard
+      const frameGeo = new THREE.BoxGeometry(0.044, 0.04, 0.24);
+      const frame = new THREE.Mesh(frameGeo, frameMat);
+      frame.position.set(0.2, -0.25, -0.41);
+      group.add(frame);
+
+      // Textured Pistol Grip
+      const gripGeo = new THREE.BoxGeometry(0.042, 0.14, 0.085);
+      const grip = new THREE.Mesh(gripGeo, frameMat);
+      grip.rotation.x = -0.32;
+      grip.position.set(0.2, -0.31, -0.34);
       group.add(grip);
-    } else if (w.id === 'p90') {
-      const p90Tex = texLoader.load('textures/w_smg_p90.png');
-      const p90Mat = new THREE.MeshLambertMaterial({ map: p90Tex });
-      const bodyGeo = new THREE.BoxGeometry(0.08, 0.16, 0.5);
-      const body = new THREE.Mesh(bodyGeo, p90Mat);
-      body.position.set(0.2, -0.22, -0.48);
-      group.add(body);
-    } else if (w.id === 'xm1014') {
-      const xmTex = texLoader.load('textures/w_shot_xm1014.png');
-      const xmMat = new THREE.MeshLambertMaterial({ map: xmTex });
-      const bodyGeo = new THREE.BoxGeometry(0.07, 0.12, 0.65);
-      const body = new THREE.Mesh(bodyGeo, xmMat);
-      body.position.set(0.2, -0.22, -0.52);
-      group.add(body);
-    } else if (w.category === 'equipment' || w.id === 'flashbang' || w.id === 'hegrenade' || w.id === 'smoke') {
-      const grenGeo = new THREE.CylinderGeometry(0.04, 0.04, 0.16, 12);
-      const grenMat = new THREE.MeshLambertMaterial({ color: w.id === 'flashbang' ? 0x6e8090 : 0x3d4a36 });
+
+      // Barrel Tip
+      const barrelGeo = new THREE.CylinderGeometry(0.012, 0.012, 0.06, 8);
+      const barrel = new THREE.Mesh(barrelGeo, new THREE.MeshLambertMaterial({ color: 0x0a0a0a }));
+      barrel.rotation.x = Math.PI / 2;
+      barrel.position.set(0.2, -0.21, -0.56);
+      group.add(barrel);
+    } else if (w.id === 'molotov') {
+      const bottleMat = new THREE.MeshLambertMaterial({ color: 0x7c4516 });
+      const bottleGeo = new THREE.CylinderGeometry(0.04, 0.045, 0.22, 10);
+      const bottle = new THREE.Mesh(bottleGeo, bottleMat);
+      bottle.position.set(0.2, -0.24, -0.44);
+      group.add(bottle);
+
+      const wickGeo = new THREE.CylinderGeometry(0.012, 0.012, 0.09, 6);
+      const wickMat = new THREE.MeshBasicMaterial({ color: 0xff4500 });
+      const wick = new THREE.Mesh(wickGeo, wickMat);
+      wick.position.set(0.2, -0.11, -0.44);
+      group.add(wick);
+    } else if (w.id === 'smokegrenade') {
+      const canGeo = new THREE.CylinderGeometry(0.045, 0.045, 0.17, 12);
+      const canMat = new THREE.MeshLambertMaterial({ color: 0x5a636e });
+      const can = new THREE.Mesh(canGeo, canMat);
+      can.position.set(0.2, -0.24, -0.44);
+      group.add(can);
+
+      const bandGeo = new THREE.CylinderGeometry(0.046, 0.046, 0.04, 12);
+      const bandMat = new THREE.MeshBasicMaterial({ color: 0x228833 });
+      const band = new THREE.Mesh(bandGeo, bandMat);
+      band.position.set(0.2, -0.22, -0.44);
+      group.add(band);
+    } else if (w.category === 'equipment' || w.id === 'flashbang' || w.id === 'hegrenade') {
+      const grenGeo = new THREE.CylinderGeometry(0.042, 0.042, 0.15, 12);
+      const grenMat = new THREE.MeshLambertMaterial({ color: w.id === 'flashbang' ? 0x7a8a9a : 0x364230 });
       const gren = new THREE.Mesh(grenGeo, grenMat);
-      gren.position.set(0.2, -0.22, -0.46);
+      gren.position.set(0.2, -0.24, -0.44);
       group.add(gren);
 
       const pinGeo = new THREE.TorusGeometry(0.02, 0.005, 6, 12);
       const pin = new THREE.Mesh(pinGeo, new THREE.MeshLambertMaterial({ color: 0xcccccc }));
-      pin.position.set(0.2, -0.13, -0.46);
+      pin.position.set(0.2, -0.14, -0.44);
       group.add(pin);
     } else {
       const defMat = new THREE.MeshLambertMaterial({ color: 0x22262c });
@@ -293,6 +341,14 @@ class CS2Player {
       body.position.set(0.2, -0.22, -0.48);
       group.add(body);
     }
+  }
+
+  cycleGrenade() {
+    if (!this.grenades || this.grenades.length <= 1) return;
+    let idx = this.grenades.findIndex(g => g && g.id === (this.activeWeapon ? this.activeWeapon.id : ''));
+    idx = (idx + 1) % this.grenades.length;
+    this.inventory[4] = this.grenades[idx];
+    this.switchSlot(4);
   }
 
   initControls() {
@@ -309,7 +365,10 @@ class CS2Player {
       if (e.code === this.keybinds.slot1) this.switchSlot(1);
       if (e.code === this.keybinds.slot2) this.switchSlot(2);
       if (e.code === this.keybinds.slot3) this.switchSlot(3);
-      if (e.code === this.keybinds.slot4) this.switchSlot(4);
+      if (e.code === this.keybinds.slot4) {
+        if (this.activeSlot === 4) this.cycleGrenade();
+        else this.switchSlot(4);
+      }
       if (e.code === this.keybinds.slot5) this.switchSlot(5);
 
       if (e.code === this.keybinds.reload) {
@@ -326,7 +385,12 @@ class CS2Player {
       if (e.button === 0) {
         this.isShooting = true;
       } else if (e.button === 2) {
-        this.toggleScope();
+        // Right click short throw for grenades or scope
+        if (this.activeSlot === 4 || (this.activeWeapon && this.activeWeapon.category === 'equipment')) {
+          this.throwGrenade(true);
+        } else {
+          this.toggleScope();
+        }
       }
     });
 
@@ -340,10 +404,16 @@ class CS2Player {
       if (!document.pointerLockElement) return;
 
       const sens = (this.sensitivity * 0.0012) * (this.isScoped ? 0.4 : 1.0);
-      this.yaw -= e.movementX * sens;
+
+      // Clamp mouse delta to prevent sudden camera teleporting/aimbot snap glitches
+      const maxDelta = 65;
+      const dx = Math.max(-maxDelta, Math.min(maxDelta, e.movementX));
+      const dy = Math.max(-maxDelta, Math.min(maxDelta, e.movementY));
+
+      this.yaw -= dx * sens;
 
       const invertMult = this.invertY ? -1 : 1;
-      this.pitch -= e.movementY * sens * invertMult;
+      this.pitch -= dy * sens * invertMult;
       this.pitch = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, this.pitch));
     });
   }
@@ -450,7 +520,7 @@ class CS2Player {
       return;
     }
 
-    // Knife melee attack
+    // Knife melee attack with real damage
     if (this.activeWeapon.category === 'melee') {
       if (currentTime - this.lastShotTime < this.activeWeapon.fireRate) return;
       this.lastShotTime = currentTime;
@@ -460,6 +530,22 @@ class CS2Player {
       setTimeout(() => {
         this.weaponRig.rotation.y = 0;
       }, 120);
+
+      // Raycast for knife melee damage up to 3.2 meters
+      if (gameManager && gameManager.net) {
+        const knifeRay = new THREE.Raycaster();
+        const dir = new THREE.Vector3();
+        this.camera.getWorldDirection(dir);
+        knifeRay.set(this.camera.position, dir);
+        Object.entries(gameManager.net.remotePlayers).forEach(([id, p]) => {
+          if (p.team === this.team || !p.mesh || !p.mesh.visible) return;
+          const hits = knifeRay.intersectObject(p.mesh, true);
+          if (hits.length > 0 && hits[0].distance < 3.2) {
+            window.csAudio.playSound('knife_hit');
+            gameManager.net.sendDamage(id, 45, 'Knife', false);
+          }
+        });
+      }
       return;
     }
 
@@ -548,33 +634,62 @@ class CS2Player {
     }
   }
 
-  // Physical thrown grenade with arc & flash
-  throwGrenade() {
-    window.csAudio.playKnifeSlash();
+  // Physical thrown utility with authentic trajectory & velocity
+  throwGrenade(isUnderhand = false) {
+    if (!this.activeWeapon || this.activeSlot !== 4) return;
+    window.csAudio.playGrenadeThrow();
+
     const spawnPos = this.camera.position.clone();
     const dir = new THREE.Vector3();
     this.camera.getWorldDirection(dir);
 
-    const geo = new THREE.SphereGeometry(0.08, 8, 8);
-    const mat = new THREE.MeshLambertMaterial({ color: 0x3d4a36 });
-    const mesh = new THREE.Mesh(geo, mat);
-    mesh.position.copy(spawnPos).addScaledVector(dir, 0.8);
-    this.scene.add(mesh);
+    const type = this.activeWeapon.id;
 
-    const velocity = dir.clone().multiplyScalar(16.0);
-    velocity.y += 4.5;
+    // Visual grenade body
+    let grenMesh;
+    if (type === 'molotov') {
+      const bGeo = new THREE.CylinderGeometry(0.04, 0.045, 0.22, 8);
+      const bMat = new THREE.MeshLambertMaterial({ color: 0x7c4516 });
+      grenMesh = new THREE.Mesh(bGeo, bMat);
+    } else if (type === 'smokegrenade') {
+      const cGeo = new THREE.CylinderGeometry(0.045, 0.045, 0.16, 8);
+      const cMat = new THREE.MeshLambertMaterial({ color: 0x5a636e });
+      grenMesh = new THREE.Mesh(cGeo, cMat);
+    } else {
+      const sGeo = new THREE.SphereGeometry(0.065, 8, 8);
+      const sMat = new THREE.MeshLambertMaterial({ color: type === 'flashbang' ? 0x8898a8 : 0x3d4a36 });
+      grenMesh = new THREE.Mesh(sGeo, sMat);
+    }
+    grenMesh.position.copy(spawnPos).addScaledVector(dir, 0.8);
+    this.scene.add(grenMesh);
+
+    // Speed: Left Click (long throw, 18 m/s) vs Right Click (short underhand lob, 7.5 m/s)
+    const speed = isUnderhand ? 7.5 : 18.0;
+    const upBoost = isUnderhand ? 2.2 : 4.5;
+    const velocity = dir.clone().multiplyScalar(speed);
+    velocity.y += upBoost;
 
     const gren = {
-      mesh,
+      mesh: grenMesh,
       velocity,
-      lifetime: 1.8,
-      type: this.activeWeapon ? this.activeWeapon.id : 'flashbang'
+      lifetime: type === 'molotov' ? 2.2 : 1.7,
+      type: type
     };
     this.activeGrenades.push(gren);
 
-    // Remove from slot 4
-    this.inventory[4] = null;
-    this.switchSlot(2);
+    // Consume from grenade inventory
+    if (this.grenades && this.grenades.length > 0) {
+      const idx = this.grenades.findIndex(g => g && g.id === type);
+      if (idx !== -1) this.grenades.splice(idx, 1);
+    }
+
+    if (this.grenades && this.grenades.length > 0) {
+      this.inventory[4] = this.grenades[0];
+      this.switchSlot(4);
+    } else {
+      this.inventory[4] = null;
+      this.switchSlot(2);
+    }
   }
 
   updateGrenades(dt) {
@@ -586,25 +701,109 @@ class CS2Player {
 
       if (g.mesh.position.y <= 0.1) {
         g.mesh.position.y = 0.1;
-        g.velocity.y = -g.velocity.y * 0.4;
-        g.velocity.x *= 0.6;
-        g.velocity.z *= 0.6;
+        g.velocity.y = -g.velocity.y * 0.35;
+        g.velocity.x *= 0.65;
+        g.velocity.z *= 0.65;
+        if (g.type === 'molotov') g.lifetime = 0; // Detonates on impact
       }
 
       if (g.lifetime <= 0) {
-        // Explode / Flash
+        const pos = g.mesh.position.clone();
         this.scene.remove(g.mesh);
         this.activeGrenades.splice(i, 1);
 
         if (g.type === 'flashbang') {
+          window.csAudio.playFlashbangExplode();
           const flashEl = document.getElementById('flash-overlay');
           if (flashEl) {
             flashEl.style.opacity = '1';
-            setTimeout(() => { flashEl.style.opacity = '0'; }, 1500);
+            let op = 1.0;
+            const fadeInterval = setInterval(() => {
+              op -= 0.05;
+              if (op <= 0) {
+                flashEl.style.opacity = '0';
+                clearInterval(fadeInterval);
+              } else {
+                flashEl.style.opacity = String(op);
+              }
+            }, 90);
           }
-          window.csAudio.playExplosion();
-        } else {
-          window.csAudio.playExplosion();
+        } else if (g.type === 'hegrenade') {
+          window.csAudio.playHEDetonate();
+          // Radial explosive blast damage to player & enemies
+          const pDist = this.position.distanceTo(pos);
+          if (pDist <= 8.5) {
+            const dmg = Math.round(85 * (1 - pDist / 8.5));
+            this.takeDamage(dmg, 'HE Grenade', 'hegrenade');
+          }
+          if (window.csGameManager && window.csGameManager.net) {
+            Object.entries(window.csGameManager.net.remotePlayers).forEach(([id, rp]) => {
+              if (rp.mesh) {
+                const dist = rp.mesh.position.distanceTo(pos);
+                if (dist <= 8.5) {
+                  const dmg = Math.round(85 * (1 - dist / 8.5));
+                  window.csGameManager.net.sendDamage(id, dmg, 'HE Grenade', false);
+                }
+              }
+            });
+          }
+        } else if (g.type === 'smokegrenade') {
+          window.csAudio.playSmokeEmit();
+          // Volumetric 3D smoke cloud
+          const smokeGroup = new THREE.Group();
+          for (let s = 0; s < 12; s++) {
+            const sGeo = new THREE.SphereGeometry(1.6 + Math.random() * 0.8, 8, 8);
+            const sMat = new THREE.MeshLambertMaterial({
+              color: 0xc4c7cc,
+              transparent: true,
+              opacity: 0.82
+            });
+            const sMesh = new THREE.Mesh(sGeo, sMat);
+            sMesh.position.set(
+              (Math.random() - 0.5) * 3.8,
+              0.8 + Math.random() * 1.6,
+              (Math.random() - 0.5) * 3.8
+            );
+            smokeGroup.add(sMesh);
+          }
+          smokeGroup.position.copy(pos);
+          this.scene.add(smokeGroup);
+
+          setTimeout(() => {
+            window.csAudio.playSmokeClear();
+            this.scene.remove(smokeGroup);
+          }, 18000);
+        } else if (g.type === 'molotov') {
+          window.csAudio.playMolotovDetonate();
+          // Burning ground fire pool
+          const fireGroup = new THREE.Group();
+          const fGeo = new THREE.CylinderGeometry(2.4, 2.6, 0.25, 16);
+          const fMat = new THREE.MeshBasicMaterial({ color: 0xff4500, transparent: true, opacity: 0.85 });
+          const fireMesh = new THREE.Mesh(fGeo, fMat);
+          fireMesh.position.y = 0.15;
+          fireGroup.add(fireMesh);
+
+          for (let f = 0; f < 8; f++) {
+            const flameGeo = new THREE.ConeGeometry(0.3, 1.2, 6);
+            const flameMat = new THREE.MeshBasicMaterial({ color: 0xffaa00 });
+            const flame = new THREE.Mesh(flameGeo, flameMat);
+            flame.position.set((Math.random() - 0.5) * 3.0, 0.6, (Math.random() - 0.5) * 3.0);
+            fireGroup.add(flame);
+          }
+          fireGroup.position.copy(pos);
+          this.scene.add(fireGroup);
+
+          const fireEndTime = Date.now() + 7500;
+          const burnInterval = setInterval(() => {
+            if (Date.now() > fireEndTime) {
+              clearInterval(burnInterval);
+              this.scene.remove(fireGroup);
+              return;
+            }
+            if (this.position.distanceTo(pos) < 3.2) {
+              this.takeDamage(12, 'Fire', 'molotov');
+            }
+          }, 500);
         }
       }
     }
