@@ -45,13 +45,13 @@ class CS2Player {
     // Camera & Movement state (+20cm height: eye level at 2.0m)
     this.yaw = 0;
     this.pitch = 0;
-    this.position = new THREE.Vector3(0, 2.0, -90);
+    this.position = new THREE.Vector3(0, 2.2, -90);
     this.velocity = new THREE.Vector3();
     this.isGrounded = true;
     this.lastGroundY = -5.8;
     this.isCrouched = false;
     this.isScoped = false;
-    this.playerHeight = 2.0;
+    this.playerHeight = 2.2;
 
     // Jump Input State (Strictly single-press: prevents auto bunny-hop)
     this.jumpRequested = false;
@@ -637,6 +637,10 @@ class CS2Player {
       if (e.code === this.keybinds.reload) {
         this.startReload();
       }
+      // Drop weapon (G key) - drops current weapon/utility as pickup on ground
+      if (e.code === this.keybinds.drop) {
+        this.dropCurrentWeapon();
+      }
     });
 
     window.addEventListener('keyup', (e) => {
@@ -708,6 +712,93 @@ class CS2Player {
       this.pitch -= dy * sens * invertMult;
       this.pitch = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, this.pitch));
     });
+  }
+
+  dropCurrentWeapon() {
+    // Cannot drop knife
+    if (this.activeSlot === 3) return;
+    if (!this.activeWeapon || !this.inventory[this.activeSlot]) return;
+
+    const droppedWeapon = this.activeWeapon;
+    const dropSlot = this.activeSlot;
+
+    // Create 3D pickup mesh on the ground
+    const dropGroup = new THREE.Group();
+    const bodyGeo = new THREE.BoxGeometry(0.12, 0.08, 0.45);
+    const bodyMat = new THREE.MeshLambertMaterial({ color: 0x444c58 });
+    const body = new THREE.Mesh(bodyGeo, bodyMat);
+    dropGroup.add(body);
+
+    // Position in front of player at ground level
+    const fwd = new THREE.Vector3(-Math.sin(this.yaw), 0, -Math.cos(this.yaw));
+    const dropPos = this.position.clone().addScaledVector(fwd, 1.5);
+    dropPos.y = this.lastGroundY + 0.15;
+    dropGroup.position.copy(dropPos);
+    dropGroup.rotation.y = this.yaw + Math.random() * 0.5;
+    this.scene.add(dropGroup);
+
+    // Store as world pickup
+    if (!window._droppedItems) window._droppedItems = [];
+    window._droppedItems.push({
+      mesh: dropGroup,
+      weapon: droppedWeapon,
+      slot: dropSlot,
+      pos: dropPos
+    });
+
+    // Remove from inventory
+    this.inventory[dropSlot] = null;
+    if (dropSlot === 4) {
+      const idx = this.grenades.findIndex(g => g && g.id === droppedWeapon.id);
+      if (idx !== -1) this.grenades.splice(idx, 1);
+      if (this.grenades.length > 0) {
+        this.inventory[4] = this.grenades[0];
+      }
+    }
+
+    // Save ammo state for the dropped weapon
+    const savedAmmo = this.weaponAmmo[droppedWeapon.id];
+
+    // Switch to next available weapon
+    const priorities = [2, 1, 3, 4, 5];
+    let switched = false;
+    for (const s of priorities) {
+      if (s !== dropSlot && this.inventory[s]) {
+        this.switchSlot(s);
+        switched = true;
+        break;
+      }
+    }
+    if (!switched) this.switchSlot(3);
+
+    window.csAudio.playWeaponEquip('knife');
+  }
+
+  // Pick up dropped weapon (E key or walk-over proximity)
+  checkPickupItems() {
+    if (!window._droppedItems || window._droppedItems.length === 0) return;
+    for (let i = window._droppedItems.length - 1; i >= 0; i--) {
+      const item = window._droppedItems[i];
+      const dist = this.position.distanceTo(item.pos);
+      if (dist < 2.0) {
+        // Auto-pickup by walking over, or E key
+        if (this.keys[this.keybinds.use] || dist < 1.2) {
+          // Can pick up if slot is empty or same category
+          const targetSlot = item.slot;
+          if (targetSlot === 4) {
+            this.grenades.push(item.weapon);
+            this.inventory[4] = item.weapon;
+          } else {
+            this.inventory[targetSlot] = item.weapon;
+          }
+          this.switchSlot(targetSlot);
+          this.scene.remove(item.mesh);
+          window._droppedItems.splice(i, 1);
+          window.csAudio.playWeaponEquip(item.weapon.id);
+          break;
+        }
+      }
+    }
   }
 
   enterSpectatorMode() {
@@ -1213,7 +1304,7 @@ class CS2Player {
         } else if (g.type === 'molotov') {
           window.csAudio.playMolotovDetonate();
           const fireGroup = new THREE.Group();
-          const fGeo = new THREE.CylinderGeometry(2.4, 2.6, 0.25, 16);
+          const fGeo = new THREE.CylinderGeometry(3.5, 3.8, 0.30, 16);
           const fMat = new THREE.MeshBasicMaterial({ color: 0xff4500, transparent: true, opacity: 0.85 });
           const fireMesh = new THREE.Mesh(fGeo, fMat);
           fireMesh.position.y = 0.15;
@@ -1223,7 +1314,7 @@ class CS2Player {
             const flameGeo = new THREE.ConeGeometry(0.3, 1.2, 6);
             const flameMat = new THREE.MeshBasicMaterial({ color: 0xffaa00 });
             const flame = new THREE.Mesh(flameGeo, flameMat);
-            flame.position.set((Math.random() - 0.5) * 3.0, 0.6, (Math.random() - 0.5) * 3.0);
+            flame.position.set((Math.random() - 0.5) * 5.0, 0.8, (Math.random() - 0.5) * 5.0);
             fireGroup.add(flame);
           }
           fireGroup.position.copy(pos);
@@ -1236,7 +1327,7 @@ class CS2Player {
               this.scene.remove(fireGroup);
               return;
             }
-            if (this.position.distanceTo(pos) < 3.2) {
+            if (this.position.distanceTo(pos) < 4.5) {
               this.takeDamage(12, 'Fire', 'molotov');
             }
           }, 500);
@@ -1328,6 +1419,7 @@ class CS2Player {
 
   update(dt, currentTime, gameManager) {
     this.updateGrenades(dt);
+    this.checkPickupItems();
 
     // Smooth Third-Person Spectator Chase Camera
     if (this.isSpectating) {
@@ -1434,7 +1526,7 @@ class CS2Player {
     if (this.jumpRequested && this.isGrounded && !inFreeze) {
       this.jumpRequested = false;
       // Crouch-jump (duck-jump) boost to easily clear and land on Dust 2 crates
-      const jumpImpulse = this.isCrouched ? 8.6 : 8.0;
+      const jumpImpulse = this.isCrouched ? 9.8 : 9.2;
       this.velocity.y = jumpImpulse;
       this.isGrounded = false;
     }
@@ -1442,7 +1534,7 @@ class CS2Player {
     this.velocity.y -= 18.0 * dt;
 
     this.isCrouched = !!this.keys[this.keybinds.crouch];
-    const targetHeight = this.isCrouched ? 1.15 : 2.0; // +20cm player eye height
+    const targetHeight = this.isCrouched ? 1.35 : 2.2;
     this.playerHeight += (targetHeight - this.playerHeight) * 0.2;
 
     const oldX = this.position.x;

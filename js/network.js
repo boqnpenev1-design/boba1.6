@@ -422,15 +422,15 @@ class CS2NetworkManager {
     const group = new THREE.Group();
 
     // 1. Full-Body Hitbox Cylinder (Scaled for +20cm taller authentic player model)
-    const hitboxGeo = new THREE.CylinderGeometry(0.52, 0.52, 2.05, 12);
+    const hitboxGeo = new THREE.CylinderGeometry(0.58, 0.58, 2.55, 12);
     const hitboxMat = new THREE.MeshBasicMaterial({ visible: false });
     const hitbox = new THREE.Mesh(hitboxGeo, hitboxMat);
-    hitbox.position.y = 1.025;
+    hitbox.position.y = 1.275;
     hitbox.name = 'hitbox';
     group.add(hitbox);
 
     // Scale character visual mesh by 1.12 (+20cm height from 1.80m to 2.02m)
-    group.scale.set(1.12, 1.12, 1.12);
+    group.scale.set(1.45, 1.45, 1.45);
 
     const texLoader = new THREE.TextureLoader();
 
@@ -656,7 +656,7 @@ class CS2NetworkManager {
     p.data = data;
     p.pos = data.pos;
     p.team = data.team;
-    p.mesh.position.set(data.pos.x, data.pos.y - 1.8, data.pos.z);
+    p.mesh.position.set(data.pos.x, data.pos.y - 2.0, data.pos.z);
     p.mesh.rotation.y = data.yaw;
     p.mesh.visible = (data.inMatch !== false && data.health > 0);
 

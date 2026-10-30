@@ -208,6 +208,12 @@ class CS2GameManager {
     this.player.setTeam(team);
 
     document.getElementById('team-select-screen').classList.add('hidden');
+    // Auto-fullscreen to prevent Ctrl+W/Ctrl+N browser shortcuts during gameplay
+    try {
+      const el = document.documentElement;
+      if (el.requestFullscreen) el.requestFullscreen().catch(() => {});
+      else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+    } catch (e) {}
     document.getElementById('hud').classList.remove('hidden');
     try {
       const lockPromise = document.getElementById('game-canvas-container').requestPointerLock();

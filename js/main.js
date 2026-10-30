@@ -211,6 +211,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const refundBtn = document.getElementById('btn-refund-weapon');
   if (refundBtn) {
+    refundBtn.style.display = 'none';
     refundBtn.addEventListener('click', () => {
       gameManager.refundLastPurchase();
       renderBuyItems(currentBuyCategory);
@@ -240,8 +241,26 @@ document.addEventListener('DOMContentLoaded', () => {
       const canAfford = playerCash >= weapon.cost;
       card.className = `weapon-card ${canAfford ? '' : 'unaffordable'}`;
 
+      const texMap = {
+        glock: 'w_pist_glock18.png', usp: 'w_pist_usp.png', p250: 'w_pist_p228.png',
+        deagle: 'w_pist_deagle.png', dualberettas: 'w_pist_elite.png', fiveseven: 'w_pist_fiveseven.png',
+        tec9: 'w_pist_p228.png', cz75: 'w_pist_p228.png',
+        mac10: 'w_smg_mac10.png', mp9: 'w_smg_mp5.png', mp7: 'w_smg_mp5.png',
+        mp5sd: 'w_smg_mp5.png', ump45: 'w_smg_ump45.png', p90: 'w_smg_p90.png', bizon: 'w_smg_tmp.png',
+        nova: 'w_shot_m3super90.png', xm1014: 'w_shot_xm1014.png', mag7: 'w_shot_m3super90.png', sawedoff: 'w_shot_m3super90.png',
+        negev: 'w_mach_m249.png', m249: 'w_mach_m249.png',
+        ak47: 'w_rif_ak47.png', m4a4: 'w_rif_m4a1.png', m4a1s: 'w_rif_m4a1.png',
+        galil: 'w_rif_galil.png', famas: 'w_rif_famas.png', aug: 'w_rif_aug.png', sg553: 'w_rif_sg552.png',
+        ssg08: 'w_snip_scout.png', awp: 'w_snip_awp.png', scar20: 'w_snip_g3sg1.png', g3sg1: 'w_snip_g3sg1.png',
+        kevlar: 'w_eq_fraggrenade.png', helmet: 'w_eq_fraggrenade.png', defuser: 'w_eq_defuser.png',
+        hegrenade: 'w_eq_fraggrenade.png', flashbang: 'w_eq_flashbang.png',
+        smokegrenade: 'w_eq_smokegrenade.png', molotov: 'w_eq_fraggrenade.png'
+      };
+      const imgFile = texMap[weapon.id] || '';
+      const imgTag = imgFile ? `<img src="textures/${imgFile}" alt="${weapon.name}" style="width:64px;height:48px;object-fit:contain;image-rendering:pixelated;margin-bottom:4px;display:block;">` : '';
       card.innerHTML = `
         <div>
+          ${imgTag}
           <div class="wc-name">${weapon.name}</div>
           <div class="wc-cost">$${weapon.cost}</div>
         </div>
@@ -260,6 +279,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
       grid.appendChild(card);
     });
+    if (refundBtn) {
+      refundBtn.style.display = (gameManager.purchaseHistory.length > 0 && gameManager.canBuy()) ? 'inline-block' : 'none';
+    }
   }
 
   function buyWeapon(weapon) {
