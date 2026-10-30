@@ -837,7 +837,7 @@ class CS2GameManager {
     this.handleObjectives(dt);
     this.updateHUD();
 
-    if (currentTime - this.lastRadarTime > 40) {
+    if (currentTime - this.lastRadarTime > 100) {
       this.lastRadarTime = currentTime;
       this.renderRadar();
     }

@@ -5,16 +5,16 @@ document.addEventListener('DOMContentLoaded', () => {
   const container = document.getElementById('game-canvas-container');
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0xdce7f0); // Crisp CS2 daytime sky
-  scene.fog = new THREE.FogExp2(0xdce7f0, 0.005);
+  scene.fog = new THREE.FogExp2(0xdce7f0, 0.008); // Tighter fog for perf
 
-  const camera = new THREE.PerspectiveCamera(85, window.innerWidth / window.innerHeight, 0.1, 1000);
+  const camera = new THREE.PerspectiveCamera(85, window.innerWidth / window.innerHeight, 0.1, 500);
   scene.add(camera);
 
   // Pixel ratio locked to 1 & MSAA disabled for maximum competitive 144-240+ FPS
   const renderer = new THREE.WebGLRenderer({
     antialias: false, // Critical competitive optimization: 2x-3x framerate gain
     powerPreference: 'high-performance',
-    precision: 'mediump',
+    precision: 'lowp',
     stencil: false,
     depth: true
   });
@@ -252,9 +252,9 @@ document.addEventListener('DOMContentLoaded', () => {
         ak47: 'w_rif_ak47.png', m4a4: 'w_rif_m4a1.png', m4a1s: 'w_rif_m4a1.png',
         galil: 'w_rif_galil.png', famas: 'w_rif_famas.png', aug: 'w_rif_aug.png', sg553: 'w_rif_sg552.png',
         ssg08: 'w_snip_scout.png', awp: 'w_snip_awp.png', scar20: 'w_snip_g3sg1.png', g3sg1: 'w_snip_g3sg1.png',
-        kevlar: 'w_eq_fraggrenade.png', helmet: 'w_eq_fraggrenade.png', defuser: 'w_eq_defuser.png',
         hegrenade: 'w_eq_fraggrenade.png', flashbang: 'w_eq_flashbang.png',
-        smokegrenade: 'w_eq_smokegrenade.png', molotov: 'w_eq_fraggrenade.png'
+        smokegrenade: 'w_eq_smokegrenade.png', molotov: 'w_eq_fraggrenade.png',
+        defuser: 'w_eq_defuser.png'
       };
       const imgFile = texMap[weapon.id] || '';
       const imgTag = imgFile ? `<img src="textures/${imgFile}" alt="${weapon.name}" style="width:64px;height:48px;object-fit:contain;image-rendering:pixelated;margin-bottom:4px;display:block;">` : '';
@@ -280,7 +280,7 @@ document.addEventListener('DOMContentLoaded', () => {
       grid.appendChild(card);
     });
     if (refundBtn) {
-      refundBtn.style.display = (gameManager.purchaseHistory.length > 0 && gameManager.canBuy()) ? 'inline-block' : 'none';
+      refundBtn.style.display = 'none';
     }
   }
 

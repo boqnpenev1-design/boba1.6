@@ -457,13 +457,10 @@ class CS2NetworkManager {
     // Left Leg Anchor & Mesh
     const leftLegGroup = new THREE.Group();
     leftLegGroup.position.set(-0.16, 0.90, 0);
-    const lLegUpper = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.08, 0.45, 8), pantsMat);
+    const lLegUpper = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.08, 0.45, 6), pantsMat);
     lLegUpper.position.y = -0.225;
     leftLegGroup.add(lLegUpper);
-    const lKneePad = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.09, 0.06), bootMat);
-    lKneePad.position.set(0, -0.42, 0.05);
-    leftLegGroup.add(lKneePad);
-    const lLegLower = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.07, 0.45, 8), pantsMat);
+    const lLegLower = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.07, 0.45, 6), pantsMat);
     lLegLower.position.y = -0.65;
     leftLegGroup.add(lLegLower);
     const lBoot = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, 0.22), bootMat);
@@ -474,13 +471,10 @@ class CS2NetworkManager {
     // Right Leg Anchor & Mesh
     const rightLegGroup = new THREE.Group();
     rightLegGroup.position.set(0.16, 0.90, 0);
-    const rLegUpper = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.08, 0.45, 8), pantsMat);
+    const rLegUpper = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.08, 0.45, 6), pantsMat);
     rLegUpper.position.y = -0.225;
     rightLegGroup.add(rLegUpper);
-    const rKneePad = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.09, 0.06), bootMat);
-    rKneePad.position.set(0, -0.42, 0.05);
-    rightLegGroup.add(rKneePad);
-    const rLegLower = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.07, 0.45, 8), pantsMat);
+    const rLegLower = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.07, 0.45, 6), pantsMat);
     rLegLower.position.y = -0.65;
     rightLegGroup.add(rLegLower);
     const rBoot = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, 0.22), bootMat);
@@ -493,7 +487,7 @@ class CS2NetworkManager {
     torsoGroup.position.set(0, 0.95, 0);
 
     // Combat Shirt / Jacket Torso
-    const torsoMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.20, 0.62, 8), shirtMat);
+    const torsoMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.20, 0.62, 6), shirtMat);
     torsoMesh.position.y = 0.31;
     torsoGroup.add(torsoMesh);
 
@@ -518,7 +512,7 @@ class CS2NetworkManager {
     if (isCT) {
       // SAS CT: Tactical Balaclava & Ballistic Helmet with Visor
       const maskMat = new THREE.MeshLambertMaterial({ color: 0x161c24 });
-      const mask = new THREE.Mesh(new THREE.SphereGeometry(0.16, 12, 12), maskMat);
+      const mask = new THREE.Mesh(new THREE.SphereGeometry(0.16, 8, 8), maskMat);
       headGroup.add(mask);
 
       const helmetMat = new THREE.MeshLambertMaterial({ color: 0x1f2936 });
@@ -526,7 +520,7 @@ class CS2NetworkManager {
         helmetMat.map = tex;
         helmetMat.needsUpdate = true;
       }, undefined, () => {});
-      const helmet = new THREE.Mesh(new THREE.SphereGeometry(0.18, 12, 12), helmetMat);
+      const helmet = new THREE.Mesh(new THREE.SphereGeometry(0.18, 8, 8), helmetMat);
       helmet.scale.set(1.05, 0.95, 1.1);
       helmet.position.set(0, 0.05, -0.02);
       headGroup.add(helmet);
@@ -537,7 +531,7 @@ class CS2NetworkManager {
     } else {
       // Phoenix Connexion Terrorist: Desert Off-White Balaclava
       const maskMat = new THREE.MeshLambertMaterial({ color: 0xd6cbb8 });
-      const mask = new THREE.Mesh(new THREE.SphereGeometry(0.17, 12, 12), maskMat);
+      const mask = new THREE.Mesh(new THREE.SphereGeometry(0.17, 8, 8), maskMat);
       headGroup.add(mask);
 
       const eyeSlit = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.05, 0.06), new THREE.MeshBasicMaterial({ color: 0x111111 }));
@@ -553,11 +547,11 @@ class CS2NetworkManager {
     // Left Arm Group
     const leftArmGroup = new THREE.Group();
     leftArmGroup.position.set(-0.28, 0.50, 0);
-    const lUpperArm = new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.055, 0.32, 8), shirtMat);
+    const lUpperArm = new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.055, 0.32, 6), shirtMat);
     lUpperArm.position.set(0.06, -0.12, 0.08);
     lUpperArm.rotation.set(Math.PI / 4, 0, -0.2);
     leftArmGroup.add(lUpperArm);
-    const lForearm = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.05, 0.32, 8), shirtMat);
+    const lForearm = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.05, 0.32, 6), shirtMat);
     lForearm.position.set(0.14, -0.20, 0.26);
     lForearm.rotation.set(Math.PI / 3, 0, -0.5);
     leftArmGroup.add(lForearm);
@@ -569,11 +563,11 @@ class CS2NetworkManager {
     // Right Arm Group
     const rightArmGroup = new THREE.Group();
     rightArmGroup.position.set(0.28, 0.50, 0);
-    const rUpperArm = new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.055, 0.32, 8), shirtMat);
+    const rUpperArm = new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.055, 0.32, 6), shirtMat);
     rUpperArm.position.set(-0.06, -0.12, 0.08);
     rUpperArm.rotation.set(Math.PI / 4, 0, 0.2);
     rightArmGroup.add(rUpperArm);
-    const rForearm = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.05, 0.32, 8), shirtMat);
+    const rForearm = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.05, 0.32, 6), shirtMat);
     rForearm.position.set(-0.08, -0.20, 0.26);
     rForearm.rotation.set(Math.PI / 3.5, 0, 0.35);
     rightArmGroup.add(rForearm);
@@ -592,7 +586,7 @@ class CS2NetworkManager {
 
     const gunBody = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.09, 0.55), gunMat);
     weaponGroup.add(gunBody);
-    const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.016, 0.35, 8), gunMat);
+    const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.016, 0.35, 6), gunMat);
     barrel.rotation.x = Math.PI / 2;
     barrel.position.set(0, 0.02, 0.38);
     weaponGroup.add(barrel);

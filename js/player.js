@@ -82,7 +82,7 @@ class CS2Player {
     this.downDir = new THREE.Vector3(0, -1, 0);
 
     // Pre-allocated Decal Pool for Bullet Holes (Zero per-shot GC pressure)
-    this.bulletHoleGeo = new THREE.CircleGeometry(0.055, 8);
+    this.bulletHoleGeo = new THREE.CircleGeometry(0.055, 5);
     this.bulletHoleMat = new THREE.MeshBasicMaterial({ color: 0x181818, side: THREE.DoubleSide, depthWrite: false });
     this.bulletHolePool = [];
     this.bulletHolePoolIndex = 0;
@@ -141,7 +141,7 @@ class CS2Player {
     // Muzzle Flash
     this.muzzleLight = new THREE.PointLight(0xffaa33, 0, 8);
     this.muzzleLight.position.set(0.18, -0.16, -0.85);
-    const flashGeo = new THREE.SphereGeometry(0.065, 8, 8);
+    const flashGeo = new THREE.SphereGeometry(0.065, 5, 5);
     const flashMat = new THREE.MeshBasicMaterial({ color: 0xffdd66 });
     this.muzzleFlashMesh = new THREE.Mesh(flashGeo, flashMat);
     this.muzzleFlashMesh.position.set(0.18, -0.16, -0.85);
@@ -238,14 +238,14 @@ class CS2Player {
       const norm = v.clone().normalize();
 
       // Full Forearm Sleeve flaring toward shoulder, originating below screen bezel
-      const sleeveGeo = new THREE.CylinderGeometry(0.046, 0.082, len * 0.96, 12);
+      const sleeveGeo = new THREE.CylinderGeometry(0.046, 0.082, len * 0.96, 8);
       const sleeve = new THREE.Mesh(sleeveGeo, sleeveMat);
       sleeve.position.copy(pStart).addScaledVector(norm, len * 0.48);
       sleeve.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), norm);
       armGroup.add(sleeve);
 
       // Wrinkled Sleeve Cuff
-      const cuffGeo = new THREE.CylinderGeometry(0.050, 0.050, 0.040, 12);
+      const cuffGeo = new THREE.CylinderGeometry(0.050, 0.050, 0.040, 8);
       const cuff = new THREE.Mesh(cuffGeo, gloveMat);
       cuff.position.copy(pStart).addScaledVector(norm, len * 0.90);
       cuff.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), norm);
@@ -265,7 +265,7 @@ class CS2Player {
       palm.add(knuck);
 
       // Wrapped Fingers holding the grip
-      const fingerGeo = new THREE.CylinderGeometry(0.011, 0.010, 0.052, 8);
+      const fingerGeo = new THREE.CylinderGeometry(0.011, 0.010, 0.052, 5);
       for (let f = 0; f < 3; f++) {
         const finger = new THREE.Mesh(fingerGeo, gloveMat);
         finger.rotation.z = Math.PI / 2;
@@ -360,7 +360,7 @@ class CS2Player {
       grip.position.set(0.13, -0.27, -0.28);
       group.add(grip);
 
-      const barrelGeo = new THREE.CylinderGeometry(0.012, 0.012, 0.05, 8);
+      const barrelGeo = new THREE.CylinderGeometry(0.012, 0.012, 0.05, 6);
       const barrel = new THREE.Mesh(barrelGeo, new THREE.MeshLambertMaterial({ color: 0x0a0a0a }));
       barrel.rotation.x = Math.PI / 2;
       barrel.position.set(0.13, -0.17, -0.49);
@@ -386,7 +386,7 @@ class CS2Player {
       grip.position.set(0.13, -0.27, -0.28);
       group.add(grip);
 
-      const silGeo = new THREE.CylinderGeometry(0.022, 0.022, 0.22, 10);
+      const silGeo = new THREE.CylinderGeometry(0.022, 0.022, 0.22, 6);
       const silMat = new THREE.MeshStandardMaterial({ color: 0x1c2024, roughness: 0.45, metalness: 0.5 });
       const sil = new THREE.Mesh(silGeo, silMat);
       sil.rotation.x = Math.PI / 2;
@@ -1224,7 +1224,7 @@ class CS2Player {
           // Authentic HE Grenade Fireball & Shockwave Animation
           const heGroup = new THREE.Group();
           heGroup.position.copy(pos);
-          const fireballGeo = new THREE.SphereGeometry(2.4, 12, 12);
+          const fireballGeo = new THREE.SphereGeometry(2.4, 8, 8);
           const fireballMat = new THREE.MeshBasicMaterial({ color: 0xff6611, transparent: true, opacity: 0.95 });
           const fireball = new THREE.Mesh(fireballGeo, fireballMat);
           heGroup.add(fireball);
@@ -1270,7 +1270,7 @@ class CS2Player {
 
           // High-Performance CS2 Volumetric Smoke (Zero Multi-Mesh Overdraw Lag)
           // 1 Single Optimized 5.2m Sphere with soft depthWrite: false
-          const smokeGeo = new THREE.SphereGeometry(5.2, 16, 16);
+          const smokeGeo = new THREE.SphereGeometry(5.2, 10, 10);
           const smokeMat = new THREE.MeshLambertMaterial({
             color: 0xc8ccd2,
             transparent: true,
@@ -1304,14 +1304,14 @@ class CS2Player {
         } else if (g.type === 'molotov') {
           window.csAudio.playMolotovDetonate();
           const fireGroup = new THREE.Group();
-          const fGeo = new THREE.CylinderGeometry(3.5, 3.8, 0.30, 16);
+          const fGeo = new THREE.CylinderGeometry(3.5, 3.8, 0.30, 10);
           const fMat = new THREE.MeshBasicMaterial({ color: 0xff4500, transparent: true, opacity: 0.85 });
           const fireMesh = new THREE.Mesh(fGeo, fMat);
           fireMesh.position.y = 0.15;
           fireGroup.add(fireMesh);
 
           for (let f = 0; f < 8; f++) {
-            const flameGeo = new THREE.ConeGeometry(0.3, 1.2, 6);
+            const flameGeo = new THREE.ConeGeometry(0.3, 1.2, 4);
             const flameMat = new THREE.MeshBasicMaterial({ color: 0xffaa00 });
             const flame = new THREE.Mesh(flameGeo, flameMat);
             flame.position.set((Math.random() - 0.5) * 5.0, 0.8, (Math.random() - 0.5) * 5.0);
@@ -1526,7 +1526,7 @@ class CS2Player {
     if (this.jumpRequested && this.isGrounded && !inFreeze) {
       this.jumpRequested = false;
       // Crouch-jump (duck-jump) boost to easily clear and land on Dust 2 crates
-      const jumpImpulse = this.isCrouched ? 9.8 : 9.2;
+      const jumpImpulse = this.isCrouched ? 8.6 : 8.0;
       this.velocity.y = jumpImpulse;
       this.isGrounded = false;
     }
@@ -1554,7 +1554,7 @@ class CS2Player {
         this.position.y - this.playerHeight * 0.35,
         this.position.y - this.playerHeight * 0.70
       ];
-      const maxStepHeight = (this.isCrouched && !this.isGrounded) ? 1.85 : 0.75;
+      const maxStepHeight = (this.isCrouched && !this.isGrounded) ? 2.4 : 1.2;
       for (const yOff of yOffsets) {
         for (const lOff of lateralOffsets) {
           this.wallOrigin.set(oldX + perpX * lOff, yOff, oldZ + perpZ * lOff);
