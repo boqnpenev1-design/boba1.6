@@ -441,20 +441,23 @@ document.addEventListener('DOMContentLoaded', () => {
   const chSize = document.getElementById('setting-ch-size');
   const chGap = document.getElementById('setting-ch-gap');
   const chDot = document.getElementById('setting-ch-dot');
+  const chDotOnly = document.getElementById('setting-ch-dot-only');
 
   function updateCrosshairStyle() {
     const color = chColor.value;
     const size = `${chSize.value}px`;
     const gap = `${chGap.value}px`;
     const showDot = chDot.checked;
+    const dotOnly = chDotOnly ? chDotOnly.checked : false;
 
     document.querySelectorAll('.crosshair-ch').forEach(el => {
       el.style.backgroundColor = color;
+      el.style.display = dotOnly ? 'none' : 'block';
     });
 
     const dot = document.querySelector('.crosshair-dot');
     dot.style.backgroundColor = color;
-    dot.style.display = showDot ? 'block' : 'none';
+    dot.style.display = (showDot || dotOnly) ? 'block' : 'none';
 
     document.querySelector('.ch-top').style.height = size;
     document.querySelector('.ch-top').style.top = gap;
@@ -470,6 +473,7 @@ document.addEventListener('DOMContentLoaded', () => {
   chSize.addEventListener('input', updateCrosshairStyle);
   chGap.addEventListener('input', updateCrosshairStyle);
   chDot.addEventListener('change', updateCrosshairStyle);
+  if (chDotOnly) chDotOnly.addEventListener('change', updateCrosshairStyle);
   updateCrosshairStyle();
 
   // Volume Sliders

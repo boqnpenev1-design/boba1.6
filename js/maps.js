@@ -191,22 +191,22 @@ class CS2MapBuilder {
     // AUTHENTIC DUST 2 SPAWN POINTS
     // ==========================================================
 
-    // CT Spawns: Standing on CT Spawn ground (Y = -5.8, eyes at Y = -4.0) facing South
+    // CT Spawns: Standing on CT Spawn ground (Y = -5.8, eyes at Y = -3.8) facing South
     this.spawnPoints.CT = [
-      { x: -5.0, y: -4.0, z: -98.0, yaw: Math.PI },
-      { x: -2.0, y: -4.0, z: -96.0, yaw: Math.PI },
-      { x: -8.0, y: -4.0, z: -96.0, yaw: Math.PI },
-      { x: -5.0, y: -4.0, z: -101.0, yaw: Math.PI },
-      { x: -1.0, y: -4.0, z: -100.0, yaw: Math.PI }
+      { x: -5.0, y: -3.8, z: -98.0, yaw: Math.PI },
+      { x: -2.0, y: -3.8, z: -96.0, yaw: Math.PI },
+      { x: -8.0, y: -3.8, z: -96.0, yaw: Math.PI },
+      { x: -5.0, y: -3.8, z: -101.0, yaw: Math.PI },
+      { x: -1.0, y: -3.8, z: -100.0, yaw: Math.PI }
     ];
 
-    // T Spawns: Standing in T Spawn Courtyard (Y = 5.8, eyes at Y = 7.6) facing North
+    // T Spawns: Standing in T Spawn Courtyard (Y = 5.8, eyes at Y = 7.8) facing North
     this.spawnPoints.T = [
-      { x: -65.0, y: 7.6, z: 35.0, yaw: 0 },
-      { x: -61.0, y: 7.6, z: 33.0, yaw: 0 },
-      { x: -69.0, y: 7.6, z: 33.0, yaw: 0 },
-      { x: -65.0, y: 7.6, z: 38.0, yaw: 0 },
-      { x: -58.0, y: 7.6, z: 36.0, yaw: 0 }
+      { x: -65.0, y: 7.8, z: 35.0, yaw: 0 },
+      { x: -61.0, y: 7.8, z: 33.0, yaw: 0 },
+      { x: -69.0, y: 7.8, z: 33.0, yaw: 0 },
+      { x: -65.0, y: 7.8, z: 38.0, yaw: 0 },
+      { x: -58.0, y: 7.8, z: 36.0, yaw: 0 }
     ];
   }
 }

@@ -242,6 +242,21 @@ class CS2GameManager {
 
     window.csAudio.playRadioTone('start');
 
+    // First round / Halftime: Strictly pistol + knife + ammo (No free grenades)
+    if (this.currentRound === 1 || this.currentRound === 13) {
+      this.player.inventory[1] = null;
+      this.player.inventory[4] = null;
+      this.player.grenades = [];
+      if (this.player.team === 'CT') {
+        this.player.inventory[2] = CS2_WEAPONS.usp;
+        this.player.inventory[5] = null;
+      } else {
+        this.player.inventory[2] = CS2_WEAPONS.glock;
+        this.player.inventory[5] = CS2_WEAPONS.c4;
+      }
+      this.player.switchSlot(2);
+    }
+
     // Spawn player immediately at authentic CS spawn point
     const spawns = (this.mapBuilder && this.mapBuilder.spawnPoints && this.mapBuilder.spawnPoints[this.player.team]) || [];
     const s = spawns.length > 0 ? spawns[Math.floor(Math.random() * spawns.length)] : null;

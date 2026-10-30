@@ -421,13 +421,16 @@ class CS2NetworkManager {
   createTacticalCharacterModel(team) {
     const group = new THREE.Group();
 
-    // 1. Full-Body Hitbox Cylinder (Covers head to feet for reliable bullet hits)
-    const hitboxGeo = new THREE.CylinderGeometry(0.48, 0.48, 1.85, 12);
+    // 1. Full-Body Hitbox Cylinder (Scaled for +20cm taller authentic player model)
+    const hitboxGeo = new THREE.CylinderGeometry(0.52, 0.52, 2.05, 12);
     const hitboxMat = new THREE.MeshBasicMaterial({ visible: false });
     const hitbox = new THREE.Mesh(hitboxGeo, hitboxMat);
-    hitbox.position.y = 0.925;
+    hitbox.position.y = 1.025;
     hitbox.name = 'hitbox';
     group.add(hitbox);
+
+    // Scale character visual mesh by 1.12 (+20cm height from 1.80m to 2.02m)
+    group.scale.set(1.12, 1.12, 1.12);
 
     const texLoader = new THREE.TextureLoader();
 

@@ -18,14 +18,15 @@ class CS2Player {
     this.team = 'CT';
 
     // Inventory Loadout: 1=Primary, 2=Secondary, 3=Knife, 4=Grenade, 5=C4
+    // First round pistol-only loadout: gun and ammo only, zero free grenades
     this.inventory = {
       1: null,
       2: CS2_WEAPONS.usp,
       3: CS2_WEAPONS.knife,
-      4: CS2_WEAPONS.flashbang,
+      4: null,
       5: null
     };
-    this.grenades = [CS2_WEAPONS.flashbang, CS2_WEAPONS.hegrenade, CS2_WEAPONS.smokegrenade];
+    this.grenades = [];
     this.grenadeIndex = 0;
     this.activeSlot = 2;
     this.activeWeapon = CS2_WEAPONS.usp;
@@ -41,16 +42,16 @@ class CS2Player {
       reserve: CS2_WEAPONS.usp.reserve
     };
 
-    // Camera & Movement state
+    // Camera & Movement state (+20cm height: eye level at 2.0m)
     this.yaw = 0;
     this.pitch = 0;
-    this.position = new THREE.Vector3(0, 1.8, -90);
+    this.position = new THREE.Vector3(0, 2.0, -90);
     this.velocity = new THREE.Vector3();
     this.isGrounded = true;
     this.lastGroundY = -5.8;
     this.isCrouched = false;
     this.isScoped = false;
-    this.playerHeight = 1.8;
+    this.playerHeight = 2.0;
 
     // Jump Input State (Strictly single-press: prevents auto bunny-hop)
     this.jumpRequested = false;
@@ -187,15 +188,16 @@ class CS2Player {
     this.team = team;
     if (team === 'CT') {
       this.inventory[2] = CS2_WEAPONS.usp;
-      this.inventory[4] = CS2_WEAPONS.flashbang;
+      this.inventory[4] = null;
       this.inventory[5] = null;
       this.hasDefuseKit = false;
     } else {
       this.inventory[2] = CS2_WEAPONS.glock;
-      this.inventory[4] = CS2_WEAPONS.flashbang;
+      this.inventory[4] = null;
       this.inventory[5] = CS2_WEAPONS.c4;
       this.hasDefuseKit = false;
     }
+    this.grenades = [];
     this.weaponAmmo = {};
     if (this.inventory[2]) {
       this.weaponAmmo[this.inventory[2].id] = {
@@ -228,23 +230,24 @@ class CS2Player {
     const knuckleMat = new THREE.MeshStandardMaterial({ color: knuckleColor, roughness: 0.35, metalness: 0.4 });
 
     // Creates an articulated tactical arm: forearm, sleeve cuff, glove palm, and knuckle guard
+    // Originates completely off-screen below the viewport bezel, eliminating floating gaps
     const createTacticalArm = (pStart, pGrip, isLeft = false) => {
       const armGroup = new THREE.Group();
       const v = new THREE.Vector3().subVectors(pGrip, pStart);
       const len = v.length();
       const norm = v.clone().normalize();
 
-      // Forearm Sleeve
-      const sleeveGeo = new THREE.CylinderGeometry(0.044, 0.052, len * 0.76, 12);
+      // Full Forearm Sleeve flaring toward shoulder, originating below screen bezel
+      const sleeveGeo = new THREE.CylinderGeometry(0.046, 0.082, len * 0.96, 12);
       const sleeve = new THREE.Mesh(sleeveGeo, sleeveMat);
-      sleeve.position.copy(pStart).addScaledVector(norm, len * 0.38);
+      sleeve.position.copy(pStart).addScaledVector(norm, len * 0.48);
       sleeve.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), norm);
       armGroup.add(sleeve);
 
       // Wrinkled Sleeve Cuff
-      const cuffGeo = new THREE.CylinderGeometry(0.048, 0.048, 0.035, 12);
+      const cuffGeo = new THREE.CylinderGeometry(0.050, 0.050, 0.040, 12);
       const cuff = new THREE.Mesh(cuffGeo, gloveMat);
-      cuff.position.copy(pStart).addScaledVector(norm, len * 0.74);
+      cuff.position.copy(pStart).addScaledVector(norm, len * 0.90);
       cuff.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), norm);
       armGroup.add(cuff);
 
@@ -273,29 +276,29 @@ class CS2Player {
       return armGroup;
     };
 
-    // Right Arm: starts naturally close to bottom-center (x: 0.16) and grips trigger
+    // Right Arm: originates from bottom-right screen edge (behind camera plane, zero visible gap)
     const rStart = (w.id === 'c4')
-      ? new THREE.Vector3(0.14, -0.32, -0.16)
-      : new THREE.Vector3(0.16, -0.32, -0.16);
+      ? new THREE.Vector3(0.24, -0.52, 0.06)
+      : new THREE.Vector3(0.28, -0.52, 0.06);
 
     const rGrip = (w.id === 'knife') 
-      ? new THREE.Vector3(0.14, -0.19, -0.28)
+      ? new THREE.Vector3(0.14, -0.22, -0.26)
       : (w.id === 'c4')
       ? new THREE.Vector3(0.09, -0.21, -0.28)
       : new THREE.Vector3(0.13, -0.18, -0.32);
     group.add(createTacticalArm(rStart, rGrip, false));
 
-    // Left Arm: natural tactical support grip
+    // Left Arm: originates from bottom-left screen edge (zero visible gap)
     if (w.category === 'rifles' || w.id === 'awp' || w.id === 'p90' || w.id === 'xm1014' || w.id === 'famas' || w.id === 'galil' || w.id === 'aug') {
-      const lStart = new THREE.Vector3(-0.06, -0.32, -0.16);
+      const lStart = new THREE.Vector3(-0.25, -0.52, 0.06);
       const lGuard = new THREE.Vector3(0.08, -0.18, -0.44);
       group.add(createTacticalArm(lStart, lGuard, true));
     } else if (w.category === 'pistols') {
-      const lStart = new THREE.Vector3(-0.02, -0.32, -0.16);
+      const lStart = new THREE.Vector3(-0.22, -0.52, 0.06);
       const lCup = new THREE.Vector3(0.10, -0.21, -0.32);
       group.add(createTacticalArm(lStart, lCup, true));
     } else if (w.id === 'c4') {
-      const lStart = new THREE.Vector3(-0.04, -0.32, -0.16);
+      const lStart = new THREE.Vector3(-0.22, -0.52, 0.06);
       const lGrip = new THREE.Vector3(-0.03, -0.21, -0.28);
       group.add(createTacticalArm(lStart, lGrip, true));
     }
@@ -937,40 +940,71 @@ class CS2Player {
 
     this.weaponRig.position.z = -0.42;
 
-    // Raycast hit check & bullet hole creation using pre-allocated reusable raycaster
+    // Raycast hit check & bullet penetration calculation
     this.camera.getWorldDirection(this.shootCamDir);
     this.shootRaycaster.set(this.camera.position, this.shootCamDir);
 
-    // Hit players with authentic headshot/body multiplier & hit sound
+    // Wall & Obstacle Penetration Check (Hard walls block completely; only wooden objects/doors allow penetration)
+    let wallObstacles = [];
+    if (this.map && this.map.groundMeshes && this.map.groundMeshes.length > 0) {
+      wallObstacles = this.shootRaycaster.intersectObjects(this.map.groundMeshes, false);
+      if (wallObstacles.length > 0 && wallObstacles[0].distance < 80) {
+        this.spawnBulletHole(wallObstacles[0].point, wallObstacles[0].face.normal);
+      }
+    }
+
+    // Hit players with authentic headshot/body multiplier, hit sound, and strict penetration rules
     if (gameManager && gameManager.net) {
       Object.entries(gameManager.net.remotePlayers).forEach(([id, p]) => {
         if (p.team === this.team) return;
         if (!p.mesh || !p.mesh.visible) return;
-        const intersects = this.shootRaycaster.intersectObject(p.mesh, true);
-        if (intersects.length > 0 && intersects[0].distance < 120) {
-          const hitPoint = intersects[0].point;
-          const relY = hitPoint.y - p.mesh.position.y;
-          const isHeadshot = relY >= 1.45;
-          const dmgMult = isHeadshot ? 2.5 : 1.0;
-          const finalDamage = Math.round(this.activeWeapon.damage * dmgMult);
+        const playerHits = this.shootRaycaster.intersectObject(p.mesh, true);
+        if (playerHits.length > 0 && playerHits[0].distance < 120) {
+          const playerDist = playerHits[0].distance;
+          let canHit = true;
+          let penetrationPenalty = 1.0;
 
-          if (isHeadshot) {
-            window.csAudio.playHeadshotDink();
-          } else {
-            window.csAudio.playSound('damage1');
+          // Check for intervening walls between shooter and player
+          if (wallObstacles.length > 0) {
+            const intervening = wallObstacles.filter(w => w.distance < playerDist);
+            if (intervening.length > 0) {
+              const firstDist = intervening[0].distance;
+              const lastDist = intervening[intervening.length - 1].distance;
+              const wallThickness = lastDist - firstDist;
+
+              // CS2 Authentic Wallbang:
+              // Only thin wooden obstacles (crates, doors where thickness <= 1.35m) can be penetrated
+              // Hard concrete/stone walls or thick structures completely absorb bullets
+              const hasPen = (this.activeWeapon.armorPen && this.activeWeapon.armorPen >= 0.65) ||
+                             (this.activeWeapon.category === 'rifles' || this.activeWeapon.id === 'awp' || this.activeWeapon.id === 'deagle');
+
+              if (hasPen && wallThickness <= 1.35 && intervening.length <= 2) {
+                // Wooden penetration: allowed with 50% damage reduction
+                penetrationPenalty = 0.50;
+              } else {
+                // Hard stone/concrete wall or excessive thickness: bullet is completely blocked
+                canHit = false;
+              }
+            }
           }
 
-          gameManager.net.sendDamage(id, finalDamage, this.activeWeapon.name, isHeadshot);
+          if (canHit) {
+            const hitPoint = playerHits[0].point;
+            const relY = hitPoint.y - p.mesh.position.y;
+            const isHeadshot = relY >= 1.60;
+            const dmgMult = (isHeadshot ? 2.5 : 1.0) * penetrationPenalty;
+            const finalDamage = Math.max(1, Math.round(this.activeWeapon.damage * dmgMult));
+
+            if (isHeadshot) {
+              window.csAudio.playHeadshotDink();
+            } else {
+              window.csAudio.playSound('damage1');
+            }
+
+            gameManager.net.sendDamage(id, finalDamage, this.activeWeapon.name, isHeadshot);
+          }
         }
       });
-    }
-
-    // Bullet hole impact on map obstacles (fast AABB check on groundMeshes)
-    if (this.map && this.map.groundMeshes && this.map.groundMeshes.length > 0) {
-      const wallHits = this.shootRaycaster.intersectObjects(this.map.groundMeshes, false);
-      if (wallHits.length > 0 && wallHits[0].distance < 80) {
-        this.spawnBulletHole(wallHits[0].point, wallHits[0].face.normal);
-      }
     }
   }
 
@@ -1051,12 +1085,25 @@ class CS2Player {
       g.mesh.position.addScaledVector(g.velocity, dt);
       g.lifetime -= dt;
 
-      if (g.mesh.position.y <= 0.1) {
-        g.mesh.position.y = 0.1;
+      // Real 3D Terrain Collision: raycast downward from grenade to find true ground height
+      let groundY = (this.lastGroundY !== undefined) ? this.lastGroundY : -5.8;
+      if (this.map && this.map.groundMeshes && this.map.groundMeshes.length > 0) {
+        this.downOrigin.set(g.mesh.position.x, g.mesh.position.y + 0.6, g.mesh.position.z);
+        this.downRaycaster.set(this.downOrigin, this.downDir);
+        this.downRaycaster.far = 25.0;
+        const gHits = this.downRaycaster.intersectObjects(this.map.groundMeshes, false);
+        if (gHits.length > 0) {
+          groundY = gHits[0].point.y;
+        }
+      }
+
+      // Bounce on actual terrain floor
+      if (g.mesh.position.y <= groundY + 0.12) {
+        g.mesh.position.y = groundY + 0.12;
         g.velocity.y = -g.velocity.y * 0.35;
         g.velocity.x *= 0.65;
         g.velocity.z *= 0.65;
-        if (g.type === 'molotov') g.lifetime = 0;
+        if (g.type === 'molotov') g.lifetime = 0; // Molotov bursts immediately upon touching ground
       }
 
       if (g.lifetime <= 0) {
@@ -1130,53 +1177,38 @@ class CS2Player {
         } else if (g.type === 'smokegrenade') {
           window.csAudio.playSmokeEmit();
 
-          // Authentic CS2 Large Volumetric Smoke Cloud (5.5m Radius / 11m Diameter)
-          // Uses depthWrite: false to completely eliminate transparency sorting lag
-          const smokeGroup = new THREE.Group();
-          smokeGroup.position.copy(pos);
-
-          const coreGeo = new THREE.SphereGeometry(3.6, 10, 10);
-          const coreMat = new THREE.MeshLambertMaterial({
-            color: 0xd6d9de,
+          // High-Performance CS2 Volumetric Smoke (Zero Multi-Mesh Overdraw Lag)
+          // 1 Single Optimized 5.2m Sphere with soft depthWrite: false
+          const smokeGeo = new THREE.SphereGeometry(5.2, 16, 16);
+          const smokeMat = new THREE.MeshLambertMaterial({
+            color: 0xc8ccd2,
             transparent: true,
-            opacity: 0.75,
+            opacity: 0.90,
             depthWrite: false
           });
-          const coreMesh = new THREE.Mesh(coreGeo, coreMat);
-          coreMesh.position.y = 1.6;
-          smokeGroup.add(coreMesh);
+          const smokeMesh = new THREE.Mesh(smokeGeo, smokeMat);
+          smokeMesh.position.set(pos.x, pos.y + 1.8, pos.z);
+          smokeMesh.scale.set(0.1, 0.1, 0.1);
+          this.scene.add(smokeMesh);
 
-          // Billowing outer lobes
-          for (let s = 0; s < 10; s++) {
-            const ang = (s / 10) * Math.PI * 2;
-            const r = 2.4 + Math.random() * 1.6;
-            const lobeGeo = new THREE.SphereGeometry(2.2 + Math.random() * 0.6, 8, 8);
-            const lobeMat = new THREE.MeshLambertMaterial({
-              color: 0xcfd3d8,
-              transparent: true,
-              opacity: 0.65,
-              depthWrite: false
-            });
-            const lobe = new THREE.Mesh(lobeGeo, lobeMat);
-            lobe.position.set(Math.cos(ang) * r, 1.2 + Math.random() * 1.5, Math.sin(ang) * r);
-            smokeGroup.add(lobe);
-          }
-
-          // Initial scale expansion over 0.55s
-          smokeGroup.scale.set(0.15, 0.15, 0.15);
-          this.scene.add(smokeGroup);
-
+          // Fast smooth expansion
           const expandStart = performance.now();
-          const expandInterval = setInterval(() => {
-            const t = Math.min(1.0, (performance.now() - expandStart) / 550);
-            const scale = 0.15 + (1.0 - 0.15) * Math.sin(t * Math.PI * 0.5);
-            smokeGroup.scale.set(scale, scale, scale);
-            if (t >= 1.0) clearInterval(expandInterval);
-          }, 16);
+          const expandTimer = setInterval(() => {
+            const elapsed = (performance.now() - expandStart) / 450;
+            if (elapsed >= 1.0) {
+              smokeMesh.scale.set(1.0, 1.0, 1.0);
+              clearInterval(expandTimer);
+            } else {
+              const s = 0.1 + 0.9 * Math.sin(elapsed * Math.PI * 0.5);
+              smokeMesh.scale.set(s, s, s);
+            }
+          }, 32);
 
           setTimeout(() => {
             window.csAudio.playSmokeClear();
-            this.scene.remove(smokeGroup);
+            this.scene.remove(smokeMesh);
+            smokeGeo.dispose();
+            smokeMat.dispose();
           }, 18000);
         } else if (g.type === 'molotov') {
           window.csAudio.playMolotovDetonate();
@@ -1257,7 +1289,7 @@ class CS2Player {
   respawn(spawnPos) {
     this.exitSpectatorMode();
     const defaultX = this.team === 'CT' ? -5.0 : -65.0;
-    const defaultY = this.team === 'CT' ? -4.0 : 7.6;
+    const defaultY = this.team === 'CT' ? -3.8 : 7.8;
     const defaultZ = this.team === 'CT' ? -98.0 : 35.0;
     const defaultYaw = this.team === 'CT' ? Math.PI : 0;
 
@@ -1350,15 +1382,17 @@ class CS2Player {
     }
 
     // Authentic CS2 Movement Speeds (Knife provides run-boost)
-    let baseSpeed = 7.2;
+    let baseSpeed = 7.0;
     if (this.activeWeapon) {
-      if (this.activeWeapon.id === 'knife') baseSpeed = 9.2; // CS2 250 units/s Knife Boost
-      else if (this.activeWeapon.category === 'pistols') baseSpeed = 8.2; // 240 units/s
-      else if (this.activeWeapon.id === 'awp') baseSpeed = 6.2; // 200 units/s
-      else baseSpeed = 7.2; // 215 units/s Rifles
+      if (this.activeWeapon.id === 'knife') baseSpeed = 8.2; // CS2 250 units/s Knife Boost
+      else if (this.activeWeapon.category === 'pistols') baseSpeed = 7.5; // 240 units/s
+      else if (this.activeWeapon.id === 'awp') baseSpeed = 5.8; // 200 units/s
+      else baseSpeed = 6.8; // 215 units/s Rifles
     }
 
-    const moveSpeed = (this.isCrouched ? 2.5 : this.keys[this.keybinds.walk] ? 3.5 : baseSpeed) * (this.isScoped ? 0.6 : 1.0);
+    // Mid-air speed dampening prevents sprint-jumping from going unrealistically fast
+    const airMult = !this.isGrounded ? 0.82 : 1.0;
+    const moveSpeed = (this.isCrouched ? 2.4 : this.keys[this.keybinds.walk] ? 3.4 : baseSpeed) * (this.isScoped ? 0.6 : 1.0) * airMult;
     const forward = new THREE.Vector3(-Math.sin(this.yaw), 0, -Math.cos(this.yaw));
     const right = new THREE.Vector3(Math.cos(this.yaw), 0, -Math.sin(this.yaw));
 
@@ -1399,8 +1433,8 @@ class CS2Player {
     // Discrete Jump (Single press required, no auto bunny-hop)
     if (this.jumpRequested && this.isGrounded && !inFreeze) {
       this.jumpRequested = false;
-      // Crouch-jump (duck-jump) boost to easily clear Dust 2 crates
-      const jumpImpulse = this.isCrouched ? 7.8 : 7.4;
+      // Crouch-jump (duck-jump) boost to easily clear and land on Dust 2 crates
+      const jumpImpulse = this.isCrouched ? 8.6 : 8.0;
       this.velocity.y = jumpImpulse;
       this.isGrounded = false;
     }
@@ -1408,7 +1442,7 @@ class CS2Player {
     this.velocity.y -= 18.0 * dt;
 
     this.isCrouched = !!this.keys[this.keybinds.crouch];
-    const targetHeight = this.isCrouched ? 1.0 : 1.8;
+    const targetHeight = this.isCrouched ? 1.15 : 2.0; // +20cm player eye height
     this.playerHeight += (targetHeight - this.playerHeight) * 0.2;
 
     const oldX = this.position.x;
@@ -1417,19 +1451,29 @@ class CS2Player {
     const colliders = this.map.colliders;
 
     // Multi-Axis Impenetrable Collision Resolution:
-    // Helper: test horizontal feeler ray against 3D map mesh to detect solid walls & crates
+    // Helper: test feeler rays with lateral offsets at waist and knee levels to stop corner clipping
     const checkMeshWall = (dirX, dirZ, dist) => {
       if (!this.map || !this.map.groundMeshes || this.map.groundMeshes.length === 0) return false;
       this.wallDir.set(dirX, 0, dirZ).normalize();
-      const testY = this.position.y - this.playerHeight * 0.45;
-      this.wallOrigin.set(oldX, testY, oldZ);
-      this.wallRaycaster.set(this.wallOrigin, this.wallDir);
-      this.wallRaycaster.far = dist;
-      const hits = this.wallRaycaster.intersectObjects(this.map.groundMeshes, false);
-      const maxStepHeight = (this.isCrouched && !this.isGrounded) ? 1.55 : 0.65;
-      for (let i = 0; i < hits.length; i++) {
-        if (hits[i].point.y > (this.lastGroundY + maxStepHeight)) {
-          return true;
+      const perpX = -dirZ;
+      const perpZ = dirX;
+      const lateralOffsets = [0, 0.40, -0.40];
+      const yOffsets = [
+        this.position.y - this.playerHeight * 0.35,
+        this.position.y - this.playerHeight * 0.70
+      ];
+      const maxStepHeight = (this.isCrouched && !this.isGrounded) ? 1.85 : 0.75;
+      for (const yOff of yOffsets) {
+        for (const lOff of lateralOffsets) {
+          this.wallOrigin.set(oldX + perpX * lOff, yOff, oldZ + perpZ * lOff);
+          this.wallRaycaster.set(this.wallOrigin, this.wallDir);
+          this.wallRaycaster.far = dist;
+          const hits = this.wallRaycaster.intersectObjects(this.map.groundMeshes, false);
+          for (let i = 0; i < hits.length; i++) {
+            if (hits[i].point.y > (this.lastGroundY + maxStepHeight)) {
+              return true;
+            }
+          }
         }
       }
       return false;
