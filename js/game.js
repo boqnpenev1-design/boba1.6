@@ -91,42 +91,88 @@ class CS2GameManager {
     this.createC4Prop();
   }
 
-  // Highly visible 3D C4 Prop with flashing red/white beacon light
+  // Highly visible 3D C4 Prop with authentic CS digital display & flashing beacon light
   createC4Prop() {
     const group = new THREE.Group();
 
-    // Main Explosive Pack
-    const packGeo = new THREE.BoxGeometry(0.5, 0.22, 0.35);
-    const packMat = new THREE.MeshLambertMaterial({ color: 0x9a6835 });
+    // Canvas Texture for Authentic C4 Keypad & LCD Screen ("7355608")
+    const canvas = document.createElement('canvas');
+    canvas.width = 256;
+    canvas.height = 256;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#1c1f24';
+    ctx.fillRect(0, 0, 256, 256);
+
+    // LCD screen
+    ctx.fillStyle = '#0a0d0a';
+    ctx.fillRect(15, 15, 226, 70);
+    ctx.strokeStyle = '#333a42';
+    ctx.lineWidth = 4;
+    ctx.strokeRect(15, 15, 226, 70);
+
+    ctx.fillStyle = '#ff2222';
+    ctx.font = 'bold 36px monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('7355608', 128, 50);
+
+    // Keypad grid
+    ctx.fillStyle = '#2a2e36';
+    for (let r = 0; r < 4; r++) {
+      for (let c = 0; c < 3; c++) {
+        ctx.fillRect(35 + c * 68, 100 + r * 35, 52, 28);
+        ctx.fillStyle = '#dddddd';
+        ctx.font = 'bold 16px sans-serif';
+        const num = (r === 3 && c === 1) ? '0' : String(r * 3 + c + 1);
+        ctx.fillText(num, 35 + c * 68 + 26, 100 + r * 35 + 14);
+        ctx.fillStyle = '#2a2e36';
+      }
+    }
+    const c4FaceTex = new THREE.CanvasTexture(canvas);
+
+    // Main Explosive Pack (Dual C4 Bricks)
+    const packGeo = new THREE.BoxGeometry(0.52, 0.22, 0.36);
+    const packMat = new THREE.MeshLambertMaterial({ color: 0x8a704e });
     const pack = new THREE.Mesh(packGeo, packMat);
+    pack.position.y = 0.11;
     group.add(pack);
 
-    // Electronics & Keypad
-    const padGeo = new THREE.BoxGeometry(0.25, 0.06, 0.2);
-    const padMat = new THREE.MeshLambertMaterial({ color: 0x1a1a1a });
+    // Silver Mounting Frame & Duct Tape
+    const tapeGeo = new THREE.BoxGeometry(0.54, 0.08, 0.12);
+    const tapeMat = new THREE.MeshLambertMaterial({ color: 0x7c8088 });
+    const tape = new THREE.Mesh(tapeGeo, tapeMat);
+    tape.position.set(0, 0.18, -0.08);
+    group.add(tape);
+
+    // Keypad Faceplate with LCD Screen
+    const padGeo = new THREE.BoxGeometry(0.26, 0.04, 0.24);
+    const padMat = new THREE.MeshStandardMaterial({ map: c4FaceTex, roughness: 0.4 });
     const pad = new THREE.Mesh(padGeo, padMat);
-    pad.position.y = 0.13;
+    pad.position.set(0, 0.23, 0.04);
     group.add(pad);
 
-    // Official CS2 C4 3D GLB Model
-    if (typeof THREE.GLTFLoader !== 'undefined') {
-      const loader = new THREE.GLTFLoader();
-      loader.load('source/C4.glb', (gltf) => {
-        const c4Model = gltf.scene;
-        c4Model.scale.set(0.9, 0.9, 0.9);
-        c4Model.position.set(0, 0.05, 0);
-        pack.visible = false;
-        pad.visible = false;
-        group.add(c4Model);
-      }, undefined, () => {});
-    }
+    // Detonator Wires (Red & Yellow)
+    const wireMatR = new THREE.MeshBasicMaterial({ color: 0xee2222 });
+    const wireMatY = new THREE.MeshBasicMaterial({ color: 0xeebb22 });
+    const wireR = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.24, 6), wireMatR);
+    wireR.position.set(-0.16, 0.22, 0.02);
+    wireR.rotation.z = Math.PI / 3;
+    group.add(wireR);
+    const wireY = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.24, 6), wireMatY);
+    wireY.position.set(-0.14, 0.22, 0.06);
+    wireY.rotation.z = Math.PI / 3.2;
+    group.add(wireY);
 
-    // Highly Visible Blinking LED Indicator
-    const ledGeo = new THREE.SphereGeometry(0.06, 8, 8);
+    // Highly Visible Blinking LED Indicator & Point Light
+    const ledGeo = new THREE.SphereGeometry(0.045, 8, 8);
     this.c4LedMat = new THREE.MeshBasicMaterial({ color: 0xff0000 });
     const led = new THREE.Mesh(ledGeo, this.c4LedMat);
-    led.position.set(0.12, 0.22, 0.08);
+    led.position.set(0.10, 0.26, -0.06);
     group.add(led);
+
+    this.c4Light = new THREE.PointLight(0xff0000, 0, 10);
+    this.c4Light.position.set(0.10, 0.35, -0.06);
+    group.add(this.c4Light);
 
     this.c4Mesh = group;
     this.c4Mesh.visible = false;
@@ -154,6 +200,7 @@ class CS2GameManager {
 
   chooseTeam(team) {
     this.selectedTeam = team;
+    this.playerInMatch = true;
     this.player.setTeam(team);
 
     document.getElementById('team-select-screen').classList.add('hidden');
@@ -431,7 +478,12 @@ class CS2GameManager {
           progressTrack.classList.remove('hidden');
           progressTitle.innerText = `ARMING C4 ON SITE ${inSite}...`;
           progressFill.style.width = `${Math.min(100, this.player.plantProgress * 100)}%`;
-          window.csAudio.playC4CodeBeep();
+
+          const nowMs = performance.now();
+          if (nowMs - (this.lastPlantBeepTime || 0) > 340) {
+            this.lastPlantBeepTime = nowMs;
+            window.csAudio.playC4CodeBeep();
+          }
 
           if (this.player.plantProgress >= 1.0) {
             this.player.isPlanting = false;
@@ -476,7 +528,11 @@ class CS2GameManager {
           progressTitle.innerText = 'DEFUSING EXPLOSIVE...';
           progressFill.style.width = `${Math.min(100, this.player.defuseProgress * 100)}%`;
 
-          if (Math.random() < 0.2) window.csAudio.playDefuseKitSnip();
+          const nowMs = performance.now();
+          if (nowMs - (this.lastDefuseAudioTime || 0) > 800) {
+            this.lastDefuseAudioTime = nowMs;
+            window.csAudio.playDefuseKitSnip();
+          }
 
           if (this.player.defuseProgress >= 1.0) {
             this.player.isDefusing = false;
@@ -708,9 +764,11 @@ class CS2GameManager {
           window.csAudio.playC4Beep(urgency);
 
           if (this.c4LedMat) this.c4LedMat.color.set(0xffffff);
+          if (this.c4Light) this.c4Light.intensity = 3.5;
           setTimeout(() => {
             if (this.c4LedMat) this.c4LedMat.color.set(0xff0000);
-          }, 60);
+            if (this.c4Light) this.c4Light.intensity = 0;
+          }, 70);
         }
 
         if (this.c4Timer <= 0) {

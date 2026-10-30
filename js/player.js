@@ -1,6 +1,7 @@
 // CS2 First-Person Player Controller:
-// Tactical Viewmodel Arms/Hands, Reload Animations, Bullet Holes, Authentic Knife Run-Speed,
-// Freezetime Movement/Shoot Lock, Fixed Site Platform Jumping, Grenades (4) & C4 (5)
+// Real Weapon Textures, Articulated Tactical Viewmodel Arms/Hands, Recoil Spray Patterns,
+// Discrete Space Jump (No Auto-Bhop), Crate Duck-Jumping, Counter-Strafing,
+// Optimized AABB Feeler Raycasts, Volumetric Smoke, HE Grenade Shockwave, and Smooth Spectator Chase Cam
 
 class CS2Player {
   constructor(camera, scene, mapBuilder) {
@@ -25,6 +26,7 @@ class CS2Player {
       5: null
     };
     this.grenades = [CS2_WEAPONS.flashbang, CS2_WEAPONS.hegrenade, CS2_WEAPONS.smokegrenade];
+    this.grenadeIndex = 0;
     this.activeSlot = 2;
     this.activeWeapon = CS2_WEAPONS.usp;
 
@@ -50,16 +52,45 @@ class CS2Player {
     this.isScoped = false;
     this.playerHeight = 1.8;
 
+    // Jump Input State (Strictly single-press: prevents auto bunny-hop)
+    this.jumpRequested = false;
+    this.spaceHeld = false;
+
     // Spectator Mode
     this.isSpectating = false;
     this.spectatorIndex = 0;
     this.spectatedTarget = null;
 
-    // Active Bullet Decals
-    this.bulletDecals = [];
-
     // Active Thrown Grenades
     this.activeGrenades = [];
+
+    // Weapon Texture Cache (Pre-loaded to eliminate hitching and runtime allocations)
+    this.weaponTextureCache = {};
+    this.initWeaponTextures();
+
+    // Reusable Shooting & Raycasting Resources (144+ FPS optimization)
+    this.shootRaycaster = new THREE.Raycaster();
+    this.shootCamDir = new THREE.Vector3();
+    this.knifeRay = new THREE.Raycaster();
+    this.knifeDir = new THREE.Vector3();
+    this.wallRaycaster = new THREE.Raycaster();
+    this.wallOrigin = new THREE.Vector3();
+    this.wallDir = new THREE.Vector3();
+    this.downRaycaster = new THREE.Raycaster();
+    this.downOrigin = new THREE.Vector3();
+    this.downDir = new THREE.Vector3(0, -1, 0);
+
+    // Pre-allocated Decal Pool for Bullet Holes (Zero per-shot GC pressure)
+    this.bulletHoleGeo = new THREE.CircleGeometry(0.055, 8);
+    this.bulletHoleMat = new THREE.MeshBasicMaterial({ color: 0x181818, side: THREE.DoubleSide, depthWrite: false });
+    this.bulletHolePool = [];
+    this.bulletHolePoolIndex = 0;
+    for (let i = 0; i < 28; i++) {
+      const mesh = new THREE.Mesh(this.bulletHoleGeo, this.bulletHoleMat);
+      mesh.visible = false;
+      this.scene.add(mesh);
+      this.bulletHolePool.push(mesh);
+    }
 
     // Input States
     this.keys = {};
@@ -85,6 +116,8 @@ class CS2Player {
     };
 
     this.lastShotTime = 0;
+    this.isShooting = false;
+    this.sprayCount = 0;
     this.isReloading = false;
     this.reloadStartTime = 0;
     this.isPlanting = false;
@@ -106,20 +139,48 @@ class CS2Player {
 
     // Muzzle Flash
     this.muzzleLight = new THREE.PointLight(0xffaa33, 0, 8);
-    this.muzzleLight.position.set(0.25, -0.19, -0.95);
-    const flashGeo = new THREE.SphereGeometry(0.06, 8, 8);
+    this.muzzleLight.position.set(0.18, -0.16, -0.85);
+    const flashGeo = new THREE.SphereGeometry(0.065, 8, 8);
     const flashMat = new THREE.MeshBasicMaterial({ color: 0xffdd66 });
     this.muzzleFlashMesh = new THREE.Mesh(flashGeo, flashMat);
-    this.muzzleFlashMesh.position.set(0.25, -0.19, -0.95);
+    this.muzzleFlashMesh.position.set(0.18, -0.16, -0.85);
     this.muzzleFlashMesh.visible = false;
     this.viewmodelGroup.add(this.muzzleLight);
     this.viewmodelGroup.add(this.muzzleFlashMesh);
 
-    this.gltfLoader = typeof THREE.GLTFLoader !== 'undefined' ? new THREE.GLTFLoader() : null;
-    this.loadedModels = {};
-
     this.initControls();
     this.buildCurrentWeaponModel();
+  }
+
+  // Pre-caches all weapon textures from textures/ directory
+  initWeaponTextures() {
+    const texFiles = [
+      'w_rif_ak47.png', 'w_rif_m4a1.png', 'w_snip_awp.png', 'w_pist_glock18.png',
+      'w_pist_usp.png', 'w_pist_deagle.png', 'w_knife_t.png', 'w_eq_smokegrenade.png',
+      'w_eq_fraggrenade.png', 'w_eq_flashbang.png', 'w_rif_famas.png', 'w_rif_galil.png',
+      'w_smg_mp5.png', 'w_smg_p90.png', 'w_shot_xm1014.png', 'w_rif_aug.png',
+      'w_snip_scout.png', 'w_mach_m249.png', 'w_smg_mac10.png', 'w_smg_ump45.png'
+    ];
+    const loader = new THREE.TextureLoader();
+    for (const f of texFiles) {
+      loader.load('textures/' + f, (tex) => {
+        tex.wrapS = THREE.RepeatWrapping;
+        tex.wrapT = THREE.RepeatWrapping;
+        this.weaponTextureCache[f] = tex;
+      }, undefined, () => {});
+    }
+  }
+
+  getWeaponTexture(filename) {
+    if (this.weaponTextureCache[filename]) {
+      return this.weaponTextureCache[filename];
+    }
+    const loader = new THREE.TextureLoader();
+    const tex = loader.load('textures/' + filename);
+    tex.wrapS = THREE.RepeatWrapping;
+    tex.wrapT = THREE.RepeatWrapping;
+    this.weaponTextureCache[filename] = tex;
+    return tex;
   }
 
   setTeam(team) {
@@ -145,7 +206,7 @@ class CS2Player {
     this.switchSlot(2);
   }
 
-  // Builds 3D weapon models with realistic tactical arms, hands, GLB models and authentic CS textures
+  // Builds realistic tactical viewmodel arms, hands and 100% textured 3D weapon models
   buildCurrentWeaponModel() {
     while (this.weaponRig.children.length > 0) {
       this.weaponRig.remove(this.weaponRig.children[0]);
@@ -156,268 +217,403 @@ class CS2Player {
 
     const group = new THREE.Group();
 
-    // 1. Tactical Operator Sleeves & Gloves
-    const sleeveColor = this.team === 'CT' ? 0x22354c : 0x5a4836;
-    const gloveColor = 0x16191f;
-    const sleeveMat = new THREE.MeshLambertMaterial({ color: sleeveColor });
-    const gloveMat = new THREE.MeshLambertMaterial({ color: gloveColor });
+    // 1. Tactical Operator Sleeves & Gloves (Proportioned to eliminate gap to body)
+    const isCT = (this.team === 'CT');
+    const sleeveColor = isCT ? 0x243548 : 0x584836; // CT SAS Navy vs T Phoenix Desert Khaki
+    const gloveColor = 0x16181c;
+    const knuckleColor = 0x2a2e36;
 
-    const createTacticalArm = (p1, p2) => {
+    const sleeveMat = new THREE.MeshStandardMaterial({ color: sleeveColor, roughness: 0.85, metalness: 0.05 });
+    const gloveMat = new THREE.MeshStandardMaterial({ color: gloveColor, roughness: 0.5, metalness: 0.2 });
+    const knuckleMat = new THREE.MeshStandardMaterial({ color: knuckleColor, roughness: 0.35, metalness: 0.4 });
+
+    // Creates an articulated tactical arm: forearm, sleeve cuff, glove palm, and knuckle guard
+    const createTacticalArm = (pStart, pGrip, isLeft = false) => {
       const armGroup = new THREE.Group();
-      const v = new THREE.Vector3().subVectors(p2, p1);
+      const v = new THREE.Vector3().subVectors(pGrip, pStart);
       const len = v.length();
-      const mid = new THREE.Vector3().addVectors(p1, p2).multiplyScalar(0.5);
       const norm = v.clone().normalize();
 
-      // Forearm sleeve originating from offscreen edge
-      const sleeveGeo = new THREE.CylinderGeometry(0.045, 0.052, len * 0.78, 12);
+      // Forearm Sleeve
+      const sleeveGeo = new THREE.CylinderGeometry(0.044, 0.052, len * 0.76, 12);
       const sleeve = new THREE.Mesh(sleeveGeo, sleeveMat);
-      sleeve.position.copy(p1).addScaledVector(norm, len * 0.39);
+      sleeve.position.copy(pStart).addScaledVector(norm, len * 0.38);
       sleeve.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), norm);
       armGroup.add(sleeve);
 
-      // Wrist cuff
-      const cuffGeo = new THREE.CylinderGeometry(0.048, 0.048, 0.04, 12);
+      // Wrinkled Sleeve Cuff
+      const cuffGeo = new THREE.CylinderGeometry(0.048, 0.048, 0.035, 12);
       const cuff = new THREE.Mesh(cuffGeo, gloveMat);
-      cuff.position.copy(p1).addScaledVector(norm, len * 0.76);
+      cuff.position.copy(pStart).addScaledVector(norm, len * 0.74);
       cuff.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), norm);
       armGroup.add(cuff);
 
-      // Tactical Glove Palm & Knuckle Guard
-      const handGeo = new THREE.BoxGeometry(0.065, 0.05, 0.08);
-      const hand = new THREE.Mesh(handGeo, gloveMat);
-      hand.position.copy(p2);
-      hand.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, -1), norm);
-      armGroup.add(hand);
+      // Tactical Combat Glove Palm
+      const palmGeo = new THREE.BoxGeometry(0.058, 0.045, 0.075);
+      const palm = new THREE.Mesh(palmGeo, gloveMat);
+      palm.position.copy(pGrip);
+      palm.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, -1), norm);
+      armGroup.add(palm);
+
+      // Carbon Knuckle Guard
+      const knuckGeo = new THREE.BoxGeometry(0.052, 0.014, 0.038);
+      const knuck = new THREE.Mesh(knuckGeo, knuckleMat);
+      knuck.position.set(0, 0.024, 0.005);
+      palm.add(knuck);
+
+      // Wrapped Fingers holding the grip
+      const fingerGeo = new THREE.CylinderGeometry(0.011, 0.010, 0.052, 8);
+      for (let f = 0; f < 3; f++) {
+        const finger = new THREE.Mesh(fingerGeo, gloveMat);
+        finger.rotation.z = Math.PI / 2;
+        finger.position.set(isLeft ? 0.026 : -0.026, -0.012 + f * 0.014, -0.022);
+        palm.add(finger);
+      }
 
       return armGroup;
     };
 
-    // Right Arm & Glove (Grips weapon from bottom-right corner)
-    const rStart = new THREE.Vector3(0.36, -0.48, -0.12);
-    let rGrip = (w.id === 'knife') 
-      ? new THREE.Vector3(0.20, -0.26, -0.30)
-      : new THREE.Vector3(0.20, -0.22, -0.38);
-    if (w.id === 'c4') {
-      rGrip = new THREE.Vector3(0.12, -0.25, -0.28);
-    }
-    group.add(createTacticalArm(rStart, rGrip));
+    // Right Arm: starts naturally close to bottom-center (x: 0.16) and grips trigger
+    const rStart = (w.id === 'c4')
+      ? new THREE.Vector3(0.14, -0.32, -0.16)
+      : new THREE.Vector3(0.16, -0.32, -0.16);
 
-    // Left Arm & Glove (Support arm for rifles/two-handed/C4)
-    if (w.category === 'rifles' || w.id === 'awp' || w.id === 'p90' || w.id === 'xm1014') {
-      const lStart = new THREE.Vector3(-0.32, -0.48, -0.16);
-      const lGuard = new THREE.Vector3(0.12, -0.22, -0.56);
-      group.add(createTacticalArm(lStart, lGuard));
+    const rGrip = (w.id === 'knife') 
+      ? new THREE.Vector3(0.14, -0.19, -0.28)
+      : (w.id === 'c4')
+      ? new THREE.Vector3(0.09, -0.21, -0.28)
+      : new THREE.Vector3(0.13, -0.18, -0.32);
+    group.add(createTacticalArm(rStart, rGrip, false));
+
+    // Left Arm: natural tactical support grip
+    if (w.category === 'rifles' || w.id === 'awp' || w.id === 'p90' || w.id === 'xm1014' || w.id === 'famas' || w.id === 'galil' || w.id === 'aug') {
+      const lStart = new THREE.Vector3(-0.06, -0.32, -0.16);
+      const lGuard = new THREE.Vector3(0.08, -0.18, -0.44);
+      group.add(createTacticalArm(lStart, lGuard, true));
     } else if (w.category === 'pistols') {
-      // Support hand cup for tactical pistol stance
-      const lStart = new THREE.Vector3(-0.24, -0.48, -0.16);
-      const lCup = new THREE.Vector3(0.17, -0.26, -0.38);
-      group.add(createTacticalArm(lStart, lCup));
+      const lStart = new THREE.Vector3(-0.02, -0.32, -0.16);
+      const lCup = new THREE.Vector3(0.10, -0.21, -0.32);
+      group.add(createTacticalArm(lStart, lCup, true));
     } else if (w.id === 'c4') {
-      // Authentic dual-handed C4 chest carry
-      const lStart = new THREE.Vector3(-0.32, -0.48, -0.12);
-      const lGrip = new THREE.Vector3(-0.08, -0.25, -0.28);
-      group.add(createTacticalArm(lStart, lGrip));
+      const lStart = new THREE.Vector3(-0.04, -0.32, -0.16);
+      const lGrip = new THREE.Vector3(-0.03, -0.21, -0.28);
+      group.add(createTacticalArm(lStart, lGrip, true));
     }
 
-    // 2. Weapon 3D Model: Use official GLB models if available
-    const glbMap = {
-      ak47: 'source/AK47.glb',
-      m4a1: 'source/M4A1.glb',
-      m4a1s: 'source/M4A1.glb',
-      m4a4: 'source/M4A4.glb',
-      awp: 'source/AWP.glb',
-      deagle: 'source/DEAGLE.glb',
-      usp: 'source/USPS.glb',
-      c4: 'source/C4.glb'
-    };
-
-    if (glbMap[w.id] && this.gltfLoader) {
-      if (this.loadedModels[w.id]) {
-        const weaponMesh = this.loadedModels[w.id].clone();
-        this.positionWeaponModel(w.id, weaponMesh);
-        group.add(weaponMesh);
-      } else {
-        this.gltfLoader.load(glbMap[w.id], (gltf) => {
-          this.loadedModels[w.id] = gltf.scene;
-          const weaponMesh = gltf.scene.clone();
-          this.positionWeaponModel(w.id, weaponMesh);
-          group.add(weaponMesh);
-        }, undefined, () => {
-          this.buildTexturedWeaponFallback(w, group);
-        });
-      }
-    } else {
-      this.buildTexturedWeaponFallback(w, group);
-    }
+    // 2. Build 100% Textured 3D Weapon Model using textures/ PNGs
+    this.buildTexturedWeaponModel(w, group);
 
     this.weaponRig.add(group);
   }
 
-  positionWeaponModel(weaponId, mesh) {
-    mesh.rotation.order = 'YXZ';
-    mesh.rotation.set(0, Math.PI, 0);
-
-    if (weaponId === 'ak47') {
-      mesh.scale.set(0.85, 0.85, 0.85);
-      mesh.position.set(0.18, -0.22, -0.44);
-    } else if (weaponId === 'm4a1' || weaponId === 'm4a1s' || weaponId === 'm4a4') {
-      mesh.scale.set(0.85, 0.85, 0.85);
-      mesh.position.set(0.18, -0.22, -0.44);
-    } else if (weaponId === 'awp') {
-      mesh.scale.set(0.82, 0.82, 0.82);
-      mesh.position.set(0.18, -0.24, -0.48);
-    } else if (weaponId === 'deagle') {
-      mesh.scale.set(0.9, 0.9, 0.9);
-      mesh.position.set(0.18, -0.19, -0.38);
-    } else if (weaponId === 'usp') {
-      mesh.scale.set(0.9, 0.9, 0.9);
-      mesh.position.set(0.18, -0.19, -0.38);
-    } else if (weaponId === 'c4') {
-      mesh.scale.set(0.28, 0.28, 0.28);
-      mesh.position.set(0.02, -0.26, -0.28);
-      mesh.rotation.set(-0.25, Math.PI, 0);
-    }
-  }
-
-  buildTexturedWeaponFallback(w, group) {
-    const texLoader = new THREE.TextureLoader();
-
+  // Maps every single weapon directly to its exact authentic textures/ PNG
+  buildTexturedWeaponModel(w, group) {
     if (w.id === 'knife') {
-      const knifeTex = texLoader.load('textures/w_knife_t.png');
+      const knifeTex = this.getWeaponTexture('w_knife_t.png');
       const knifeMat = new THREE.MeshStandardMaterial({ map: knifeTex, roughness: 0.35, metalness: 0.65 });
       const handleMat = new THREE.MeshLambertMaterial({ color: 0x1b1f24 });
 
-      // Curved Combat Knife Blade
-      const bladeGeo = new THREE.BoxGeometry(0.018, 0.065, 0.32);
+      const bladeGeo = new THREE.BoxGeometry(0.016, 0.065, 0.32);
       const blade = new THREE.Mesh(bladeGeo, knifeMat);
-      blade.position.set(0.2, -0.22, -0.46);
+      blade.position.set(0.14, -0.18, -0.42);
       blade.rotation.x = 0.32;
       group.add(blade);
 
-      // Knife Blade Tip Taper
       const tipGeo = new THREE.ConeGeometry(0.032, 0.08, 4);
       const tip = new THREE.Mesh(tipGeo, knifeMat);
       tip.rotation.x = -Math.PI / 2 + 0.32;
-      tip.position.set(0.2, -0.18, -0.62);
+      tip.position.set(0.14, -0.14, -0.58);
       group.add(tip);
 
-      // Crossguard
       const guardGeo = new THREE.BoxGeometry(0.045, 0.085, 0.02);
       const guard = new THREE.Mesh(guardGeo, handleMat);
-      guard.position.set(0.2, -0.25, -0.31);
+      guard.position.set(0.14, -0.21, -0.27);
       guard.rotation.x = 0.32;
       group.add(guard);
 
-      // Ergonomic Tactical Handle
-      const gripGeo = new THREE.CylinderGeometry(0.024, 0.022, 0.16, 8);
+      const gripGeo = new THREE.CylinderGeometry(0.022, 0.020, 0.16, 8);
       const grip = new THREE.Mesh(gripGeo, handleMat);
       grip.rotation.x = 0.32;
-      grip.position.set(0.2, -0.28, -0.24);
+      grip.position.set(0.14, -0.24, -0.20);
       group.add(grip);
     } else if (w.id === 'glock') {
-      const glockTex = texLoader.load('textures/w_pist_glock18.png');
+      const glockTex = this.getWeaponTexture('w_pist_glock18.png');
       const slideMat = new THREE.MeshStandardMaterial({ map: glockTex, roughness: 0.4, metalness: 0.5 });
       const frameMat = new THREE.MeshLambertMaterial({ color: 0x1c1e22 });
 
-      // Steel Slide & Barrel Top
-      const slideGeo = new THREE.BoxGeometry(0.048, 0.055, 0.26);
+      const slideGeo = new THREE.BoxGeometry(0.046, 0.052, 0.25);
       const slide = new THREE.Mesh(slideGeo, slideMat);
-      slide.position.set(0.2, -0.21, -0.42);
+      slide.position.set(0.13, -0.17, -0.36);
       group.add(slide);
 
-      // Polymer Lower Frame & Trigger Guard
-      const frameGeo = new THREE.BoxGeometry(0.044, 0.04, 0.24);
+      const frameGeo = new THREE.BoxGeometry(0.042, 0.038, 0.23);
       const frame = new THREE.Mesh(frameGeo, frameMat);
-      frame.position.set(0.2, -0.25, -0.41);
+      frame.position.set(0.13, -0.21, -0.35);
       group.add(frame);
 
-      // Textured Pistol Grip
-      const gripGeo = new THREE.BoxGeometry(0.042, 0.14, 0.085);
+      const gripGeo = new THREE.BoxGeometry(0.040, 0.13, 0.085);
       const grip = new THREE.Mesh(gripGeo, frameMat);
       grip.rotation.x = -0.32;
-      grip.position.set(0.2, -0.31, -0.34);
+      grip.position.set(0.13, -0.27, -0.28);
       group.add(grip);
 
-      // Barrel Tip
-      const barrelGeo = new THREE.CylinderGeometry(0.012, 0.012, 0.06, 8);
+      const barrelGeo = new THREE.CylinderGeometry(0.012, 0.012, 0.05, 8);
       const barrel = new THREE.Mesh(barrelGeo, new THREE.MeshLambertMaterial({ color: 0x0a0a0a }));
       barrel.rotation.x = Math.PI / 2;
-      barrel.position.set(0.2, -0.21, -0.56);
+      barrel.position.set(0.13, -0.17, -0.49);
       group.add(barrel);
-    } else if (w.id === 'molotov') {
-      const bottleMat = new THREE.MeshLambertMaterial({ color: 0x7c4516 });
-      const bottleGeo = new THREE.CylinderGeometry(0.04, 0.045, 0.22, 10);
-      const bottle = new THREE.Mesh(bottleGeo, bottleMat);
-      bottle.position.set(0.2, -0.24, -0.44);
-      group.add(bottle);
+    } else if (w.id === 'usp') {
+      const uspTex = this.getWeaponTexture('w_pist_usp.png');
+      const slideMat = new THREE.MeshStandardMaterial({ map: uspTex, roughness: 0.35, metalness: 0.6 });
+      const frameMat = new THREE.MeshLambertMaterial({ color: 0x181a1e });
 
-      const wickGeo = new THREE.CylinderGeometry(0.012, 0.012, 0.09, 6);
-      const wickMat = new THREE.MeshBasicMaterial({ color: 0xff4500 });
-      const wick = new THREE.Mesh(wickGeo, wickMat);
-      wick.position.set(0.2, -0.11, -0.44);
-      group.add(wick);
-    } else if (w.id === 'smokegrenade') {
-      const canGeo = new THREE.CylinderGeometry(0.045, 0.045, 0.17, 12);
-      const canMat = new THREE.MeshLambertMaterial({ color: 0x5a636e });
-      const can = new THREE.Mesh(canGeo, canMat);
-      can.position.set(0.2, -0.24, -0.44);
-      group.add(can);
+      const slideGeo = new THREE.BoxGeometry(0.046, 0.052, 0.27);
+      const slide = new THREE.Mesh(slideGeo, slideMat);
+      slide.position.set(0.13, -0.17, -0.36);
+      group.add(slide);
 
-      const bandGeo = new THREE.CylinderGeometry(0.046, 0.046, 0.04, 12);
-      const bandMat = new THREE.MeshBasicMaterial({ color: 0x228833 });
-      const band = new THREE.Mesh(bandGeo, bandMat);
-      band.position.set(0.2, -0.22, -0.44);
-      group.add(band);
+      const frameGeo = new THREE.BoxGeometry(0.042, 0.038, 0.25);
+      const frame = new THREE.Mesh(frameGeo, frameMat);
+      frame.position.set(0.13, -0.21, -0.35);
+      group.add(frame);
+
+      const gripGeo = new THREE.BoxGeometry(0.040, 0.13, 0.085);
+      const grip = new THREE.Mesh(gripGeo, frameMat);
+      grip.rotation.x = -0.32;
+      grip.position.set(0.13, -0.27, -0.28);
+      group.add(grip);
+
+      const silGeo = new THREE.CylinderGeometry(0.022, 0.022, 0.22, 10);
+      const silMat = new THREE.MeshStandardMaterial({ color: 0x1c2024, roughness: 0.45, metalness: 0.5 });
+      const sil = new THREE.Mesh(silGeo, silMat);
+      sil.rotation.x = Math.PI / 2;
+      sil.position.set(0.13, -0.17, -0.60);
+      group.add(sil);
+    } else if (w.id === 'deagle') {
+      const deagleTex = this.getWeaponTexture('w_pist_deagle.png');
+      const deagleMat = new THREE.MeshStandardMaterial({ map: deagleTex, roughness: 0.3, metalness: 0.7 });
+
+      const slideGeo = new THREE.BoxGeometry(0.052, 0.068, 0.30);
+      const slide = new THREE.Mesh(slideGeo, deagleMat);
+      slide.position.set(0.13, -0.16, -0.38);
+      group.add(slide);
+
+      const gripGeo = new THREE.BoxGeometry(0.044, 0.15, 0.095);
+      const grip = new THREE.Mesh(gripGeo, new THREE.MeshLambertMaterial({ color: 0x141619 }));
+      grip.rotation.x = -0.30;
+      grip.position.set(0.13, -0.27, -0.29);
+      group.add(grip);
+
+      const barrelGeo = new THREE.CylinderGeometry(0.018, 0.018, 0.06, 8);
+      const barrel = new THREE.Mesh(barrelGeo, new THREE.MeshLambertMaterial({ color: 0x080808 }));
+      barrel.rotation.x = Math.PI / 2;
+      barrel.position.set(0.13, -0.16, -0.54);
+      group.add(barrel);
+    } else if (w.id === 'ak47') {
+      const akTex = this.getWeaponTexture('w_rif_ak47.png');
+      const akMat = new THREE.MeshStandardMaterial({ map: akTex, roughness: 0.45, metalness: 0.4 });
+      const woodMat = new THREE.MeshLambertMaterial({ color: 0x6e3b1c });
+
+      const recGeo = new THREE.BoxGeometry(0.052, 0.088, 0.48);
+      const receiver = new THREE.Mesh(recGeo, akMat);
+      receiver.position.set(0.13, -0.17, -0.42);
+      group.add(receiver);
+
+      const barGeo = new THREE.CylinderGeometry(0.014, 0.014, 0.44, 8);
+      const barrel = new THREE.Mesh(barGeo, new THREE.MeshLambertMaterial({ color: 0x141618 }));
+      barrel.rotation.x = Math.PI / 2;
+      barrel.position.set(0.13, -0.16, -0.86);
+      group.add(barrel);
+
+      const woodGuard = new THREE.Mesh(new THREE.BoxGeometry(0.056, 0.065, 0.22), woodMat);
+      woodGuard.position.set(0.13, -0.17, -0.62);
+      group.add(woodGuard);
+
+      const magGeo = new THREE.BoxGeometry(0.038, 0.22, 0.095);
+      const mag = new THREE.Mesh(magGeo, new THREE.MeshLambertMaterial({ color: 0x22262a }));
+      mag.rotation.x = -0.38;
+      mag.position.set(0.13, -0.28, -0.40);
+      group.add(mag);
+
+      const stockGeo = new THREE.BoxGeometry(0.046, 0.11, 0.28);
+      const stock = new THREE.Mesh(stockGeo, woodMat);
+      stock.position.set(0.13, -0.21, -0.14);
+      group.add(stock);
+    } else if (w.id === 'm4a1' || w.id === 'm4a4' || w.id === 'm4a1s') {
+      const m4Tex = this.getWeaponTexture('w_rif_m4a1.png');
+      const m4Mat = new THREE.MeshStandardMaterial({ map: m4Tex, roughness: 0.4, metalness: 0.5 });
+
+      const recGeo = new THREE.BoxGeometry(0.052, 0.092, 0.46);
+      const receiver = new THREE.Mesh(recGeo, m4Mat);
+      receiver.position.set(0.13, -0.17, -0.42);
+      group.add(receiver);
+
+      const barGeo = new THREE.CylinderGeometry(0.015, 0.015, 0.42, 8);
+      const barrel = new THREE.Mesh(barGeo, new THREE.MeshLambertMaterial({ color: 0x121417 }));
+      barrel.rotation.x = Math.PI / 2;
+      barrel.position.set(0.13, -0.16, -0.84);
+      group.add(barrel);
+
+      const magGeo = new THREE.BoxGeometry(0.036, 0.20, 0.08);
+      const mag = new THREE.Mesh(magGeo, new THREE.MeshLambertMaterial({ color: 0x2a2e34 }));
+      mag.rotation.x = -0.22;
+      mag.position.set(0.13, -0.28, -0.38);
+      group.add(mag);
+
+      const stockGeo = new THREE.BoxGeometry(0.044, 0.10, 0.26);
+      const stock = new THREE.Mesh(stockGeo, new THREE.MeshLambertMaterial({ color: 0x1e2227 }));
+      stock.position.set(0.13, -0.20, -0.15);
+      group.add(stock);
+    } else if (w.id === 'awp') {
+      const awpTex = this.getWeaponTexture('w_snip_awp.png');
+      const awpMat = new THREE.MeshStandardMaterial({ map: awpTex, roughness: 0.4, metalness: 0.4 });
+
+      const bodyGeo = new THREE.BoxGeometry(0.058, 0.10, 0.65);
+      const body = new THREE.Mesh(bodyGeo, awpMat);
+      body.position.set(0.13, -0.18, -0.46);
+      group.add(body);
+
+      const barGeo = new THREE.CylinderGeometry(0.016, 0.016, 0.55, 8);
+      const barrel = new THREE.Mesh(barGeo, new THREE.MeshLambertMaterial({ color: 0x16181b }));
+      barrel.rotation.x = Math.PI / 2;
+      barrel.position.set(0.13, -0.16, -1.04);
+      group.add(barrel);
+
+      const scopeGeo = new THREE.CylinderGeometry(0.024, 0.026, 0.32, 12);
+      const scope = new THREE.Mesh(scopeGeo, new THREE.MeshLambertMaterial({ color: 0x141618 }));
+      scope.rotation.x = Math.PI / 2;
+      scope.position.set(0.13, -0.09, -0.46);
+      group.add(scope);
+
+      const stockGeo = new THREE.BoxGeometry(0.052, 0.12, 0.34);
+      const stock = new THREE.Mesh(stockGeo, awpMat);
+      stock.position.set(0.13, -0.21, -0.14);
+      group.add(stock);
     } else if (w.id === 'c4') {
+      // Dynamic Textured C4 Bomb with LCD ("7355608") & Keypad
+      const canvas = document.createElement('canvas');
+      canvas.width = 128;
+      canvas.height = 128;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#1c1f24';
+      ctx.fillRect(0, 0, 128, 128);
+      ctx.fillStyle = '#0a0d0a';
+      ctx.fillRect(8, 8, 112, 35);
+      ctx.fillStyle = '#ff2222';
+      ctx.font = 'bold 18px monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('7355608', 64, 25);
+      ctx.fillStyle = '#2e333b';
+      for (let r = 0; r < 4; r++) {
+        for (let c = 0; c < 3; c++) {
+          ctx.fillRect(16 + c * 34, 48 + r * 18, 26, 14);
+        }
+      }
+      const c4Tex = new THREE.CanvasTexture(canvas);
+
       const c4Mat = new THREE.MeshLambertMaterial({ color: 0x826c52 });
       const c4Brick = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.16, 0.1), c4Mat);
-      c4Brick.position.set(0.02, -0.26, -0.28);
+      c4Brick.position.set(0.03, -0.22, -0.28);
       c4Brick.rotation.set(-0.25, 0, 0);
       group.add(c4Brick);
 
-      const keypadMat = new THREE.MeshLambertMaterial({ color: 0x111111 });
-      const keypad = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.09, 0.02), keypadMat);
-      keypad.position.set(0.06, -0.24, -0.23);
+      const tapeMat = new THREE.MeshLambertMaterial({ color: 0x666b72 });
+      const tape = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.05, 0.11), tapeMat);
+      tape.position.set(0.03, -0.19, -0.28);
+      tape.rotation.set(-0.25, 0, 0);
+      group.add(tape);
+
+      const keypadMat = new THREE.MeshStandardMaterial({ map: c4Tex, roughness: 0.4 });
+      const keypad = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, 0.02), keypadMat);
+      keypad.position.set(0.06, -0.21, -0.23);
       keypad.rotation.set(-0.25, 0, 0);
       group.add(keypad);
 
+      const ledGeo = new THREE.SphereGeometry(0.016, 6, 6);
+      const ledMat = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+      const led = new THREE.Mesh(ledGeo, ledMat);
+      led.position.set(0.06, -0.14, -0.23);
+      group.add(led);
+
       const wireMat = new THREE.MeshBasicMaterial({ color: 0xdd2222 });
       const wire = new THREE.Mesh(new THREE.CylinderGeometry(0.005, 0.005, 0.15, 6), wireMat);
-      wire.position.set(-0.04, -0.22, -0.23);
+      wire.position.set(-0.04, -0.20, -0.23);
       wire.rotation.set(-0.25, 0, 0.4);
       group.add(wire);
+    } else if (w.id === 'smokegrenade') {
+      const smkTex = this.getWeaponTexture('w_eq_smokegrenade.png');
+      const canMat = new THREE.MeshStandardMaterial({ map: smkTex, roughness: 0.4 });
+      const canGeo = new THREE.CylinderGeometry(0.042, 0.042, 0.16, 12);
+      const can = new THREE.Mesh(canGeo, canMat);
+      can.position.set(0.13, -0.20, -0.38);
+      group.add(can);
+
+      const pinGeo = new THREE.TorusGeometry(0.018, 0.005, 6, 12);
+      const pin = new THREE.Mesh(pinGeo, new THREE.MeshLambertMaterial({ color: 0xcccccc }));
+      pin.position.set(0.13, -0.11, -0.38);
+      group.add(pin);
     } else if (w.category === 'equipment' || w.id === 'flashbang' || w.id === 'hegrenade') {
-      const grenGeo = new THREE.CylinderGeometry(0.042, 0.042, 0.15, 12);
-      const grenMat = new THREE.MeshLambertMaterial({ color: w.id === 'flashbang' ? 0x7a8a9a : 0x364230 });
+      const texPath = w.id === 'flashbang' ? 'w_eq_flashbang.png' : 'w_eq_fraggrenade.png';
+      const grenTex = this.getWeaponTexture(texPath);
+      const grenMat = new THREE.MeshStandardMaterial({ map: grenTex, roughness: 0.4 });
+
+      const grenGeo = new THREE.CylinderGeometry(0.040, 0.040, 0.15, 12);
       const gren = new THREE.Mesh(grenGeo, grenMat);
-      gren.position.set(0.2, -0.24, -0.44);
+      gren.position.set(0.13, -0.20, -0.38);
       group.add(gren);
 
-      const pinGeo = new THREE.TorusGeometry(0.02, 0.005, 6, 12);
+      const pinGeo = new THREE.TorusGeometry(0.018, 0.005, 6, 12);
       const pin = new THREE.Mesh(pinGeo, new THREE.MeshLambertMaterial({ color: 0xcccccc }));
-      pin.position.set(0.2, -0.14, -0.44);
+      pin.position.set(0.13, -0.11, -0.38);
       group.add(pin);
     } else {
-      const defMat = new THREE.MeshLambertMaterial({ color: 0x22262c });
-      const bodyGeo = new THREE.BoxGeometry(0.07, 0.12, 0.55);
-      const body = new THREE.Mesh(bodyGeo, defMat);
-      body.position.set(0.2, -0.22, -0.48);
+      // General Rifle / SMG textured weapon model (Famas, Galil, MP5, P90, XM1014)
+      const texPath = w.id === 'famas' ? 'w_rif_famas.png' :
+                      w.id === 'galil' ? 'w_rif_galil.png' :
+                      w.id === 'p90' ? 'w_smg_p90.png' :
+                      w.id === 'mp5' ? 'w_smg_mp5.png' :
+                      w.id === 'xm1014' ? 'w_shot_xm1014.png' :
+                      w.id === 'aug' ? 'w_rif_aug.png' :
+                      w.id === 'ssg08' ? 'w_snip_scout.png' :
+                      w.id === 'mac10' ? 'w_smg_mac10.png' :
+                      w.id === 'ump45' ? 'w_smg_ump45.png' :
+                      'w_rif_m4a1.png';
+      const tex = this.getWeaponTexture(texPath);
+      const mat = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.4 });
+
+      const bodyGeo = new THREE.BoxGeometry(0.052, 0.095, 0.48);
+      const body = new THREE.Mesh(bodyGeo, mat);
+      body.position.set(0.13, -0.17, -0.42);
       group.add(body);
+
+      const barGeo = new THREE.CylinderGeometry(0.015, 0.015, 0.35, 8);
+      const bar = new THREE.Mesh(barGeo, new THREE.MeshLambertMaterial({ color: 0x16181b }));
+      bar.rotation.x = Math.PI / 2;
+      bar.position.set(0.13, -0.16, -0.66);
+      group.add(bar);
     }
   }
 
+  // Cycles through grenades in inventory when pressing key 4
   cycleGrenade() {
     if (!this.grenades || this.grenades.length <= 1) return;
-    let idx = this.grenades.findIndex(g => g && g.id === (this.activeWeapon ? this.activeWeapon.id : ''));
-    idx = (idx + 1) % this.grenades.length;
-    this.inventory[4] = this.grenades[idx];
+    this.grenadeIndex = (this.grenadeIndex + 1) % this.grenades.length;
+    this.inventory[4] = this.grenades[this.grenadeIndex];
     this.switchSlot(4);
   }
 
   initControls() {
     window.addEventListener('keydown', (e) => {
       this.keys[e.code] = true;
+
+      // Discrete Space bar jump trigger: prevents continuous bunny-hop when holding space
+      if (e.code === 'Space') {
+        if (!this.spaceHeld) {
+          this.jumpRequested = true;
+        }
+        this.spaceHeld = true;
+      }
 
       // Spectator Cycle: A or D
       if (this.isSpectating) {
@@ -442,14 +638,25 @@ class CS2Player {
 
     window.addEventListener('keyup', (e) => {
       this.keys[e.code] = false;
+      if (e.code === 'Space') {
+        this.spaceHeld = false;
+        this.jumpRequested = false;
+      }
     });
 
     window.addEventListener('mousedown', (e) => {
       if (!document.pointerLockElement) return;
+
+      if (this.isSpectating) {
+        if (e.button === 0) this.cycleSpectator(1);
+        else if (e.button === 2) this.cycleSpectator(-1);
+        return;
+      }
+
       if (e.button === 0) {
         this.isShooting = true;
       } else if (e.button === 2) {
-        // Right click short throw for grenades or scope
+        // Right click: short underhand throw for grenades, or toggle scope for snipers
         if (this.activeSlot === 4 || (this.activeWeapon && this.activeWeapon.category === 'equipment')) {
           this.throwGrenade(true);
         } else {
@@ -461,6 +668,7 @@ class CS2Player {
     window.addEventListener('mouseup', (e) => {
       if (e.button === 0) {
         this.isShooting = false;
+        this.sprayCount = 0;
       }
     });
 
@@ -504,6 +712,7 @@ class CS2Player {
     document.getElementById('hud').classList.add('hidden');
     document.getElementById('spectator-hud').classList.remove('hidden');
     this.viewmodelGroup.visible = false;
+    this.cycleSpectator(0);
   }
 
   exitSpectatorMode() {
@@ -514,15 +723,18 @@ class CS2Player {
   }
 
   cycleSpectator(dir) {
-    if (!window.csGameManager) return;
-    const rem = Object.values(window.csGameManager.net.remotePlayers);
+    if (!window.csGameManager || !window.csGameManager.net) return;
+    const rem = Object.values(window.csGameManager.net.remotePlayers).filter(p => p && p.mesh && p.mesh.visible);
     if (rem.length === 0) {
-      document.getElementById('spectator-target-name').innerText = 'WAITING FOR PLAYERS...';
+      this.spectatedTarget = null;
+      const tName = document.getElementById('spectator-target-name');
+      if (tName) tName.innerText = 'OVERVIEW CAMERA (DE_DUST2)';
       return;
     }
     this.spectatorIndex = (this.spectatorIndex + dir + rem.length) % rem.length;
     this.spectatedTarget = rem[this.spectatorIndex];
-    document.getElementById('spectator-target-name').innerText = `Player_${this.spectatorIndex + 1} (${this.spectatedTarget.team})`;
+    const tName = document.getElementById('spectator-target-name');
+    if (tName) tName.innerText = `Player_${this.spectatorIndex + 1} (${this.spectatedTarget.team})`;
   }
 
   toggleScope() {
@@ -545,7 +757,7 @@ class CS2Player {
   switchSlot(slot) {
     if (!this.inventory[slot]) return;
 
-    // Save previous weapon's persistent ammo before switching
+    // Save previous weapon persistent ammo before switching
     if (this.activeWeapon && this.activeWeapon.clip) {
       this.weaponAmmo[this.activeWeapon.id] = {
         clip: this.clipAmmo.get(),
@@ -556,10 +768,11 @@ class CS2Player {
     this.activeSlot = slot;
     this.activeWeapon = this.inventory[slot];
     this.isReloading = false;
-    this.isShooting = false; // Never carry firing state across weapon switches
+    this.isShooting = false;
+    this.sprayCount = 0;
     if (this.isScoped) this.toggleScope();
 
-    // Restore saved persistent ammo for target weapon (prevents free reloads)
+    // Restore persistent ammo
     if (this.activeWeapon.clip) {
       if (!this.weaponAmmo[this.activeWeapon.id]) {
         this.weaponAmmo[this.activeWeapon.id] = {
@@ -570,31 +783,32 @@ class CS2Player {
       const saved = this.weaponAmmo[this.activeWeapon.id];
       this.clipAmmo.set(saved.clip);
       this.reserveAmmo.set(saved.reserve);
-    } else {
-      this.clipAmmo.set(0);
-      this.reserveAmmo.set(0);
     }
 
+    window.csAudio.playWeaponEquip(this.activeWeapon.id);
     this.buildCurrentWeaponModel();
     this.updateSlotHUD();
   }
 
   updateSlotHUD() {
-    document.querySelectorAll('.slot-item').forEach(el => {
-      el.classList.remove('active');
-      if (Number(el.dataset.slot) === this.activeSlot) {
-        el.classList.add('active');
+    for (let s = 1; s <= 5; s++) {
+      const el = document.getElementById(`slot-${s}`);
+      if (el) {
+        if (s === this.activeSlot) el.classList.add('active');
+        else el.classList.remove('active');
       }
-    });
+    }
   }
 
   startReload() {
-    if (this.isReloading || !this.activeWeapon || !this.activeWeapon.clip) return;
-    if (this.clipAmmo.get() >= this.activeWeapon.clip || this.reserveAmmo.get() <= 0) return;
+    if (!this.activeWeapon || !this.activeWeapon.clip) return;
+    if (this.isReloading) return;
+    if (this.clipAmmo.get() >= this.activeWeapon.clip) return;
+    if (this.reserveAmmo.get() <= 0) return;
 
     this.isReloading = true;
     this.reloadStartTime = performance.now();
-    window.csAudio.playReload(this.activeWeapon.id);
+    window.csAudio.playWeaponReload(this.activeWeapon.id);
   }
 
   finishReload() {
@@ -624,11 +838,11 @@ class CS2Player {
       return;
     }
 
-    // Grenade throwing
+    // Grenade throwing (Slot 4)
     if (this.activeSlot === 4 || this.activeWeapon.category === 'equipment') {
-      if (currentTime - this.lastShotTime < 1.0) return;
+      if (currentTime - this.lastShotTime < 0.8) return;
       this.lastShotTime = currentTime;
-      this.throwGrenade();
+      this.throwGrenade(false);
       this.isShooting = false;
       return;
     }
@@ -639,21 +853,19 @@ class CS2Player {
       this.lastShotTime = currentTime;
       this.isShooting = false;
       window.csAudio.playKnifeSlash();
-      this.weaponRig.position.z = -0.35;
-      this.weaponRig.rotation.y = 0.4;
+      this.weaponRig.position.z = -0.32;
+      this.weaponRig.rotation.y = 0.35;
       setTimeout(() => {
         this.weaponRig.rotation.y = 0;
       }, 120);
 
       // Raycast for knife melee damage up to 3.2 meters
       if (gameManager && gameManager.net) {
-        const knifeRay = new THREE.Raycaster();
-        const dir = new THREE.Vector3();
-        this.camera.getWorldDirection(dir);
-        knifeRay.set(this.camera.position, dir);
+        this.camera.getWorldDirection(this.knifeDir);
+        this.knifeRay.set(this.camera.position, this.knifeDir);
         Object.entries(gameManager.net.remotePlayers).forEach(([id, p]) => {
           if (p.team === this.team || !p.mesh || !p.mesh.visible) return;
-          const hits = knifeRay.intersectObject(p.mesh, true);
+          const hits = this.knifeRay.intersectObject(p.mesh, true);
           if (hits.length > 0 && hits[0].distance < 3.2) {
             window.csAudio.playSound('knife_hit');
             gameManager.net.sendDamage(id, 45, 'Knife', false);
@@ -672,7 +884,7 @@ class CS2Player {
     if (currentTime - this.lastShotTime < this.activeWeapon.fireRate) return;
     this.lastShotTime = currentTime;
 
-    // Semi-automatic trigger (Pistols except CZ-75 require a distinct click per bullet)
+    // Semi-automatic trigger (Pistols require a distinct click per bullet)
     const isSemiAuto = (this.activeWeapon.category === 'pistols' && this.activeWeapon.id !== 'cz75') ||
                        (this.activeWeapon.category === 'snipers' && this.activeWeapon.id !== 'scar20' && this.activeWeapon.id !== 'g3sg1') ||
                        (this.activeWeapon.category === 'heavy' && this.activeWeapon.id !== 'negev' && this.activeWeapon.id !== 'm249');
@@ -696,23 +908,45 @@ class CS2Player {
       this.muzzleFlashMesh.visible = false;
     }, 45);
 
-    this.recoilPitch += (this.activeWeapon.recoil || 0.02) * (0.8 + Math.random() * 0.4);
-    this.recoilYaw += (Math.random() - 0.5) * (this.activeWeapon.recoil || 0.02);
+    // Authentic CS Recoil Spray Pattern
+    this.sprayCount = (this.sprayCount || 0) + 1;
+    const baseRecoil = this.activeWeapon.recoil || 0.024;
+    let pitchKick = baseRecoil;
+    let yawKick = 0;
+
+    if (this.sprayCount <= 3) {
+      // First 3 bullets: Direct upward climb
+      pitchKick = baseRecoil * 1.35;
+      yawKick = (Math.random() - 0.5) * baseRecoil * 0.15;
+    } else if (this.sprayCount <= 8) {
+      // Bullets 4 to 8: Recoil pulls to the left
+      pitchKick = baseRecoil * 0.85;
+      yawKick = -baseRecoil * 0.65;
+    } else if (this.sprayCount <= 15) {
+      // Bullets 9 to 15: Recoil swings across to the right
+      pitchKick = baseRecoil * 0.35;
+      yawKick = baseRecoil * 0.85;
+    } else {
+      // High spray: Horizontal sway
+      pitchKick = baseRecoil * 0.20;
+      yawKick = (Math.sin(this.sprayCount * 1.2) > 0 ? 1 : -1) * baseRecoil * 0.65;
+    }
+
+    this.recoilPitch += pitchKick;
+    this.recoilYaw += yawKick;
 
     this.weaponRig.position.z = -0.42;
 
-    // Raycast hit check & bullet hole creation
-    const raycaster = new THREE.Raycaster();
-    const camDir = new THREE.Vector3();
-    this.camera.getWorldDirection(camDir);
-    raycaster.set(this.camera.position, camDir);
+    // Raycast hit check & bullet hole creation using pre-allocated reusable raycaster
+    this.camera.getWorldDirection(this.shootCamDir);
+    this.shootRaycaster.set(this.camera.position, this.shootCamDir);
 
     // Hit players with authentic headshot/body multiplier & hit sound
     if (gameManager && gameManager.net) {
       Object.entries(gameManager.net.remotePlayers).forEach(([id, p]) => {
         if (p.team === this.team) return;
         if (!p.mesh || !p.mesh.visible) return;
-        const intersects = raycaster.intersectObject(p.mesh, true);
+        const intersects = this.shootRaycaster.intersectObject(p.mesh, true);
         if (intersects.length > 0 && intersects[0].distance < 120) {
           const hitPoint = intersects[0].point;
           const relY = hitPoint.y - p.mesh.position.y;
@@ -731,33 +965,24 @@ class CS2Player {
       });
     }
 
-    // Bullet hole impact on map obstacles
-    if (this.map && this.map.mapGroup) {
-      const wallHits = raycaster.intersectObjects(this.map.mapGroup.children, true);
+    // Bullet hole impact on map obstacles (fast AABB check on groundMeshes)
+    if (this.map && this.map.groundMeshes && this.map.groundMeshes.length > 0) {
+      const wallHits = this.shootRaycaster.intersectObjects(this.map.groundMeshes, false);
       if (wallHits.length > 0 && wallHits[0].distance < 80) {
         this.spawnBulletHole(wallHits[0].point, wallHits[0].face.normal);
       }
     }
   }
 
-  // Realistic bullet holes on walls and obstacles
+  // High-performance bullet holes from pre-allocated object pool
   spawnBulletHole(point, normal) {
-    const geo = new THREE.CircleGeometry(0.06, 8);
-    const mat = new THREE.MeshBasicMaterial({ color: 0x1a1a1a, side: THREE.DoubleSide });
-    const decal = new THREE.Mesh(geo, mat);
+    if (!this.bulletHolePool || this.bulletHolePool.length === 0) return;
+    const decal = this.bulletHolePool[this.bulletHolePoolIndex];
+    this.bulletHolePoolIndex = (this.bulletHolePoolIndex + 1) % this.bulletHolePool.length;
 
-    // Position slightly offset from surface to prevent z-fighting
-    decal.position.copy(point).addScaledVector(normal, 0.02);
-    decal.lookAt(point.clone().add(normal));
-    this.scene.add(decal);
-
-    this.bulletDecals.push(decal);
-    if (this.bulletDecals.length > 40) {
-      const old = this.bulletDecals.shift();
-      this.scene.remove(old);
-      if (old.geometry) old.geometry.dispose();
-      if (old.material) old.material.dispose();
-    }
+    decal.position.copy(point).addScaledVector(normal, 0.012);
+    decal.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), normal);
+    decal.visible = true;
   }
 
   // Physical thrown utility with authentic trajectory & velocity
@@ -789,9 +1014,9 @@ class CS2Player {
     grenMesh.position.copy(spawnPos).addScaledVector(dir, 0.8);
     this.scene.add(grenMesh);
 
-    // Speed: Left Click (long throw, 18 m/s) vs Right Click (short underhand lob, 7.5 m/s)
-    const speed = isUnderhand ? 7.5 : 18.0;
-    const upBoost = isUnderhand ? 2.2 : 4.5;
+    // Speed: Left Click (long throw, 22 m/s) vs Right Click (short underhand lob, 9.5 m/s)
+    const speed = isUnderhand ? 9.5 : 22.0;
+    const upBoost = isUnderhand ? 2.5 : 5.0;
     const velocity = dir.clone().multiplyScalar(speed);
     velocity.y += upBoost;
 
@@ -810,6 +1035,7 @@ class CS2Player {
     }
 
     if (this.grenades && this.grenades.length > 0) {
+      this.grenadeIndex = 0;
       this.inventory[4] = this.grenades[0];
       this.switchSlot(4);
     } else {
@@ -830,7 +1056,7 @@ class CS2Player {
         g.velocity.y = -g.velocity.y * 0.35;
         g.velocity.x *= 0.65;
         g.velocity.z *= 0.65;
-        if (g.type === 'molotov') g.lifetime = 0; // Detonates on impact
+        if (g.type === 'molotov') g.lifetime = 0;
       }
 
       if (g.lifetime <= 0) {
@@ -856,7 +1082,35 @@ class CS2Player {
           }
         } else if (g.type === 'hegrenade') {
           window.csAudio.playHEDetonate();
-          // Radial explosive blast damage to player & enemies
+
+          // Authentic HE Grenade Fireball & Shockwave Animation
+          const heGroup = new THREE.Group();
+          heGroup.position.copy(pos);
+          const fireballGeo = new THREE.SphereGeometry(2.4, 12, 12);
+          const fireballMat = new THREE.MeshBasicMaterial({ color: 0xff6611, transparent: true, opacity: 0.95 });
+          const fireball = new THREE.Mesh(fireballGeo, fireballMat);
+          heGroup.add(fireball);
+
+          const blastLight = new THREE.PointLight(0xff8822, 10, 16);
+          blastLight.position.set(0, 0.5, 0);
+          heGroup.add(blastLight);
+          this.scene.add(heGroup);
+
+          const expStart = performance.now();
+          const expInterval = setInterval(() => {
+            const expElapsed = (performance.now() - expStart) / 1000;
+            if (expElapsed > 0.35) {
+              clearInterval(expInterval);
+              this.scene.remove(heGroup);
+            } else {
+              const sc = 1.0 + expElapsed * 5.0;
+              fireball.scale.set(sc, sc, sc);
+              fireballMat.opacity = Math.max(0, 0.95 - expElapsed * 2.8);
+              blastLight.intensity = Math.max(0, 10 * (1 - expElapsed / 0.35));
+            }
+          }, 16);
+
+          // Radial explosive blast damage to local player & remote enemies
           const pDist = this.position.distanceTo(pos);
           if (pDist <= 8.5) {
             const dmg = Math.round(85 * (1 - pDist / 8.5));
@@ -875,25 +1129,50 @@ class CS2Player {
           }
         } else if (g.type === 'smokegrenade') {
           window.csAudio.playSmokeEmit();
-          // Volumetric 3D smoke cloud
+
+          // Authentic CS2 Large Volumetric Smoke Cloud (5.5m Radius / 11m Diameter)
+          // Uses depthWrite: false to completely eliminate transparency sorting lag
           const smokeGroup = new THREE.Group();
-          for (let s = 0; s < 12; s++) {
-            const sGeo = new THREE.SphereGeometry(1.6 + Math.random() * 0.8, 8, 8);
-            const sMat = new THREE.MeshLambertMaterial({
-              color: 0xc4c7cc,
-              transparent: true,
-              opacity: 0.82
-            });
-            const sMesh = new THREE.Mesh(sGeo, sMat);
-            sMesh.position.set(
-              (Math.random() - 0.5) * 3.8,
-              0.8 + Math.random() * 1.6,
-              (Math.random() - 0.5) * 3.8
-            );
-            smokeGroup.add(sMesh);
-          }
           smokeGroup.position.copy(pos);
+
+          const coreGeo = new THREE.SphereGeometry(3.6, 10, 10);
+          const coreMat = new THREE.MeshLambertMaterial({
+            color: 0xd6d9de,
+            transparent: true,
+            opacity: 0.75,
+            depthWrite: false
+          });
+          const coreMesh = new THREE.Mesh(coreGeo, coreMat);
+          coreMesh.position.y = 1.6;
+          smokeGroup.add(coreMesh);
+
+          // Billowing outer lobes
+          for (let s = 0; s < 10; s++) {
+            const ang = (s / 10) * Math.PI * 2;
+            const r = 2.4 + Math.random() * 1.6;
+            const lobeGeo = new THREE.SphereGeometry(2.2 + Math.random() * 0.6, 8, 8);
+            const lobeMat = new THREE.MeshLambertMaterial({
+              color: 0xcfd3d8,
+              transparent: true,
+              opacity: 0.65,
+              depthWrite: false
+            });
+            const lobe = new THREE.Mesh(lobeGeo, lobeMat);
+            lobe.position.set(Math.cos(ang) * r, 1.2 + Math.random() * 1.5, Math.sin(ang) * r);
+            smokeGroup.add(lobe);
+          }
+
+          // Initial scale expansion over 0.55s
+          smokeGroup.scale.set(0.15, 0.15, 0.15);
           this.scene.add(smokeGroup);
+
+          const expandStart = performance.now();
+          const expandInterval = setInterval(() => {
+            const t = Math.min(1.0, (performance.now() - expandStart) / 550);
+            const scale = 0.15 + (1.0 - 0.15) * Math.sin(t * Math.PI * 0.5);
+            smokeGroup.scale.set(scale, scale, scale);
+            if (t >= 1.0) clearInterval(expandInterval);
+          }, 16);
 
           setTimeout(() => {
             window.csAudio.playSmokeClear();
@@ -901,7 +1180,6 @@ class CS2Player {
           }, 18000);
         } else if (g.type === 'molotov') {
           window.csAudio.playMolotovDetonate();
-          // Burning ground fire pool
           const fireGroup = new THREE.Group();
           const fGeo = new THREE.CylinderGeometry(2.4, 2.6, 0.25, 16);
           const fMat = new THREE.MeshBasicMaterial({ color: 0xff4500, transparent: true, opacity: 0.85 });
@@ -952,8 +1230,10 @@ class CS2Player {
     window.csAudio.playDamage();
 
     const dmgVignette = document.getElementById('damage-vignette');
-    dmgVignette.style.opacity = '0.8';
-    setTimeout(() => { dmgVignette.style.opacity = '0'; }, 180);
+    if (dmgVignette) {
+      dmgVignette.style.opacity = '0.8';
+      setTimeout(() => { dmgVignette.style.opacity = '0'; }, 180);
+    }
 
     if (newHealth <= 0) {
       this.onDeath(attackerName, weaponName);
@@ -987,8 +1267,12 @@ class CS2Player {
     this.health.set(100);
     this.armor.set(100);
     this.isReloading = false;
+    this.isShooting = false;
+    this.sprayCount = 0;
     this.isPlanting = false;
     this.isDefusing = false;
+    this.jumpRequested = false;
+    this.spaceHeld = false;
     if (this.isScoped) this.toggleScope();
 
     // Reset fresh ammo for all loadout weapons on round respawn
@@ -1008,15 +1292,22 @@ class CS2Player {
   update(dt, currentTime, gameManager) {
     this.updateGrenades(dt);
 
-    // Spectator POV Camera following
+    // Smooth Third-Person Spectator Chase Camera
     if (this.isSpectating) {
-      if (this.spectatedTarget && this.spectatedTarget.mesh) {
-        this.camera.position.set(
-          this.spectatedTarget.mesh.position.x,
-          this.spectatedTarget.mesh.position.y + 1.7,
-          this.spectatedTarget.mesh.position.z
-        );
-        this.camera.rotation.set(0, this.spectatedTarget.mesh.rotation.y, 0);
+      if (this.spectatedTarget && this.spectatedTarget.mesh && this.spectatedTarget.mesh.visible) {
+        const tPos = this.spectatedTarget.mesh.position;
+        const tYaw = this.spectatedTarget.mesh.rotation.y;
+        // Position camera 2.4m behind and 0.55m above the player's head
+        const camX = tPos.x + Math.sin(tYaw) * 2.4;
+        const camY = tPos.y + 2.15;
+        const camZ = tPos.z + Math.cos(tYaw) * 2.4;
+        this.camera.position.set(camX, camY, camZ);
+        this.camera.lookAt(tPos.x, tPos.y + 1.45, tPos.z);
+      } else {
+        // Fallback: smooth orbit overview of A Site
+        const t = performance.now() * 0.0004;
+        this.camera.position.set(28 + Math.cos(t) * 18, 12, -118 + Math.sin(t) * 18);
+        this.camera.lookAt(28, 0, -118);
       }
       return;
     }
@@ -1026,7 +1317,6 @@ class CS2Player {
       const elapsed = currentTime - this.reloadStartTime;
       const t = Math.min(1.0, elapsed / 2200);
 
-      // Gun tilts down and to the side while mag is inserted
       this.weaponRig.position.y = -Math.sin(t * Math.PI) * 0.14;
       this.weaponRig.rotation.z = Math.sin(t * Math.PI) * 0.35;
       this.weaponRig.rotation.x = Math.sin(t * Math.PI) * 0.22;
@@ -1045,10 +1335,13 @@ class CS2Player {
       this.velocity.x = 0;
       this.velocity.z = 0;
       this.isShooting = false;
+      this.sprayCount = 0;
     }
 
     if (this.isShooting && !this.isReloading && !inFreeze) {
       this.shoot(currentTime / 1000, gameManager);
+    } else if (!this.isShooting && (currentTime / 1000 - this.lastShotTime > 0.35)) {
+      this.sprayCount = 0;
     }
 
     // Authentic CS2 Movement Speeds (Knife provides run-boost)
@@ -1064,32 +1357,49 @@ class CS2Player {
     const forward = new THREE.Vector3(-Math.sin(this.yaw), 0, -Math.cos(this.yaw));
     const right = new THREE.Vector3(Math.cos(this.yaw), 0, -Math.sin(this.yaw));
 
-    const moveDir = new THREE.Vector3();
+    // Input Movement Calculation
+    const wishDir = new THREE.Vector3();
     if (!inFreeze) {
-      if (this.keys[this.keybinds.forward]) moveDir.add(forward);
-      if (this.keys[this.keybinds.backward]) moveDir.sub(forward);
-      if (this.keys[this.keybinds.right]) moveDir.add(right);
-      if (this.keys[this.keybinds.left]) moveDir.sub(right);
+      if (this.keys[this.keybinds.forward]) wishDir.add(forward);
+      if (this.keys[this.keybinds.backward]) wishDir.sub(forward);
+      if (this.keys[this.keybinds.right]) wishDir.add(right);
+      if (this.keys[this.keybinds.left]) wishDir.sub(right);
     }
 
-    if (moveDir.length() > 0) {
-      moveDir.normalize();
-      this.velocity.x = moveDir.x * moveSpeed;
-      this.velocity.z = moveDir.z * moveSpeed;
+    // Authentic CS Counter-Strafing & Instant Stops
+    if (wishDir.length() > 0) {
+      wishDir.normalize();
+
+      // If opposing input is detected on an axis, immediately halt momentum (Counter-Strafe)
+      const curDot = (wishDir.x * this.velocity.x) + (wishDir.z * this.velocity.z);
+      if (curDot < -0.1) {
+        this.velocity.x = 0;
+        this.velocity.z = 0;
+      }
+
+      this.velocity.x = wishDir.x * moveSpeed;
+      this.velocity.z = wishDir.z * moveSpeed;
 
       if (this.isGrounded && Math.random() < 0.05) {
         window.csAudio.playFootstep();
       }
     } else {
-      this.velocity.x *= 0.7;
-      this.velocity.z *= 0.7;
+      // Instant crisp deceleration upon releasing movement keys
+      this.velocity.x *= 0.15;
+      this.velocity.z *= 0.15;
+      if (Math.abs(this.velocity.x) < 0.05) this.velocity.x = 0;
+      if (Math.abs(this.velocity.z) < 0.05) this.velocity.z = 0;
     }
 
-    // Jumping
-    if (this.keys[this.keybinds.jump] && this.isGrounded && !inFreeze) {
-      this.velocity.y = 6.2;
+    // Discrete Jump (Single press required, no auto bunny-hop)
+    if (this.jumpRequested && this.isGrounded && !inFreeze) {
+      this.jumpRequested = false;
+      // Crouch-jump (duck-jump) boost to easily clear Dust 2 crates
+      const jumpImpulse = this.isCrouched ? 7.8 : 7.4;
+      this.velocity.y = jumpImpulse;
       this.isGrounded = false;
     }
+
     this.velocity.y -= 18.0 * dt;
 
     this.isCrouched = !!this.keys[this.keybinds.crouch];
@@ -1105,19 +1415,15 @@ class CS2Player {
     // Helper: test horizontal feeler ray against 3D map mesh to detect solid walls & crates
     const checkMeshWall = (dirX, dirZ, dist) => {
       if (!this.map || !this.map.groundMeshes || this.map.groundMeshes.length === 0) return false;
-      if (!this.wallRaycaster) {
-        this.wallRaycaster = new THREE.Raycaster();
-        this.wallOrigin = new THREE.Vector3();
-        this.wallDir = new THREE.Vector3();
-      }
       this.wallDir.set(dirX, 0, dirZ).normalize();
       const testY = this.position.y - this.playerHeight * 0.45;
       this.wallOrigin.set(oldX, testY, oldZ);
       this.wallRaycaster.set(this.wallOrigin, this.wallDir);
       this.wallRaycaster.far = dist;
       const hits = this.wallRaycaster.intersectObjects(this.map.groundMeshes, false);
+      const maxStepHeight = (this.isCrouched && !this.isGrounded) ? 1.55 : 0.65;
       for (let i = 0; i < hits.length; i++) {
-        if (hits[i].point.y > (this.lastGroundY + 0.65)) {
+        if (hits[i].point.y > (this.lastGroundY + maxStepHeight)) {
           return true;
         }
       }
@@ -1181,11 +1487,6 @@ class CS2Player {
 
     let targetGroundY = (this.lastGroundY !== undefined) ? this.lastGroundY : -5.8;
     if (this.map && this.map.groundMeshes && this.map.groundMeshes.length > 0) {
-      if (!this.downRaycaster) {
-        this.downRaycaster = new THREE.Raycaster();
-        this.downOrigin = new THREE.Vector3();
-        this.downDir = new THREE.Vector3(0, -1, 0);
-      }
       this.downOrigin.set(this.position.x, this.position.y + 0.5, this.position.z);
       this.downRaycaster.set(this.downOrigin, this.downDir);
       this.downRaycaster.far = 40.0;
@@ -1247,7 +1548,7 @@ class CS2Player {
     this.camera.rotation.x = this.pitch + this.recoilPitch;
 
     // Viewmodel Recoil Recovery & Weapon Bobbing
-    this.weaponRig.position.z += (-0.5 - this.weaponRig.position.z) * 0.15;
+    this.weaponRig.position.z += (-0.45 - this.weaponRig.position.z) * 0.15;
     const speed2D = Math.sqrt(this.velocity.x * this.velocity.x + this.velocity.z * this.velocity.z);
     const bob = Math.sin(currentTime * 0.008) * (speed2D * 0.004);
     if (!this.isReloading) {

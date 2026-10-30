@@ -126,6 +126,8 @@ class CS2MapBuilder {
               if (child.isMesh) {
                 if (child.geometry) {
                   child.geometry.computeVertexNormals();
+                  child.geometry.computeBoundingBox();
+                  child.geometry.computeBoundingSphere();
                 }
                 if (child.material) {
                   child.material.side = THREE.DoubleSide;
@@ -144,8 +146,14 @@ class CS2MapBuilder {
 
             obj.traverse((child) => {
               if (child.isMesh) {
-                if (child.geometry) child.geometry.computeVertexNormals();
-                if (child.material) child.material.side = THREE.DoubleSide;
+                if (child.geometry) {
+                  child.geometry.computeVertexNormals();
+                  child.geometry.computeBoundingBox();
+                  child.geometry.computeBoundingSphere();
+                }
+                if (child.material) {
+                  child.material.side = THREE.DoubleSide;
+                }
                 this.groundMeshes.push(child);
               }
             });

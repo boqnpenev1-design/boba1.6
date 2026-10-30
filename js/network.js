@@ -396,6 +396,8 @@ class CS2NetworkManager {
   sendPlayerState(player) {
     if (!this.isConnected || !this.peer) return;
 
+    const inMatch = this.gm.playerInMatch !== false && this.gm.phase !== 'unselected';
+
     const packet = {
       type: 'player_update',
       id: this.peer.id,
@@ -404,7 +406,9 @@ class CS2NetworkManager {
       yaw: player.yaw,
       pitch: player.pitch,
       health: player.health.get(),
-      weapon: player.activeWeapon ? player.activeWeapon.id : 'knife'
+      weapon: player.activeWeapon ? player.activeWeapon.id : 'knife',
+      isCrouched: player.isCrouched,
+      inMatch: inMatch
     };
 
     if (this.isHost) {
@@ -575,11 +579,12 @@ class CS2NetworkManager {
     rightArmGroup.add(rGlove);
     torsoGroup.add(rightArmGroup);
 
-    // Operator Weapon Model
+    // Operator Weapon Model (Textured with authentic weapon PNG)
     const weaponGroup = new THREE.Group();
     weaponGroup.position.set(0.08, 0.28, 0.38);
 
-    const gunMat = new THREE.MeshLambertMaterial({ color: 0x181a1e });
+    const weaponTex = isCT ? texLoader.load('textures/w_rif_m4a1.png') : texLoader.load('textures/w_rif_ak47.png');
+    const gunMat = new THREE.MeshStandardMaterial({ map: weaponTex, roughness: 0.4, metalness: 0.5 });
     const woodMat = new THREE.MeshLambertMaterial({ color: 0x6e3b1c });
 
     const gunBody = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.09, 0.55), gunMat);
@@ -650,13 +655,24 @@ class CS2NetworkManager {
     p.team = data.team;
     p.mesh.position.set(data.pos.x, data.pos.y - 1.8, data.pos.z);
     p.mesh.rotation.y = data.yaw;
-    p.mesh.visible = (data.health > 0);
+    p.mesh.visible = (data.inMatch !== false && data.health > 0);
 
     const now = performance.now();
     const dt = p.lastTime ? Math.max(0.001, Math.min(0.1, (now - p.lastTime) / 1000)) : 0.016;
     p.lastTime = now;
 
     if (p.rig) {
+      // Stance: Crouch vs Standing
+      if (data.isCrouched) {
+        p.rig.torso.position.y = 0.72;
+        p.rig.leftLeg.position.y = 0.72;
+        p.rig.rightLeg.position.y = 0.72;
+      } else {
+        p.rig.torso.position.y = 0.95;
+        p.rig.leftLeg.position.y = 0.90;
+        p.rig.rightLeg.position.y = 0.90;
+      }
+
       // 1. Aim Pitch
       if (data.pitch !== undefined) {
         p.rig.torso.rotation.x = Math.max(-0.6, Math.min(0.6, -data.pitch));
