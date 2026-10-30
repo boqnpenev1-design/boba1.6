@@ -168,6 +168,9 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btn-pause-switch-team').addEventListener('click', () => {
     document.getElementById('pause-menu').classList.add('hidden');
     document.getElementById('team-select-screen').classList.remove('hidden');
+    try {
+      if (document.exitPointerLock) document.exitPointerLock();
+    } catch (e) {}
   });
 
   document.getElementById('btn-pause-buy').addEventListener('click', () => {
@@ -179,6 +182,9 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('pause-menu').classList.add('hidden');
     document.getElementById('hud').classList.add('hidden');
     document.getElementById('main-menu').classList.remove('hidden');
+    try {
+      if (document.exitPointerLock) document.exitPointerLock();
+    } catch (e) {}
   });
 
   // 8. Buy Menu

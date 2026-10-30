@@ -193,7 +193,9 @@ class CS2GameManager {
       console.log(`Connected to online server dust2 as ${role}`);
     });
 
-    if (document.exitPointerLock) document.exitPointerLock();
+    try {
+      if (document.exitPointerLock) document.exitPointerLock();
+    } catch (e) {}
 
     // Open team selection split-screen
     document.getElementById('main-menu').classList.add('hidden');
@@ -207,7 +209,12 @@ class CS2GameManager {
 
     document.getElementById('team-select-screen').classList.add('hidden');
     document.getElementById('hud').classList.remove('hidden');
-    document.getElementById('game-canvas-container').requestPointerLock();
+    try {
+      const lockPromise = document.getElementById('game-canvas-container').requestPointerLock();
+      if (lockPromise && typeof lockPromise.catch === 'function') {
+        lockPromise.catch(() => {});
+      }
+    } catch (e) {}
 
     // If joining client while round is currently LIVE, spectate until next round starts!
     if (!this.net.isHost && this.phase === 'live') {

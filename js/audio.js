@@ -282,6 +282,19 @@ class CS2AudioSystem {
     }
   }
 
+  playWeaponReload(weaponId) {
+    this.playReload(weaponId);
+  }
+
+  playWeaponEquip(weaponId = 'usp') {
+    const wid = (weaponId || 'usp').toLowerCase();
+    if (wid === 'knife') {
+      this.playSound('knife_slash', 'sfx', 0.6);
+    } else {
+      this.playSound('usp_slide', 'sfx', 0.5);
+    }
+  }
+
   playGrenadeThrow() {
     this.playSound('grenade_throw', 'sfx', 1.0);
   }
