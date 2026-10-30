@@ -193,6 +193,8 @@ class CS2GameManager {
       console.log(`Connected to online server dust2 as ${role}`);
     });
 
+    if (document.exitPointerLock) document.exitPointerLock();
+
     // Open team selection split-screen
     document.getElementById('main-menu').classList.add('hidden');
     document.getElementById('team-select-screen').classList.remove('hidden');
@@ -234,8 +236,8 @@ class CS2GameManager {
     window.csAudio.playRadioTone('start');
 
     // Spawn player immediately at authentic CS spawn point
-    const spawns = this.mapBuilder.spawnPoints[this.player.team];
-    const s = spawns[Math.floor(Math.random() * spawns.length)];
+    const spawns = (this.mapBuilder && this.mapBuilder.spawnPoints && this.mapBuilder.spawnPoints[this.player.team]) || [];
+    const s = spawns.length > 0 ? spawns[Math.floor(Math.random() * spawns.length)] : null;
     this.player.respawn(s);
 
     // If host, notify all connected clients to start new round

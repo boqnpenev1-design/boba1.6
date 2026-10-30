@@ -680,9 +680,10 @@ body, html {
   left: 0;
   width: 100vw;
   height: 100vh;
-  z-index: 90;
+  z-index: 500;
   background: #080b10;
   display: flex;
+  pointer-events: auto;
 }
 
 .team-split-side {
@@ -694,6 +695,8 @@ body, html {
   padding: 40px;
   position: relative;
   transition: all 0.3s;
+  cursor: pointer;
+  pointer-events: auto;
 }
 
 .side-terrorists {
@@ -770,6 +773,9 @@ body, html {
   cursor: pointer;
   transition: all 0.2s;
   margin-top: 10px;
+  pointer-events: auto;
+  position: relative;
+  z-index: 10;
 }
 
 .btn-join-t {

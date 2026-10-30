@@ -1256,14 +1256,19 @@ class CS2Player {
 
   respawn(spawnPos) {
     this.exitSpectatorMode();
-    const spawnY = (spawnPos && spawnPos.y !== undefined) ? spawnPos.y : this.playerHeight;
-    this.position.set(spawnPos.x, spawnY, spawnPos.z);
-    if (spawnPos && spawnPos.yaw !== undefined) {
-      this.yaw = spawnPos.yaw;
-    }
+    const defaultX = this.team === 'CT' ? -5.0 : -65.0;
+    const defaultY = this.team === 'CT' ? -4.0 : 7.6;
+    const defaultZ = this.team === 'CT' ? -98.0 : 35.0;
+    const defaultYaw = this.team === 'CT' ? Math.PI : 0;
+
+    const posX = (spawnPos && spawnPos.x !== undefined) ? spawnPos.x : defaultX;
+    const posY = (spawnPos && spawnPos.y !== undefined) ? spawnPos.y : defaultY;
+    const posZ = (spawnPos && spawnPos.z !== undefined) ? spawnPos.z : defaultZ;
+    this.position.set(posX, posY, posZ);
+    this.yaw = (spawnPos && spawnPos.yaw !== undefined) ? spawnPos.yaw : defaultYaw;
     this.velocity.set(0, 0, 0);
     this.isGrounded = true;
-    this.lastGroundY = spawnY - this.playerHeight;
+    this.lastGroundY = posY - this.playerHeight;
     this.health.set(100);
     this.armor.set(100);
     this.isReloading = false;

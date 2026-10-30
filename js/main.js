@@ -64,14 +64,27 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // 5. Team Selection (Terrorists | Line | Counter-Terrorists)
-  document.getElementById('btn-select-t').addEventListener('click', () => {
+  const joinTerrorists = () => {
     window.csAudio.ensureContext();
     gameManager.chooseTeam('T');
-  });
-
-  document.getElementById('btn-select-ct').addEventListener('click', () => {
+  };
+  const joinCounterTerrorists = () => {
     window.csAudio.ensureContext();
     gameManager.chooseTeam('CT');
+  };
+
+  const btnT = document.getElementById('btn-select-t');
+  if (btnT) btnT.addEventListener('click', joinTerrorists);
+  const sideT = document.querySelector('.side-terrorists');
+  if (sideT) sideT.addEventListener('click', (e) => {
+    if (e.target.id !== 'btn-select-t') joinTerrorists();
+  });
+
+  const btnCT = document.getElementById('btn-select-ct');
+  if (btnCT) btnCT.addEventListener('click', joinCounterTerrorists);
+  const sideCT = document.querySelector('.side-counter-terrorists');
+  if (sideCT) sideCT.addEventListener('click', (e) => {
+    if (e.target.id !== 'btn-select-ct') joinCounterTerrorists();
   });
 
   // 6. Custom Room Lobby
