@@ -150,7 +150,7 @@ class CS2MapBuilder {
     }
 
     // ==========================================================
-    // MAP BOUNDARIES & OBSTACLES (Outer Perimeter Limits)
+    // MAP BOUNDARIES & OBSTACLES (Outer Perimeter Limits & Anti-Escape Clips)
     // ==========================================================
     // Outer skybox boundaries preventing walking off into void
     this.addCollider(0, -15, -165, 260, 45, 12); // North limit
@@ -158,15 +158,22 @@ class CS2MapBuilder {
     this.addCollider(-115, -15, -50, 12, 45, 260); // West limit
     this.addCollider(88, -15, -50, 12, 45, 260);  // East limit
 
+    // Canyon Cliff Top Invisible Barrier Clips (Blocks escaping onto the mountain ridges shown in Pic 2 & 3)
+    this.addCollider(-50, 4.0, -10, 80, 20, 10);  // Canyon wall ridge above mid
+    this.addCollider(-75, 4.0, -35, 30, 20, 40);  // Canyon cliff above B doors / tunnels
+    this.addCollider(-20, 4.0, -60, 40, 20, 25);  // Canyon ridge above double doors
+    this.addCollider(55, 5.0, -120, 30, 20, 60);  // Canyon ridge east of A site
+    this.addCollider(-85, 3.5, -90, 25, 20, 50);  // Wall above B site back plateau
+
     // ==========================================================
     // BOMBSITES & BUY ZONES (100% Authentic Dust 2 Geometry)
     // ==========================================================
 
-    // Bombsite A (Platform at Y = 4.3)
-    this.addBombsiteZone('A', 28.0, 4.3, -118.0, 8.5);
+    // Bombsite A: Positioned directly at the platform triple boxes (Pic 4)
+    this.addBombsiteZone('A', 34.0, 4.3, -128.0, 9.5);
 
-    // Bombsite B (Courtyard at Y = 0.0)
-    this.addBombsiteZone('B', -72.0, 0.0, -98.0, 8.5);
+    // Bombsite B: Positioned directly in the courtyard spray between crates (Pic 5)
+    this.addBombsiteZone('B', -66.0, 0.05, -91.0, 9.5);
 
     // Authentic Buy Zones matching CT & T Spawns
     this.buyZones.CT = { minX: -25, maxX: 15, minZ: -115, maxZ: -85 };

@@ -1093,4 +1093,159 @@ body, html {
 .pause-box { background: var(--cs-panel-bg); border: 1px solid var(--cs-panel-border); border-radius: 6px; padding: 24px; width: 320px; display: flex; flex-direction: column; gap: 12px; text-align: center; }
 .pause-box h2 { font-family: var(--cs-font-display); font-size: 18px; color: #fff; margin-bottom: 8px; }
 
+/* ==============================================================
+   C4 Planted Pulsing Clock HUD Indicator (Replaces standard timer)
+   ============================================================== */
+.c4-planted-clock {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+}
+.c4-pulsing-bomb-icon {
+  width: 32px;
+  height: 24px;
+  animation: c4PulseAnim 0.75s ease-in-out infinite alternate;
+}
+.c4-bomb-svg {
+  width: 100%;
+  height: 100%;
+  filter: drop-shadow(0 0 6px #ff2222);
+}
+@keyframes c4PulseAnim {
+  0% { transform: scale(0.95); filter: drop-shadow(0 0 4px #ff3311); }
+  100% { transform: scale(1.25); filter: drop-shadow(0 0 16px #ff0000); }
+}
+.c4-clock-label {
+  font-family: var(--cs-font-display);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  color: #ff3b30;
+  text-shadow: 0 0 8px rgba(255, 59, 48, 0.8);
+}
+
+/* ==============================================================
+   Round End Victory & MVP Overlay Banner
+   ============================================================== */
+.round-end-overlay {
+  position: absolute;
+  top: 18%;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 120;
+  pointer-events: none;
+  animation: roundEndFadeIn 0.3s ease-out;
+}
+@keyframes roundEndFadeIn {
+  from { opacity: 0; transform: translate(-50%, -15px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+.round-end-box {
+  background: rgba(12, 17, 24, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  padding: 16px 36px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.75);
+}
+.round-end-title {
+  font-family: var(--cs-font-display);
+  font-size: 26px;
+  font-weight: 900;
+  letter-spacing: 2px;
+  text-shadow: 0 0 16px currentColor;
+}
+.round-end-title.ct-win {
+  color: #5bb3f5;
+  text-shadow: 0 0 20px rgba(91, 179, 245, 0.7);
+}
+.round-end-title.t-win {
+  color: #f5a623;
+  text-shadow: 0 0 20px rgba(245, 166, 35, 0.7);
+}
+.round-end-reason {
+  font-family: var(--cs-font-display);
+  font-size: 13px;
+  letter-spacing: 1.5px;
+  color: #94a3b8;
+  font-weight: 600;
+}
+.round-end-mvp {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--cs-font-display);
+  font-size: 13px;
+  color: #fbbf24;
+}
+.mvp-star {
+  font-size: 18px;
+  color: #f59e0b;
+  text-shadow: 0 0 10px #f59e0b;
+}
+
+/* ==============================================================
+   Smoke Blindness Overlay (Impenetrable CS2 Gray Screen inside Smoke)
+   ============================================================== */
+#smoke-blindness-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(190, 195, 202, 0.98);
+  backdrop-filter: blur(12px);
+  z-index: 55;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s ease-out;
+}
+#smoke-blindness-overlay.active {
+  opacity: 1;
+}
+
+/* ==============================================================
+   Buy Menu Vector Icons & Revert Button
+   ============================================================== */
+.wc-icon-wrap {
+  width: 100%;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 6px;
+}
+.buy-svg {
+  max-width: 80px;
+  max-height: 44px;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.6));
+}
+.btn-card-revert {
+  margin-top: 8px;
+  width: 100%;
+  background: rgba(239, 68, 68, 0.2);
+  border: 1px solid #ef4444;
+  color: #fca5a5;
+  font-family: var(--cs-font-display);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 8px;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.btn-card-revert:hover {
+  background: rgba(239, 68, 68, 0.4);
+  color: #fff;
+  border-color: #f87171;
+}
+
 .hidden { display: none !important; }

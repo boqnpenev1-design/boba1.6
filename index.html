@@ -30,9 +30,22 @@
     <div class="scope-lens"></div>
   </div>
 
-  <!-- Hit / Flash Overlays -->
+  <!-- Hit / Flash / Smoke Overlays -->
   <div id="damage-vignette"></div>
   <div id="flash-overlay"></div>
+  <div id="smoke-blindness-overlay"></div>
+
+  <!-- Round End Victory & MVP Overlay -->
+  <div id="round-end-overlay" class="round-end-overlay hidden">
+    <div class="round-end-box">
+      <div class="round-end-title" id="round-winner-title">COUNTER-TERRORISTS WIN</div>
+      <div class="round-end-reason" id="round-winner-reason">BOMB DEFUSED</div>
+      <div class="round-end-mvp" id="round-mvp-box">
+        <span class="mvp-star">★</span>
+        <span class="mvp-text">MVP: <strong id="round-mvp-name">Player</strong> <span id="round-mvp-reason">for eliminating 3 opponents</span></span>
+      </div>
+    </div>
+  </div>
 
   <!-- Spectator HUD Overlay -->
   <div id="spectator-hud" class="hidden">
@@ -59,10 +72,19 @@
       <div class="match-clock-box">
         <div class="round-status-text" id="round-phase-label">FREEZETIME</div>
         <div class="round-timer" id="round-timer">0:15</div>
-        <div class="bomb-carrier-indicator hidden" id="c4-planted-alert">
-          <span class="bomb-icon">💣</span>
-          <span class="bomb-label" style="font-weight:700;color:#ff3322;letter-spacing:1px;font-size:12px;">BOMB PLANTED</span>
+        <div class="c4-planted-clock hidden" id="c4-planted-clock">
+          <div class="c4-pulsing-bomb-icon">
+            <svg viewBox="0 0 32 32" class="c4-bomb-svg">
+              <rect x="6" y="10" width="20" height="15" rx="3" fill="#ff2222" />
+              <rect x="10" y="6" width="12" height="4" rx="1" fill="#cc1111" />
+              <rect x="14" y="2" width="4" height="4" fill="#333333" />
+              <line x1="16" y1="2" x2="22" y2="0" stroke="#ffaa00" stroke-width="2" stroke-linecap="round"/>
+              <circle cx="16" cy="17" r="4" fill="#ffffff" class="c4-led-blink"/>
+            </svg>
+          </div>
+          <div class="c4-clock-label">BOMB PLANTED</div>
         </div>
+        <div class="bomb-carrier-indicator hidden" id="c4-planted-alert"></div>
       </div>
 
       <div class="team-score-card t-score-card">
@@ -461,14 +483,14 @@
     </div>
   </div>
 
-  <!-- Game Scripts (Cache-busted v5.3 - FPS Optimized, Box Climbing, Jump Reverted, Refund Hidden) -->
-  <script src="js/audio.js?v=5.6"></script>
-  <script src="js/antiCheat.js?v=5.6"></script>
-  <script src="js/weapons.js?v=5.6"></script>
-  <script src="js/maps.js?v=5.6"></script>
-  <script src="js/player.js?v=5.6"></script>
-  <script src="js/network.js?v=5.6"></script>
-  <script src="js/game.js?v=5.6"></script>
-  <script src="js/main.js?v=5.6"></script>
+  <!-- Game Scripts (v5.7 Authentic Fixes) -->
+  <script src="js/audio.js?v=5.7"></script>
+  <script src="js/antiCheat.js?v=5.7"></script>
+  <script src="js/weapons.js?v=5.7"></script>
+  <script src="js/maps.js?v=5.7"></script>
+  <script src="js/player.js?v=5.7"></script>
+  <script src="js/network.js?v=5.7"></script>
+  <script src="js/game.js?v=5.7"></script>
+  <script src="js/main.js?v=5.7"></script>
 </body>
 </html>

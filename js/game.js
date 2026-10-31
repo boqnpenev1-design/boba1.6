@@ -251,13 +251,23 @@ class CS2GameManager {
     this.c4Mesh.visible = false;
     this.purchaseHistory = [];
 
-    // Reset HUD
+    // Reset HUD & Victory/MVP Overlay
+    const roundEndOverlay = document.getElementById('round-end-overlay');
+    if (roundEndOverlay) roundEndOverlay.classList.add('hidden');
+
+    const timerEl = document.getElementById('round-timer');
+    const phaseEl = document.getElementById('round-phase-label');
+    const c4Clock = document.getElementById('c4-planted-clock');
+    if (timerEl) timerEl.classList.remove('hidden');
+    if (phaseEl) phaseEl.classList.remove('hidden');
+    if (c4Clock) c4Clock.classList.add('hidden');
+
     document.getElementById('c4-planted-alert').classList.add('hidden');
     document.getElementById('action-prompt').classList.add('hidden');
     document.getElementById('interaction-bar-container').classList.add('hidden');
     document.getElementById('spectator-hud').classList.add('hidden');
 
-    window.csAudio.playRadioTone('start');
+    window.csAudio.playRoundStart();
 
     // First round / Halftime: Strictly pistol + knife + ammo (No free grenades)
     if (this.currentRound === 1 || this.currentRound === 13) {
@@ -348,14 +358,28 @@ class CS2GameManager {
     this.c4Mesh.position.set(position.x, posY, position.z);
     this.c4Mesh.visible = true;
 
-    document.getElementById('c4-planted-alert').classList.remove('hidden');
+    // Hide normal clock timer and display pulsating red bomb icon right in match-clock-box
+    const timerEl = document.getElementById('round-timer');
+    const phaseEl = document.getElementById('round-phase-label');
+    const c4Clock = document.getElementById('c4-planted-clock');
+    if (timerEl) timerEl.classList.add('hidden');
+    if (phaseEl) phaseEl.classList.add('hidden');
+    if (c4Clock) c4Clock.classList.remove('hidden');
+
+    document.getElementById('c4-planted-alert').classList.add('hidden');
     window.csAudio.playRadioTone('alert');
   }
 
   onC4Defused() {
     this.c4Planted = false;
     this.c4Mesh.visible = false;
-    document.getElementById('c4-planted-alert').classList.add('hidden');
+    const timerEl = document.getElementById('round-timer');
+    const phaseEl = document.getElementById('round-phase-label');
+    const c4Clock = document.getElementById('c4-planted-clock');
+    if (timerEl) timerEl.classList.remove('hidden');
+    if (phaseEl) phaseEl.classList.remove('hidden');
+    if (c4Clock) c4Clock.classList.add('hidden');
+
     this.endRound('CT', 'BOMB DEFUSED');
   }
 
@@ -396,6 +420,14 @@ class CS2GameManager {
     this.phase = 'round_over';
     this.phaseTimer = 5;
 
+    // Restore timer UI if bomb had hidden it
+    const timerEl = document.getElementById('round-timer');
+    const phaseEl = document.getElementById('round-phase-label');
+    const c4Clock = document.getElementById('c4-planted-clock');
+    if (timerEl) timerEl.classList.remove('hidden');
+    if (phaseEl) phaseEl.classList.remove('hidden');
+    if (c4Clock) c4Clock.classList.add('hidden');
+
     // Broadcast round end to all connected clients
     if (this.net && this.net.isHost) {
       this.net.broadcast({
@@ -409,12 +441,41 @@ class CS2GameManager {
       this.ctScore++;
       this.consecutiveLosses.CT = 0;
       this.consecutiveLosses.T++;
-      window.csAudio.playRadioTone('win');
     } else {
       this.tScore++;
       this.consecutiveLosses.T = 0;
       this.consecutiveLosses.CT++;
-      window.csAudio.playRadioTone('win');
+    }
+
+    // Play triumphant brass fanfare for round victory
+    window.csAudio.playRoundEnd(winner);
+
+    // Calculate match & round MVP (player with most eliminations / performance)
+    let mvpName = 'You';
+    let mvpReason = 'for most eliminations';
+    let maxKills = this.player.kills || 0;
+    if (this.net && this.net.remotePlayers) {
+      Object.values(this.net.remotePlayers).forEach(p => {
+        if (p && p.name && (p.kills > maxKills)) {
+          maxKills = p.kills;
+          mvpName = p.name;
+        }
+      });
+    }
+
+    // Display authentic CS2 Round End Overlay
+    const overlay = document.getElementById('round-end-overlay');
+    const winTitle = document.getElementById('round-winner-title');
+    const winReason = document.getElementById('round-winner-reason');
+    const mvpNameEl = document.getElementById('round-mvp-name');
+    const mvpReasonEl = document.getElementById('round-mvp-reason');
+    if (overlay && winTitle && winReason) {
+      winTitle.textContent = (winner === 'CT') ? 'COUNTER-TERRORISTS WIN' : 'TERRORISTS WIN';
+      winTitle.className = `round-end-title ${winner === 'CT' ? 'ct-win' : 't-win'}`;
+      winReason.textContent = reason;
+      if (mvpNameEl) mvpNameEl.textContent = mvpName;
+      if (mvpReasonEl) mvpReasonEl.textContent = `for eliminating ${maxKills} opponents`;
+      overlay.classList.remove('hidden');
     }
 
     const winBonus = 3250;
@@ -440,6 +501,60 @@ class CS2GameManager {
         this.startRound();
       }, 5000);
     }
+  }
+
+  // 3D Visual C4 Explosion Effect with screen shake & radial shockwave
+  spawnC4ExplosionEffect(pos) {
+    if (!pos) return;
+    const expGroup = new THREE.Group();
+    expGroup.position.copy(pos);
+
+    // Blast fireball
+    const ballGeo = new THREE.SphereGeometry(7.0, 14, 14);
+    const ballMat = new THREE.MeshBasicMaterial({ color: 0xff4400, transparent: true, opacity: 0.95 });
+    const ball = new THREE.Mesh(ballGeo, ballMat);
+    expGroup.add(ball);
+
+    // Horizontal shockwave ring
+    const ringGeo = new THREE.RingGeometry(0.5, 5.0, 32);
+    const ringMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.9, side: THREE.DoubleSide });
+    const ring = new THREE.Mesh(ringGeo, ringMat);
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.y = 0.25;
+    expGroup.add(ring);
+
+    const expLight = new THREE.PointLight(0xff7711, 28, 70);
+    expLight.position.set(0, 3, 0);
+    expGroup.add(expLight);
+
+    this.scene.add(expGroup);
+
+    // Camera screen shake based on blast proximity
+    const dist = this.player.position.distanceTo(pos);
+    const shakeIntensity = Math.max(0, 0.40 * (1 - dist / 55));
+    this.player.pitch += (Math.random() - 0.5) * shakeIntensity;
+    this.player.yaw += (Math.random() - 0.5) * shakeIntensity;
+
+    const t0 = performance.now();
+    const anim = setInterval(() => {
+      const el = (performance.now() - t0) / 1000;
+      if (el > 1.2) {
+        clearInterval(anim);
+        this.scene.remove(expGroup);
+        ballGeo.dispose();
+        ballMat.dispose();
+        ringGeo.dispose();
+        ringMat.dispose();
+      } else {
+        const s = 1.0 + el * 5.0;
+        ball.scale.set(s, s * 0.8, s);
+        ballMat.opacity = Math.max(0, 0.95 - el * 0.85);
+        const ringS = 1.0 + el * 10.0;
+        ring.scale.set(ringS, ringS, ringS);
+        ringMat.opacity = Math.max(0, 0.9 - el * 0.9);
+        expLight.intensity = Math.max(0, 28 * (1 - el / 1.2));
+      }
+    }, 16);
   }
 
   endMatch() {
@@ -813,9 +928,36 @@ class CS2GameManager {
         }
 
         if (this.c4Timer <= 0) {
+          const boomPos = this.c4Pos ? this.c4Pos.clone() : this.c4Mesh.position.clone();
           this.c4Planted = false;
           this.c4Mesh.visible = false;
           window.csAudio.playExplosion();
+
+          // Spawn authentic fireball animation & shockwave
+          this.spawnC4ExplosionEffect(boomPos);
+
+          // Distance-based blast damage: closer to bomb = greater damage (lethal up to 55m)
+          const dist = this.player.position.distanceTo(boomPos);
+          if (dist < 55) {
+            const factor = Math.pow(Math.max(0, 1 - dist / 55), 1.6);
+            const blastDamage = Math.round(500 * factor);
+            this.player.takeDamage(blastDamage, 'C4 Explosive', 'c4');
+          }
+
+          // Damage remote players
+          if (this.net && this.net.remotePlayers) {
+            Object.entries(this.net.remotePlayers).forEach(([id, rp]) => {
+              if (rp && rp.mesh) {
+                const rDist = rp.mesh.position.distanceTo(boomPos);
+                if (rDist < 55) {
+                  const factor = Math.pow(Math.max(0, 1 - rDist / 55), 1.6);
+                  const dmg = Math.round(500 * factor);
+                  this.net.sendDamage(id, dmg, 'C4 Explosive', false);
+                }
+              }
+            });
+          }
+
           this.endRound('T', 'TARGET DESTROYED');
         }
       } else {

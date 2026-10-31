@@ -132,19 +132,26 @@ class CS2Player {
     this.recoilPitch = 0;
     this.recoilYaw = 0;
 
-    // Viewmodel Rig
+    // Viewmodel Rig with Dedicated Studio Lighting (Ensures vibrant, never-black weapon skins)
     this.viewmodelGroup = new THREE.Group();
     this.camera.add(this.viewmodelGroup);
     this.weaponRig = new THREE.Group();
     this.viewmodelGroup.add(this.weaponRig);
 
+    // Dedicated viewmodel lights (eliminates black silhouettes in shadows)
+    const vmAmbient = new THREE.AmbientLight(0xffffff, 1.4);
+    this.viewmodelGroup.add(vmAmbient);
+    const vmDir = new THREE.DirectionalLight(0xfff5e6, 0.8);
+    vmDir.position.set(0.5, 1.5, 1.0);
+    this.viewmodelGroup.add(vmDir);
+
     // Muzzle Flash
     this.muzzleLight = new THREE.PointLight(0xffaa33, 0, 8);
-    this.muzzleLight.position.set(0.18, -0.16, -0.85);
+    this.muzzleLight.position.set(0.16, -0.12, -0.65);
     const flashGeo = new THREE.SphereGeometry(0.065, 5, 5);
     const flashMat = new THREE.MeshBasicMaterial({ color: 0xffdd66 });
     this.muzzleFlashMesh = new THREE.Mesh(flashGeo, flashMat);
-    this.muzzleFlashMesh.position.set(0.18, -0.16, -0.85);
+    this.muzzleFlashMesh.position.set(0.16, -0.12, -0.65);
     this.muzzleFlashMesh.visible = false;
     this.viewmodelGroup.add(this.muzzleLight);
     this.viewmodelGroup.add(this.muzzleFlashMesh);
@@ -270,16 +277,16 @@ class CS2Player {
     'defuser': 'w_eq_defuser.png'
   };
 
-  // Viewmodel positioning per weapon category: authentic CS scale (0.016) & forward orientation
+  // Viewmodel positioning per weapon category: authentic CS scale (0.016) & barrel pointing forward into crosshair
   static WEAPON_VIEWMODEL = {
-    'pistols':    { pos: [0.14, -0.15, -0.28], scale: 0.018, rot: [-Math.PI / 2, Math.PI, 0] },
-    'smgs':       { pos: [0.15, -0.16, -0.30], scale: 0.017, rot: [-Math.PI / 2, Math.PI, 0] },
-    'rifles':     { pos: [0.15, -0.15, -0.28], scale: 0.016, rot: [-Math.PI / 2, Math.PI, 0] },
-    'shotguns':   { pos: [0.15, -0.16, -0.30], scale: 0.016, rot: [-Math.PI / 2, Math.PI, 0] },
-    'machineguns':{ pos: [0.14, -0.16, -0.30], scale: 0.016, rot: [-Math.PI / 2, Math.PI, 0] },
-    'snipers':    { pos: [0.14, -0.15, -0.28], scale: 0.016, rot: [-Math.PI / 2, Math.PI, 0] },
-    'equipment':  { pos: [0.14, -0.15, -0.28], scale: 0.018, rot: [-Math.PI / 2, Math.PI, 0] },
-    'knife':      { pos: [0.15, -0.15, -0.26], scale: 0.016, rot: [-Math.PI / 2, Math.PI, 0] }
+    'pistols':    { pos: [0.14, -0.15, -0.28], scale: 0.018, rot: [-Math.PI / 2, 0, 0] },
+    'smgs':       { pos: [0.15, -0.16, -0.30], scale: 0.017, rot: [-Math.PI / 2, 0, 0] },
+    'rifles':     { pos: [0.15, -0.15, -0.28], scale: 0.016, rot: [-Math.PI / 2, 0, 0] },
+    'shotguns':   { pos: [0.15, -0.16, -0.30], scale: 0.016, rot: [-Math.PI / 2, 0, 0] },
+    'machineguns':{ pos: [0.14, -0.16, -0.30], scale: 0.016, rot: [-Math.PI / 2, 0, 0] },
+    'snipers':    { pos: [0.14, -0.15, -0.28], scale: 0.016, rot: [-Math.PI / 2, 0, 0] },
+    'equipment':  { pos: [0.14, -0.15, -0.28], scale: 0.018, rot: [-Math.PI / 2, 0, 0] },
+    'knife':      { pos: [0.15, -0.15, -0.26], scale: 0.016, rot: [-Math.PI / 2, 0, 0] }
   };
 
   // Loads the FBX file containing all CSS weapon meshes
@@ -493,6 +500,18 @@ class CS2Player {
 
   // Maps every single weapon to its FBX mesh from the loaded model pack
   buildTexturedWeaponModel(w, group) {
+    // Dedicated Molotov Cocktail Model (glass bottle + cloth rag + flaming wick)
+    if (w.id === 'molotov' || w.id === 'incgrenade') {
+      this.buildMolotovCocktail(group);
+      return;
+    }
+
+    // Fallback: C4 always uses procedural (no FBX mesh for it)
+    if (w.id === 'c4') {
+      this.buildProceduralC4(group);
+      return;
+    }
+
     // Try to use real FBX mesh first
     if (this.weaponModelsLoaded && this.weaponMeshCache) {
       const meshName = CS2Player.WEAPON_MESH_MAP[w.id];
@@ -501,23 +520,29 @@ class CS2Player {
         if (cachedMesh) {
           const weaponClone = cachedMesh.clone(true);
 
-          // Apply the correct texture
+          // Apply authentic weapon texture with full vertex normal computation
           const texFile = CS2Player.WEAPON_TEX_MAP[w.id];
           if (texFile) {
             const tex = this.getWeaponTexture(texFile);
             weaponClone.traverse((child) => {
               if (child.isMesh) {
+                if (child.geometry) child.geometry.computeVertexNormals();
                 child.material = new THREE.MeshLambertMaterial({
                   map: tex,
+                  color: 0xffffff,
                   side: THREE.DoubleSide
                 });
+                child.material.needsUpdate = true;
               }
             });
             if (weaponClone.isMesh) {
+              if (weaponClone.geometry) weaponClone.geometry.computeVertexNormals();
               weaponClone.material = new THREE.MeshLambertMaterial({
                 map: tex,
+                color: 0xffffff,
                 side: THREE.DoubleSide
               });
+              weaponClone.material.needsUpdate = true;
             }
           }
 
@@ -535,20 +560,73 @@ class CS2Player {
           weaponClone.scale.set(vm.scale, vm.scale, vm.scale);
           weaponClone.rotation.set(vm.rot[0], vm.rot[1], vm.rot[2]);
 
+          // Position muzzle flash precisely at the forward barrel tip
+          const isPistol = (cat === 'pistols');
+          const isSniper = (cat === 'snipers');
+          const barrelTipZ = isSniper ? -0.92 : (isPistol ? -0.52 : -0.78);
+          this.muzzleFlashMesh.position.set(vm.pos[0] + 0.01, vm.pos[1] + 0.03, barrelTipZ);
+          this.muzzleLight.position.copy(this.muzzleFlashMesh.position);
+
           group.add(weaponClone);
           return; // Successfully used real model
         }
       }
     }
 
-    // Fallback: C4 always uses procedural (no FBX mesh for it)
-    if (w.id === 'c4') {
-      this.buildProceduralC4(group);
-      return;
-    }
-
     // Fallback: procedural model when FBX not loaded yet
     this.buildProceduralWeapon(w, group);
+  }
+
+  // Authentic CS2 Molotov Cocktail model with amber bottle, rag wick, and flickering flame
+  buildMolotovCocktail(group) {
+    const molyGroup = new THREE.Group();
+
+    // Amber/brown glass bottle body
+    const bottleGeo = new THREE.CylinderGeometry(0.042, 0.042, 0.17, 12);
+    const bottleMat = new THREE.MeshLambertMaterial({
+      color: 0x964b00,
+      transparent: true,
+      opacity: 0.88,
+      side: THREE.DoubleSide
+    });
+    const bottle = new THREE.Mesh(bottleGeo, bottleMat);
+    bottle.position.set(0, -0.02, 0);
+    molyGroup.add(bottle);
+
+    // Tapered neck
+    const neckGeo = new THREE.CylinderGeometry(0.016, 0.026, 0.09, 10);
+    const neckMat = new THREE.MeshLambertMaterial({
+      color: 0x8b4513,
+      transparent: true,
+      opacity: 0.90,
+      side: THREE.DoubleSide
+    });
+    const neck = new THREE.Mesh(neckGeo, neckMat);
+    neck.position.set(0, 0.11, 0);
+    molyGroup.add(neck);
+
+    // Cloth rag wick
+    const wickGeo = new THREE.CylinderGeometry(0.010, 0.012, 0.08, 8);
+    const wickMat = new THREE.MeshLambertMaterial({ color: 0xdedede });
+    const wick = new THREE.Mesh(wickGeo, wickMat);
+    wick.position.set(0, 0.17, 0);
+    wick.rotation.z = 0.2;
+    molyGroup.add(wick);
+
+    // Burning flame at wick tip
+    const flameGeo = new THREE.ConeGeometry(0.028, 0.065, 8);
+    const flameMat = new THREE.MeshBasicMaterial({ color: 0xff6600 });
+    const flame = new THREE.Mesh(flameGeo, flameMat);
+    flame.position.set(0.012, 0.22, 0);
+    molyGroup.add(flame);
+
+    const flameLight = new THREE.PointLight(0xff5511, 1.2, 3);
+    flameLight.position.set(0.012, 0.22, 0);
+    molyGroup.add(flameLight);
+
+    molyGroup.position.set(0.14, -0.18, -0.32);
+    molyGroup.rotation.set(-0.25, 0.2, 0);
+    group.add(molyGroup);
   }
 
   // Procedural C4 Bomb with LCD and Keypad
@@ -773,29 +851,65 @@ class CS2Player {
   }
 
   dropCurrentWeapon() {
-    // Cannot drop knife
-    if (this.activeSlot === 3) return;
-    if (!this.activeWeapon || !this.inventory[this.activeSlot]) return;
+    this.dropWeaponBySlot(this.activeSlot);
+  }
 
-    const droppedWeapon = this.activeWeapon;
-    const dropSlot = this.activeSlot;
+  dropWeaponBySlot(dropSlot) {
+    // Cannot drop knife (Slot 3)
+    if (dropSlot === 3) return;
+    if (!this.inventory[dropSlot]) return;
 
-    // Create 3D pickup mesh on the ground
+    const droppedWeapon = this.inventory[dropSlot];
+
+    // Create authentic 3D pickup mesh on the ground
     const dropGroup = new THREE.Group();
-    const bodyGeo = new THREE.BoxGeometry(0.12, 0.08, 0.45);
-    const bodyMat = new THREE.MeshLambertMaterial({ color: 0x444c58 });
-    const body = new THREE.Mesh(bodyGeo, bodyMat);
-    dropGroup.add(body);
+    let meshCreated = false;
 
-    // Position in front of player at ground level
+    if (this.weaponModelsLoaded && this.weaponMeshCache) {
+      const meshName = CS2Player.WEAPON_MESH_MAP[droppedWeapon.id];
+      if (meshName) {
+        const cached = this.findWeaponMesh(meshName);
+        if (cached) {
+          const clone = cached.clone(true);
+          const texFile = CS2Player.WEAPON_TEX_MAP[droppedWeapon.id];
+          if (texFile) {
+            const tex = this.getWeaponTexture(texFile);
+            clone.traverse((child) => {
+              if (child.isMesh) {
+                if (child.geometry) child.geometry.computeVertexNormals();
+                child.material = new THREE.MeshLambertMaterial({
+                  map: tex,
+                  color: 0xffffff,
+                  side: THREE.DoubleSide
+                });
+              }
+            });
+          }
+          clone.scale.set(0.016, 0.016, 0.016);
+          clone.rotation.set(-Math.PI / 2, 0, 0);
+          dropGroup.add(clone);
+          meshCreated = true;
+        }
+      }
+    }
+
+    if (!meshCreated) {
+      const texFile = CS2Player.WEAPON_TEX_MAP[droppedWeapon.id] || 'w_rif_ak47.png';
+      const tex = this.getWeaponTexture(texFile);
+      const boxMat = new THREE.MeshLambertMaterial({ map: tex, color: 0xffffff, side: THREE.DoubleSide });
+      const box = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.08, 0.45), boxMat);
+      dropGroup.add(box);
+    }
+
+    // Position weapon on the ground in front of the player
     const fwd = new THREE.Vector3(-Math.sin(this.yaw), 0, -Math.cos(this.yaw));
-    const dropPos = this.position.clone().addScaledVector(fwd, 1.5);
-    dropPos.y = this.lastGroundY + 0.15;
+    const dropPos = this.position.clone().addScaledVector(fwd, 1.2);
+    dropPos.y = (this.lastGroundY !== undefined ? this.lastGroundY : 0.0) + 0.08;
     dropGroup.position.copy(dropPos);
-    dropGroup.rotation.y = this.yaw + Math.random() * 0.5;
+    dropGroup.rotation.y = this.yaw + 1.2;
     this.scene.add(dropGroup);
 
-    // Store as world pickup
+    // Register in world dropped items pool
     if (!window._droppedItems) window._droppedItems = [];
     window._droppedItems.push({
       mesh: dropGroup,
@@ -804,7 +918,7 @@ class CS2Player {
       pos: dropPos
     });
 
-    // Remove from inventory
+    // Remove from player inventory
     this.inventory[dropSlot] = null;
     if (dropSlot === 4) {
       const idx = this.grenades.findIndex(g => g && g.id === droppedWeapon.id);
@@ -814,48 +928,75 @@ class CS2Player {
       }
     }
 
-    // Save ammo state for the dropped weapon
-    const savedAmmo = this.weaponAmmo[droppedWeapon.id];
-
-    // Switch to next available weapon
-    const priorities = [2, 1, 3, 4, 5];
-    let switched = false;
-    for (const s of priorities) {
-      if (s !== dropSlot && this.inventory[s]) {
-        this.switchSlot(s);
-        switched = true;
-        break;
+    // If we dropped the active weapon, switch to next available slot
+    if (this.activeSlot === dropSlot) {
+      const priorities = [1, 2, 3, 4, 5];
+      let switched = false;
+      for (const s of priorities) {
+        if (s !== dropSlot && this.inventory[s]) {
+          this.switchSlot(s);
+          switched = true;
+          break;
+        }
       }
+      if (!switched) this.switchSlot(3);
     }
-    if (!switched) this.switchSlot(3);
 
     window.csAudio.playWeaponEquip('knife');
   }
 
-  // Pick up dropped weapon (E key or walk-over proximity)
+  // Pick up dropped weapon (walk-over proximity or pressing [E])
   checkPickupItems() {
     if (!window._droppedItems || window._droppedItems.length === 0) return;
+    const feetY = this.position.y - this.playerHeight;
+    const actionPrompt = document.getElementById('action-prompt');
+    const actionText = document.getElementById('action-prompt-text');
+
+    let nearbyPrompt = null;
+
     for (let i = window._droppedItems.length - 1; i >= 0; i--) {
       const item = window._droppedItems[i];
-      const dist = this.position.distanceTo(item.pos);
-      if (dist < 2.0) {
-        // Auto-pickup by walking over, or E key
-        if (this.keys[this.keybinds.use] || dist < 1.2) {
-          // Can pick up if slot is empty or same category
+      const dx = this.position.x - item.pos.x;
+      const dz = this.position.z - item.pos.z;
+      const horizDist = Math.hypot(dx, dz);
+      const vertDist = Math.abs(feetY - item.pos.y);
+
+      if (horizDist < 2.4 && vertDist < 2.0) {
+        nearbyPrompt = `PICK UP ${item.weapon.name}`;
+
+        // Auto pickup on close walkover if slot is completely empty
+        const slotEmpty = !this.inventory[item.slot];
+        const wantPickup = (this.keys[this.keybinds.use]) || (horizDist < 1.3 && slotEmpty);
+
+        if (wantPickup) {
           const targetSlot = item.slot;
+
+          // If slot already has a weapon and player presses E to swap, drop existing weapon first
+          if (this.inventory[targetSlot] && targetSlot !== 4) {
+            this.dropWeaponBySlot(targetSlot);
+          }
+
           if (targetSlot === 4) {
             this.grenades.push(item.weapon);
             this.inventory[4] = item.weapon;
           } else {
             this.inventory[targetSlot] = item.weapon;
           }
+
           this.switchSlot(targetSlot);
           this.scene.remove(item.mesh);
           window._droppedItems.splice(i, 1);
           window.csAudio.playWeaponEquip(item.weapon.id);
+
+          if (actionPrompt) actionPrompt.classList.add('hidden');
           break;
         }
       }
+    }
+
+    if (nearbyPrompt && actionPrompt && actionText && !this.isPlanting && !this.isDefusing) {
+      actionText.textContent = nearbyPrompt;
+      actionPrompt.classList.remove('hidden');
     }
   }
 
@@ -943,13 +1084,11 @@ class CS2Player {
   }
 
   updateSlotHUD() {
-    for (let s = 1; s <= 5; s++) {
-      const el = document.getElementById(`slot-${s}`);
-      if (el) {
-        if (s === this.activeSlot) el.classList.add('active');
-        else el.classList.remove('active');
-      }
-    }
+    const slotElements = document.querySelectorAll('.slot-item');
+    slotElements.forEach(el => {
+      const s = parseInt(el.dataset.slot, 10);
+      el.classList.toggle('active', s === this.activeSlot);
+    });
   }
 
   startReload() {
@@ -1098,9 +1237,23 @@ class CS2Player {
     if (this.map && this.map.groundMeshes && this.map.groundMeshes.length > 0) {
       wallObstacles = this.shootRaycaster.intersectObjects(this.map.groundMeshes, false);
       if (wallObstacles.length > 0 && wallObstacles[0].distance < 80) {
-        this.spawnBulletHole(wallObstacles[0].point, wallObstacles[0].face.normal);
+        const hit = wallObstacles[0];
+        const normalMatrix = new THREE.Matrix3().getNormalMatrix(hit.object.matrixWorld);
+        const worldNormal = hit.face.normal.clone().applyMatrix3(normalMatrix).normalize();
+        this.spawnBulletHole(hit.point, worldNormal);
       }
     }
+
+    // Spawn authentic CS2 bullet tracer extending from forward barrel tip to impact point
+    const muzzlePos = new THREE.Vector3();
+    this.muzzleFlashMesh.getWorldPosition(muzzlePos);
+    const targetPoint = new THREE.Vector3();
+    if (wallObstacles.length > 0 && wallObstacles[0].distance < 80) {
+      targetPoint.copy(wallObstacles[0].point);
+    } else {
+      targetPoint.copy(this.camera.position).addScaledVector(this.shootCamDir, 75);
+    }
+    this.spawnTracer(muzzlePos, targetPoint);
 
     // Hit players with authentic headshot/body multiplier, hit sound, and strict penetration rules
     if (gameManager && gameManager.net) {
@@ -1163,9 +1316,26 @@ class CS2Player {
     const decal = this.bulletHolePool[this.bulletHolePoolIndex];
     this.bulletHolePoolIndex = (this.bulletHolePoolIndex + 1) % this.bulletHolePool.length;
 
-    decal.position.copy(point).addScaledVector(normal, 0.012);
+    decal.position.copy(point).addScaledVector(normal, 0.015);
     decal.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), normal);
     decal.visible = true;
+  }
+
+  // Authentic CS2 tracer line from forward barrel tip to impact point
+  spawnTracer(start, end) {
+    const geo = new THREE.BufferGeometry().setFromPoints([start, end]);
+    const mat = new THREE.LineBasicMaterial({
+      color: 0xffe680,
+      transparent: true,
+      opacity: 0.95
+    });
+    const line = new THREE.Line(geo, mat);
+    this.scene.add(line);
+    setTimeout(() => {
+      this.scene.remove(line);
+      geo.dispose();
+      mat.dispose();
+    }, 45);
   }
 
   // Physical thrown utility with authentic trajectory & velocity
@@ -1326,19 +1496,23 @@ class CS2Player {
         } else if (g.type === 'smokegrenade') {
           window.csAudio.playSmokeEmit();
 
-          // High-Performance CS2 Volumetric Smoke (Zero Multi-Mesh Overdraw Lag)
-          // 1 Single Optimized 5.2m Sphere with soft depthWrite: false
-          const smokeGeo = new THREE.SphereGeometry(5.2, 10, 10);
+          // Fully impenetrable CS2 Volumetric Smoke (DoubleSide, 0.98 Opacity, Zero See-Through)
+          const smokeGeo = new THREE.SphereGeometry(5.4, 14, 14);
           const smokeMat = new THREE.MeshLambertMaterial({
             color: 0xc8ccd2,
             transparent: true,
-            opacity: 0.90,
+            opacity: 0.98,
+            side: THREE.DoubleSide,
             depthWrite: false
           });
           const smokeMesh = new THREE.Mesh(smokeGeo, smokeMat);
           smokeMesh.position.set(pos.x, pos.y + 1.8, pos.z);
           smokeMesh.scale.set(0.1, 0.1, 0.1);
           this.scene.add(smokeMesh);
+
+          if (!window._activeSmokes) window._activeSmokes = [];
+          const smokeRecord = { mesh: smokeMesh, pos: smokeMesh.position, radius: 5.4 };
+          window._activeSmokes.push(smokeRecord);
 
           // Fast smooth expansion
           const expandStart = performance.now();
@@ -1355,6 +1529,8 @@ class CS2Player {
 
           setTimeout(() => {
             window.csAudio.playSmokeClear();
+            const idx = window._activeSmokes ? window._activeSmokes.indexOf(smokeRecord) : -1;
+            if (idx !== -1) window._activeSmokes.splice(idx, 1);
             this.scene.remove(smokeMesh);
             smokeGeo.dispose();
             smokeMat.dispose();
@@ -1593,13 +1769,20 @@ class CS2Player {
     const forward = new THREE.Vector3(-Math.sin(this.yaw), 0, -Math.cos(this.yaw));
     const right = new THREE.Vector3(Math.cos(this.yaw), 0, -Math.sin(this.yaw));
 
-    // Input Movement Calculation
+    const wasGrounded = this.isGrounded;
+
+    // Input Movement Calculation: Cannot move while planting or defusing
     const wishDir = new THREE.Vector3();
-    if (!inFreeze) {
+    if (!inFreeze && !this.isPlanting && !this.isDefusing) {
       if (this.keys[this.keybinds.forward]) wishDir.add(forward);
       if (this.keys[this.keybinds.backward]) wishDir.sub(forward);
       if (this.keys[this.keybinds.right]) wishDir.add(right);
       if (this.keys[this.keybinds.left]) wishDir.sub(right);
+    }
+
+    if (this.isPlanting || this.isDefusing) {
+      this.velocity.x = 0;
+      this.velocity.z = 0;
     }
 
     // Authentic CS Counter-Strafing & Instant Stops
@@ -1628,12 +1811,13 @@ class CS2Player {
     }
 
     // Discrete Jump (Single press required, no auto bunny-hop)
-    if (this.jumpRequested && this.isGrounded && !inFreeze) {
+    if (this.jumpRequested && this.isGrounded && !inFreeze && !this.isPlanting && !this.isDefusing) {
       this.jumpRequested = false;
       // Crouch-jump (duck-jump) boost (11.2) to easily clear and land on 2.8m Dust 2 crates
       const jumpImpulse = this.isCrouched ? 11.2 : 10.0;
       this.velocity.y = jumpImpulse;
       this.isGrounded = false;
+      window.csAudio.playJump();
     }
 
     this.velocity.y -= 18.0 * dt;
@@ -1648,32 +1832,26 @@ class CS2Player {
     const colliders = this.map.colliders;
 
     // Multi-Axis Impenetrable Collision Resolution:
-    // Helper: test feeler rays with lateral offsets at waist and knee levels to stop corner clipping
+    // Feeler ray test: 0.45m max step height. Obstacles above that block horizontal movement (player must jump!)
     const checkMeshWall = (dirX, dirZ, dist) => {
       if (!this.map || !this.map.groundMeshes || this.map.groundMeshes.length === 0) return false;
       this.wallDir.set(dirX, 0, dirZ).normalize();
-      const perpX = -dirZ;
-      const perpZ = dirX;
-      const lateralOffsets = [0, 0.35, -0.35];
       const currentFeetY = this.position.y - this.playerHeight;
-      // When jumping or in air, any obstacle below feet + 0.6 is a climbable surface/step, NOT a wall!
-      const stepAllowance = this.isGrounded ? 1.4 : 0.6;
+      const stepAllowance = 0.45; // Authentic CS step height (crates cannot be walked through!)
       const wallCheckMinY = currentFeetY + stepAllowance;
       const yOffsets = [
         currentFeetY + this.playerHeight * 0.45,
-        currentFeetY + this.playerHeight * 0.80
+        currentFeetY + this.playerHeight * 0.75
       ];
       for (const yOff of yOffsets) {
         if (yOff <= wallCheckMinY) continue;
-        for (const lOff of lateralOffsets) {
-          this.wallOrigin.set(oldX + perpX * lOff, yOff, oldZ + perpZ * lOff);
-          this.wallRaycaster.set(this.wallOrigin, this.wallDir);
-          this.wallRaycaster.far = dist;
-          const hits = this.wallRaycaster.intersectObjects(this.map.groundMeshes, false);
-          for (let i = 0; i < hits.length; i++) {
-            if (hits[i].point.y > wallCheckMinY) {
-              return true;
-            }
+        this.wallOrigin.set(oldX, yOff, oldZ);
+        this.wallRaycaster.set(this.wallOrigin, this.wallDir);
+        this.wallRaycaster.far = dist;
+        const hits = this.wallRaycaster.intersectObjects(this.map.groundMeshes, false);
+        for (let i = 0; i < hits.length; i++) {
+          if (hits[i].point.y > wallCheckMinY) {
+            return true;
           }
         }
       }
@@ -1739,13 +1917,14 @@ class CS2Player {
     if (this.map && this.map.groundMeshes && this.map.groundMeshes.length > 0) {
       this.downOrigin.set(this.position.x, this.position.y + 0.5, this.position.z);
       this.downRaycaster.set(this.downOrigin, this.downDir);
-      this.downRaycaster.far = 40.0;
+      this.downRaycaster.far = 12.0; // High-performance capped far distance
       const hits = this.downRaycaster.intersectObjects(this.map.groundMeshes, false);
       let foundGround = false;
       let highestGroundY = -999;
       for (let i = 0; i < hits.length; i++) {
         const ptY = hits[i].point.y;
-        if (ptY <= (this.position.y - this.playerHeight + 0.8) && ptY > highestGroundY) {
+        // Strictly block climbing canyon mountain cliffs (cliffs are Y >= 6.8)
+        if (ptY <= (this.position.y - this.playerHeight + 0.8) && ptY > highestGroundY && ptY <= 6.8) {
           highestGroundY = ptY;
           foundGround = true;
         }
@@ -1765,6 +1944,11 @@ class CS2Player {
       this.velocity.y = 0;
     } else {
       this.isGrounded = false;
+    }
+
+    // Landing audio effect
+    if (!wasGrounded && this.isGrounded && this.velocity.y <= 0) {
+      window.csAudio.playLand();
     }
 
     // 4. Climbable site platforms & crates
@@ -1803,6 +1987,21 @@ class CS2Player {
     const bob = Math.sin(currentTime * 0.008) * (speed2D * 0.004);
     if (!this.isReloading) {
       this.weaponRig.position.y = bob;
+    }
+
+    // Check if player camera is inside active smoke cloud
+    const smokeBlindOverlay = document.getElementById('smoke-blindness-overlay');
+    if (smokeBlindOverlay) {
+      let insideSmoke = false;
+      if (window._activeSmokes && window._activeSmokes.length > 0) {
+        for (let s of window._activeSmokes) {
+          if (this.position.distanceTo(s.pos) < s.radius * 0.95) {
+            insideSmoke = true;
+            break;
+          }
+        }
+      }
+      smokeBlindOverlay.classList.toggle('active', insideSmoke);
     }
   }
 }

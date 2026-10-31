@@ -349,6 +349,80 @@ class CS2AudioSystem {
     this.playSound('footstep_sand', 'sfx', 0.35);
   }
 
+  playJump() {
+    this.ensureContext();
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(120, t);
+    osc.frequency.exponentialRampToValueAtTime(60, t + 0.12);
+    gain.gain.setValueAtTime(0.25, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+    osc.connect(gain);
+    gain.connect(this.sfxGain);
+    osc.start(t);
+    osc.stop(t + 0.12);
+  }
+
+  playLand() {
+    this.ensureContext();
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(90, t);
+    osc.frequency.exponentialRampToValueAtTime(35, t + 0.18);
+    gain.gain.setValueAtTime(0.45, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
+    osc.connect(gain);
+    gain.connect(this.sfxGain);
+    osc.start(t);
+    osc.stop(t + 0.18);
+    this.playSound('footstep_sand', 'sfx', 0.55);
+  }
+
+  playRoundStart() {
+    this.ensureContext();
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    // Authentic CS2 double-tone round start horn (F4 -> C5)
+    [ { f: 349.2, start: 0, dur: 0.18 }, { f: 523.2, start: 0.16, dur: 0.35 } ].forEach(tone => {
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(tone.f, t + tone.start);
+      gain.gain.setValueAtTime(0.28, t + tone.start);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + tone.start + tone.dur);
+      osc.connect(gain);
+      gain.connect(this.sfxGain);
+      osc.start(t + tone.start);
+      osc.stop(t + tone.start + tone.dur);
+    });
+  }
+
+  playRoundEnd(winner = 'CT') {
+    this.ensureContext();
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    // Triumphant orchestral brass chords for round victory
+    const chord = (winner === 'CT') ? [523.2, 659.2, 783.9, 1046.5] : [440.0, 554.3, 659.2, 880.0];
+    chord.forEach((freq, idx) => {
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(freq, t + idx * 0.04);
+      gain.gain.setValueAtTime(0.18, t + idx * 0.04);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 1.2);
+      osc.connect(gain);
+      gain.connect(this.sfxGain);
+      osc.start(t + idx * 0.04);
+      osc.stop(t + 1.2);
+    });
+  }
+
   playDamage() {
     this.playSound('damage1', 'sfx', 0.7);
   }
