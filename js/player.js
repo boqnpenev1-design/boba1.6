@@ -1377,20 +1377,67 @@ class CS2Player {
     }
   }
 
+  // Raycast down from current position to snap to true ground (called after map OBJ loads)
+  snapToGround() {
+    if (!this.map || !this.map.groundMeshes || this.map.groundMeshes.length === 0) return;
+    const rayOrigin = new THREE.Vector3(this.position.x, this.position.y + 5, this.position.z);
+    const rayDir = new THREE.Vector3(0, -1, 0);
+    const raycaster = new THREE.Raycaster(rayOrigin, rayDir, 0, 80);
+    const hits = raycaster.intersectObjects(this.map.groundMeshes, false);
+    if (hits.length > 0) {
+      let bestY = -999;
+      for (let i = 0; i < hits.length; i++) {
+        if (hits[i].point.y > bestY) bestY = hits[i].point.y;
+      }
+      if (bestY > -900) {
+        this.position.y = bestY + this.playerHeight;
+        this.lastGroundY = bestY;
+        this.isGrounded = true;
+        this.velocity.y = 0;
+      }
+    }
+  }
+
   respawn(spawnPos) {
     this.exitSpectatorMode();
     const defaultX = this.team === 'CT' ? -5.0 : -65.0;
-    const defaultY = this.team === 'CT' ? -3.8 : 7.8;
+    const defaultY = 25.0; // High Y — raycast finds true ground below
     const defaultZ = this.team === 'CT' ? -98.0 : 35.0;
     const defaultYaw = this.team === 'CT' ? Math.PI : 0;
 
     const posX = (spawnPos && spawnPos.x !== undefined) ? spawnPos.x : defaultX;
-    const posY = (spawnPos && spawnPos.y !== undefined) ? spawnPos.y : defaultY;
+    let posY = (spawnPos && spawnPos.y !== undefined) ? spawnPos.y : defaultY;
     const posZ = (spawnPos && spawnPos.z !== undefined) ? spawnPos.z : defaultZ;
+
+    // Raycast straight down from spawn to find real ground surface
+    if (this.map && this.map.groundMeshes && this.map.groundMeshes.length > 0) {
+      const rayOrigin = new THREE.Vector3(posX, posY + 5, posZ);
+      const rayDir = new THREE.Vector3(0, -1, 0);
+      const raycaster = new THREE.Raycaster(rayOrigin, rayDir, 0, 80);
+      const hits = raycaster.intersectObjects(this.map.groundMeshes, false);
+      if (hits.length > 0) {
+        // Find the highest ground surface that isn't a ceiling above us
+        let bestY = -999;
+        for (let i = 0; i < hits.length; i++) {
+          const hitY = hits[i].point.y;
+          if (hitY > bestY) bestY = hitY;
+        }
+        if (bestY > -900) {
+          posY = bestY + this.playerHeight;
+        }
+      }
+    }
+
     this.position.set(posX, posY, posZ);
     this.yaw = (spawnPos && spawnPos.yaw !== undefined) ? spawnPos.yaw : defaultYaw;
     this.velocity.set(0, 0, 0);
-    this.isGrounded = true;
+    // If raycast found ground, snap grounded. Otherwise let gravity pull down.
+    if (this.map && this.map.groundMeshes && this.map.groundMeshes.length > 0) {
+      this.isGrounded = true;
+    } else {
+      this.isGrounded = false;
+      this.velocity.y = -2; // gentle initial drop
+    }
     this.lastGroundY = posY - this.playerHeight;
     this.health.set(100);
     this.armor.set(100);

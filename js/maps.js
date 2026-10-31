@@ -110,6 +110,31 @@ class CS2MapBuilder {
     // Native 3D Dust 2 Model from source/de_dust2/ (Native Origin at 0, 0, 0)
     if (typeof THREE.OBJLoader !== 'undefined') {
       const objLoader = new THREE.OBJLoader();
+      const processObj = (obj) => {
+        obj.rotation.x = -Math.PI / 2;
+        obj.scale.set(0.045, 0.045, 0.045);
+        obj.position.set(0, 0, 0);
+
+        obj.traverse((child) => {
+          if (child.isMesh) {
+            if (child.geometry) {
+              child.geometry.computeVertexNormals();
+              child.geometry.computeBoundingBox();
+              child.geometry.computeBoundingSphere();
+            }
+            if (child.material) {
+              child.material.side = THREE.DoubleSide;
+            }
+            this.groundMeshes.push(child);
+          }
+        });
+
+        this.mapGroup.add(obj);
+        this.mapLoaded = true;
+        // Fire callback so player can re-snap to true ground
+        if (this.onMapLoaded) this.onMapLoaded();
+      };
+
       if (typeof THREE.MTLLoader !== 'undefined') {
         const mtlLoader = new THREE.MTLLoader();
         mtlLoader.setPath('source/de_dust2/');
@@ -117,49 +142,9 @@ class CS2MapBuilder {
           materials.preload();
           objLoader.setMaterials(materials);
           objLoader.setPath('source/de_dust2/');
-          objLoader.load('de_dust2.obj', (obj) => {
-            obj.rotation.x = -Math.PI / 2;
-            obj.scale.set(0.045, 0.045, 0.045);
-            obj.position.set(0, 0, 0);
-
-            obj.traverse((child) => {
-              if (child.isMesh) {
-                if (child.geometry) {
-                  child.geometry.computeVertexNormals();
-                  child.geometry.computeBoundingBox();
-                  child.geometry.computeBoundingSphere();
-                }
-                if (child.material) {
-                  child.material.side = THREE.DoubleSide;
-                }
-                this.groundMeshes.push(child);
-              }
-            });
-
-            this.mapGroup.add(obj);
-          }, undefined, () => {});
+          objLoader.load('de_dust2.obj', processObj, undefined, () => {});
         }, undefined, () => {
-          objLoader.load('source/de_dust2/de_dust2.obj', (obj) => {
-            obj.rotation.x = -Math.PI / 2;
-            obj.scale.set(0.045, 0.045, 0.045);
-            obj.position.set(0, 0, 0);
-
-            obj.traverse((child) => {
-              if (child.isMesh) {
-                if (child.geometry) {
-                  child.geometry.computeVertexNormals();
-                  child.geometry.computeBoundingBox();
-                  child.geometry.computeBoundingSphere();
-                }
-                if (child.material) {
-                  child.material.side = THREE.DoubleSide;
-                }
-                this.groundMeshes.push(child);
-              }
-            });
-
-            this.mapGroup.add(obj);
-          }, undefined, () => {});
+          objLoader.load('source/de_dust2/de_dust2.obj', processObj, undefined, () => {});
         });
       }
     }
@@ -191,22 +176,22 @@ class CS2MapBuilder {
     // AUTHENTIC DUST 2 SPAWN POINTS
     // ==========================================================
 
-    // CT Spawns: Standing on CT Spawn ground (Y = -5.8, eyes at Y = -3.8) facing South
+    // CT Spawns: Y set high — respawn() raycasts down to find true ground
     this.spawnPoints.CT = [
-      { x: -5.0, y: -3.8, z: -98.0, yaw: Math.PI },
-      { x: -2.0, y: -3.8, z: -96.0, yaw: Math.PI },
-      { x: -8.0, y: -3.8, z: -96.0, yaw: Math.PI },
-      { x: -5.0, y: -3.8, z: -101.0, yaw: Math.PI },
-      { x: -1.0, y: -3.8, z: -100.0, yaw: Math.PI }
+      { x: -5.0, y: 25.0, z: -98.0, yaw: Math.PI },
+      { x: -2.0, y: 25.0, z: -96.0, yaw: Math.PI },
+      { x: -8.0, y: 25.0, z: -96.0, yaw: Math.PI },
+      { x: -5.0, y: 25.0, z: -101.0, yaw: Math.PI },
+      { x: -1.0, y: 25.0, z: -100.0, yaw: Math.PI }
     ];
 
-    // T Spawns: Standing in T Spawn Courtyard (Y = 5.8, eyes at Y = 7.8) facing North
+    // T Spawns: Y set high — respawn() raycasts down to find true ground
     this.spawnPoints.T = [
-      { x: -65.0, y: 7.8, z: 35.0, yaw: 0 },
-      { x: -61.0, y: 7.8, z: 33.0, yaw: 0 },
-      { x: -69.0, y: 7.8, z: 33.0, yaw: 0 },
-      { x: -65.0, y: 7.8, z: 38.0, yaw: 0 },
-      { x: -58.0, y: 7.8, z: 36.0, yaw: 0 }
+      { x: -65.0, y: 25.0, z: 35.0, yaw: 0 },
+      { x: -61.0, y: 25.0, z: 33.0, yaw: 0 },
+      { x: -69.0, y: 25.0, z: 33.0, yaw: 0 },
+      { x: -65.0, y: 25.0, z: 38.0, yaw: 0 },
+      { x: -58.0, y: 25.0, z: 36.0, yaw: 0 }
     ];
   }
 }

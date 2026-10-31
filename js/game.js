@@ -183,6 +183,12 @@ class CS2GameManager {
     this.selectedMap = 'dust2';
 
     this.mapBuilder.buildDust2();
+    // When OBJ finishes loading, re-snap player to true ground
+    this.mapBuilder.onMapLoaded = () => {
+      if (this.player && this.player.position) {
+        this.player.snapToGround();
+      }
+    };
     const rMap = document.getElementById('radar-map-name');
     const sbMap = document.getElementById('sb-map-name');
     if (rMap) rMap.innerText = 'DE_DUST2';
