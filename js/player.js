@@ -153,23 +153,178 @@ class CS2Player {
     this.buildCurrentWeaponModel();
   }
 
-  // Pre-caches all weapon textures from textures/ directory
+  // Pre-caches all weapon textures from models/ directory (converted from TGA)
   initWeaponTextures() {
     const texFiles = [
       'w_rif_ak47.png', 'w_rif_m4a1.png', 'w_snip_awp.png', 'w_pist_glock18.png',
       'w_pist_usp.png', 'w_pist_deagle.png', 'w_knife_t.png', 'w_eq_smokegrenade.png',
       'w_eq_fraggrenade.png', 'w_eq_flashbang.png', 'w_rif_famas.png', 'w_rif_galil.png',
       'w_smg_mp5.png', 'w_smg_p90.png', 'w_shot_xm1014.png', 'w_rif_aug.png',
-      'w_snip_scout.png', 'w_mach_m249.png', 'w_smg_mac10.png', 'w_smg_ump45.png'
+      'w_snip_scout.png', 'w_mach_m249.png', 'w_smg_mac10.png', 'w_smg_ump45.png',
+      'w_pist_elite.png', 'w_pist_fiveseven.png', 'w_pist_p228.png', 'w_rif_sg552.png',
+      'w_shot_m3super90.png', 'w_smg_tmp.png', 'w_snip_g3sg1.png', 'w_snip_sg550.png',
+      'w_eq_defuser.png'
     ];
     const loader = new THREE.TextureLoader();
     for (const f of texFiles) {
-      loader.load('textures/' + f, (tex) => {
+      // Load from models/ (TGA→PNG conversions) first, fallback to textures/
+      loader.load('models/' + f, (tex) => {
         tex.wrapS = THREE.RepeatWrapping;
         tex.wrapT = THREE.RepeatWrapping;
+        tex.encoding = THREE.sRGBEncoding;
         this.weaponTextureCache[f] = tex;
-      }, undefined, () => {});
+      }, undefined, () => {
+        // Fallback to textures/ directory
+        loader.load('textures/' + f, (tex) => {
+          tex.wrapS = THREE.RepeatWrapping;
+          tex.wrapT = THREE.RepeatWrapping;
+          this.weaponTextureCache[f] = tex;
+        }, undefined, () => {});
+      });
     }
+    // Load FBX weapon models
+    this.loadWeaponModels();
+  }
+
+  // Weapon ID → FBX mesh name mapping
+  static WEAPON_MESH_MAP = {
+    'glock': 'w_pist_glock18',
+    'usp': 'w_pist_usp',
+    'p250': 'w_pist_p228',
+    'deagle': 'w_pist_deagle',
+    'dualberettas': 'w_pist_elite',
+    'fiveseven': 'w_pist_fiveseven',
+    'tec9': 'w_pist_glock18',      // reuse glock mesh
+    'cz75': 'w_pist_fiveseven',     // reuse fiveseven mesh
+    'mac10': 'w_smg_mac10',
+    'mp9': 'w_smg_tmp',
+    'mp7': 'w_smg_mp5',
+    'mp5sd': 'w_smg_mp5',
+    'ump45': 'w_smg_ump45',
+    'p90': 'w_smg_p90',
+    'bizon': 'w_smg_p90',           // reuse p90 mesh
+    'nova': 'w_shot_m3super90',
+    'xm1014': 'w_shot_xm1014',
+    'mag7': 'w_shot_m3super90',     // reuse m3 mesh
+    'sawedoff': 'w_shot_xm1014',   // reuse xm mesh
+    'negev': 'w_mach_m249',         // reuse m249 mesh
+    'm249': 'w_mach_m249',
+    'ak47': 'w_rif_ak47',
+    'm4a4': 'w_rif_m4a1',
+    'm4a1s': 'w_rif_m4a1_silencer',
+    'galil': 'w_rif_galil',
+    'famas': 'w_rif_famas',
+    'ssg08': 'w_snip_scout',
+    'awp': 'w_snip_awp',
+    'aug': 'w_rif_aug',
+    'sg553': 'w_rif_sg552',
+    'scar20': 'w_snip_sg550',       // reuse sg550 mesh
+    'g3sg1': 'w_snip_g3sg1',
+    'knife': 'w_knife_t',
+    'hegrenade': 'w_eq_fraggrenade',
+    'flashbang': 'w_eq_flashbang',
+    'smokegrenade': 'w_eq_smokegrenade',
+    'molotov': 'w_eq_fraggrenade',  // reuse frag mesh
+    'defuser': 'w_eq_defuser'
+  };
+
+  // Weapon ID → texture filename mapping
+  static WEAPON_TEX_MAP = {
+    'glock': 'w_pist_glock18.png',
+    'usp': 'w_pist_usp.png',
+    'p250': 'w_pist_p228.png',
+    'deagle': 'w_pist_deagle.png',
+    'dualberettas': 'w_pist_elite.png',
+    'fiveseven': 'w_pist_fiveseven.png',
+    'tec9': 'w_pist_glock18.png',
+    'cz75': 'w_pist_fiveseven.png',
+    'mac10': 'w_smg_mac10.png',
+    'mp9': 'w_smg_tmp.png',
+    'mp7': 'w_smg_mp5.png',
+    'mp5sd': 'w_smg_mp5.png',
+    'ump45': 'w_smg_ump45.png',
+    'p90': 'w_smg_p90.png',
+    'bizon': 'w_smg_p90.png',
+    'nova': 'w_shot_m3super90.png',
+    'xm1014': 'w_shot_xm1014.png',
+    'mag7': 'w_shot_m3super90.png',
+    'sawedoff': 'w_shot_xm1014.png',
+    'negev': 'w_mach_m249.png',
+    'm249': 'w_mach_m249.png',
+    'ak47': 'w_rif_ak47.png',
+    'm4a4': 'w_rif_m4a1.png',
+    'm4a1s': 'w_rif_m4a1.png',
+    'galil': 'w_rif_galil.png',
+    'famas': 'w_rif_famas.png',
+    'ssg08': 'w_snip_scout.png',
+    'awp': 'w_snip_awp.png',
+    'aug': 'w_rif_aug.png',
+    'sg553': 'w_rif_sg552.png',
+    'scar20': 'w_snip_sg550.png',
+    'g3sg1': 'w_snip_g3sg1.png',
+    'knife': 'w_knife_t.png',
+    'hegrenade': 'w_eq_fraggrenade.png',
+    'flashbang': 'w_eq_flashbang.png',
+    'smokegrenade': 'w_eq_smokegrenade.png',
+    'molotov': 'w_eq_fraggrenade.png',
+    'defuser': 'w_eq_defuser.png'
+  };
+
+  // Viewmodel positioning per weapon category
+  static WEAPON_VIEWMODEL = {
+    'pistols':    { pos: [0.18, -0.22, -0.32], scale: 0.0032, rotY: Math.PI },
+    'smgs':       { pos: [0.16, -0.24, -0.34], scale: 0.0030, rotY: Math.PI },
+    'rifles':     { pos: [0.15, -0.24, -0.36], scale: 0.0028, rotY: Math.PI },
+    'shotguns':   { pos: [0.16, -0.24, -0.36], scale: 0.0030, rotY: Math.PI },
+    'machineguns':{ pos: [0.14, -0.26, -0.36], scale: 0.0026, rotY: Math.PI },
+    'snipers':    { pos: [0.15, -0.24, -0.38], scale: 0.0028, rotY: Math.PI },
+    'equipment':  { pos: [0.16, -0.22, -0.32], scale: 0.0035, rotY: Math.PI },
+    'knife':      { pos: [0.18, -0.22, -0.30], scale: 0.0035, rotY: Math.PI }
+  };
+
+  // Loads the FBX file containing all CSS weapon meshes
+  loadWeaponModels() {
+    this.weaponMeshCache = {};
+    this.weaponModelsLoaded = false;
+
+    if (typeof THREE.FBXLoader === 'undefined') {
+      console.warn('FBXLoader not available — using procedural weapon models');
+      return;
+    }
+
+    const fbxLoader = new THREE.FBXLoader();
+    fbxLoader.load('models/css_weapons.fbx', (fbxScene) => {
+      console.log('FBX weapon pack loaded, extracting meshes...');
+
+      fbxScene.traverse((child) => {
+        if (child.isMesh && child.name) {
+          // Store each named mesh in cache
+          this.weaponMeshCache[child.name] = child;
+          // Also store partial matches (mesh names may have suffixes)
+          const baseName = child.name.replace(/_\d+$/, '');
+          if (!this.weaponMeshCache[baseName]) {
+            this.weaponMeshCache[baseName] = child;
+          }
+        }
+      });
+
+      // Also store children by traversing groups
+      fbxScene.children.forEach((child) => {
+        if (child.name) {
+          if (!this.weaponMeshCache[child.name]) {
+            this.weaponMeshCache[child.name] = child;
+          }
+        }
+      });
+
+      this.weaponModelsLoaded = true;
+      console.log('Weapon meshes cached:', Object.keys(this.weaponMeshCache).join(', '));
+
+      // Rebuild current weapon to use the real model
+      this.buildCurrentWeaponModel();
+    }, undefined, (err) => {
+      console.warn('Failed to load FBX weapons:', err);
+    });
   }
 
   getWeaponTexture(filename) {
@@ -177,7 +332,10 @@ class CS2Player {
       return this.weaponTextureCache[filename];
     }
     const loader = new THREE.TextureLoader();
-    const tex = loader.load('textures/' + filename);
+    // Try models/ first (higher quality TGA→PNG), then textures/
+    const tex = loader.load('models/' + filename, undefined, undefined, () => {
+      loader.load('textures/' + filename);
+    });
     tex.wrapS = THREE.RepeatWrapping;
     tex.wrapT = THREE.RepeatWrapping;
     this.weaponTextureCache[filename] = tex;
@@ -309,287 +467,157 @@ class CS2Player {
     this.weaponRig.add(group);
   }
 
-  // Maps every single weapon directly to its exact authentic textures/ PNG
+  // Maps every single weapon to its FBX mesh from the loaded model pack
   buildTexturedWeaponModel(w, group) {
-    if (w.id === 'knife') {
-      const knifeTex = this.getWeaponTexture('w_knife_t.png');
-      const knifeMat = new THREE.MeshStandardMaterial({ map: knifeTex, roughness: 0.35, metalness: 0.65 });
-      const handleMat = new THREE.MeshLambertMaterial({ color: 0x1b1f24 });
+    // Try to use real FBX mesh first
+    if (this.weaponModelsLoaded && this.weaponMeshCache) {
+      const meshName = CS2Player.WEAPON_MESH_MAP[w.id];
+      if (meshName) {
+        const cachedMesh = this.weaponMeshCache[meshName];
+        if (cachedMesh) {
+          const weaponClone = cachedMesh.clone(true);
 
+          // Apply the correct texture
+          const texFile = CS2Player.WEAPON_TEX_MAP[w.id];
+          if (texFile) {
+            const tex = this.getWeaponTexture(texFile);
+            weaponClone.traverse((child) => {
+              if (child.isMesh) {
+                child.material = new THREE.MeshLambertMaterial({
+                  map: tex,
+                  side: THREE.DoubleSide
+                });
+              }
+            });
+            if (weaponClone.isMesh) {
+              weaponClone.material = new THREE.MeshLambertMaterial({
+                map: tex,
+                side: THREE.DoubleSide
+              });
+            }
+          }
+
+          // Determine viewmodel positioning based on weapon category
+          let cat = w.category || 'rifles';
+          if (w.id === 'knife') cat = 'knife';
+          else if (w.id === 'hegrenade' || w.id === 'flashbang' || w.id === 'smokegrenade' || w.id === 'molotov') cat = 'equipment';
+          else if (w.category === 'snipers' || w.id === 'awp' || w.id === 'ssg08' || w.id === 'g3sg1' || w.id === 'scar20') cat = 'snipers';
+          else if (w.category === 'heavy' && (w.id === 'm249' || w.id === 'negev')) cat = 'machineguns';
+          else if (w.category === 'heavy') cat = 'shotguns';
+
+          const vm = CS2Player.WEAPON_VIEWMODEL[cat] || CS2Player.WEAPON_VIEWMODEL['rifles'];
+
+          weaponClone.position.set(vm.pos[0], vm.pos[1], vm.pos[2]);
+          weaponClone.scale.set(vm.scale, vm.scale, vm.scale);
+          weaponClone.rotation.y = vm.rotY;
+
+          group.add(weaponClone);
+          return; // Successfully used real model
+        }
+      }
+    }
+
+    // Fallback: C4 always uses procedural (no FBX mesh for it)
+    if (w.id === 'c4') {
+      this.buildProceduralC4(group);
+      return;
+    }
+
+    // Fallback: procedural model when FBX not loaded yet
+    this.buildProceduralWeapon(w, group);
+  }
+
+  // Procedural C4 Bomb with LCD and Keypad
+  buildProceduralC4(group) {
+    const canvas = document.createElement('canvas');
+    canvas.width = 128;
+    canvas.height = 128;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#1c1f24';
+    ctx.fillRect(0, 0, 128, 128);
+    ctx.fillStyle = '#0a0d0a';
+    ctx.fillRect(8, 8, 112, 35);
+    ctx.fillStyle = '#ff2222';
+    ctx.font = 'bold 18px monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('7355608', 64, 25);
+    ctx.fillStyle = '#2e333b';
+    for (let r = 0; r < 4; r++) {
+      for (let c = 0; c < 3; c++) {
+        ctx.fillRect(16 + c * 34, 48 + r * 18, 26, 14);
+      }
+    }
+    const c4Tex = new THREE.CanvasTexture(canvas);
+    const c4Mat = new THREE.MeshLambertMaterial({ color: 0x826c52 });
+    const c4Brick = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.16, 0.1), c4Mat);
+    c4Brick.position.set(0.03, -0.22, -0.28);
+    c4Brick.rotation.set(-0.25, 0, 0);
+    group.add(c4Brick);
+
+    const tapeMat = new THREE.MeshLambertMaterial({ color: 0x666b72 });
+    const tape = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.05, 0.11), tapeMat);
+    tape.position.set(0.03, -0.19, -0.28);
+    tape.rotation.set(-0.25, 0, 0);
+    group.add(tape);
+
+    const keypadMat = new THREE.MeshLambertMaterial({ map: c4Tex, roughness: 0.4 });
+    const keypad = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, 0.02), keypadMat);
+    keypad.position.set(0.06, -0.21, -0.23);
+    keypad.rotation.set(-0.25, 0, 0);
+    group.add(keypad);
+
+    const ledGeo = new THREE.SphereGeometry(0.016, 6, 6);
+    const ledMat = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+    const led = new THREE.Mesh(ledGeo, ledMat);
+    led.position.set(0.06, -0.14, -0.23);
+    group.add(led);
+
+    const wireMat = new THREE.MeshBasicMaterial({ color: 0xdd2222 });
+    const wire = new THREE.Mesh(new THREE.CylinderGeometry(0.005, 0.005, 0.15, 6), wireMat);
+    wire.position.set(-0.04, -0.20, -0.23);
+    wire.rotation.set(-0.25, 0, 0.4);
+    group.add(wire);
+  }
+
+  // Fallback procedural weapon models (used before FBX loads)
+  buildProceduralWeapon(w, group) {
+    const texFile = CS2Player.WEAPON_TEX_MAP[w.id] || 'w_rif_m4a1.png';
+    const tex = this.getWeaponTexture(texFile);
+    const mat = new THREE.MeshLambertMaterial({ map: tex });
+
+    if (w.id === 'knife') {
       const bladeGeo = new THREE.BoxGeometry(0.016, 0.065, 0.32);
-      const blade = new THREE.Mesh(bladeGeo, knifeMat);
+      const blade = new THREE.Mesh(bladeGeo, mat);
       blade.position.set(0.14, -0.18, -0.42);
       blade.rotation.x = 0.32;
       group.add(blade);
-
-      const tipGeo = new THREE.ConeGeometry(0.032, 0.08, 4);
-      const tip = new THREE.Mesh(tipGeo, knifeMat);
-      tip.rotation.x = -Math.PI / 2 + 0.32;
-      tip.position.set(0.14, -0.14, -0.58);
-      group.add(tip);
-
-      const guardGeo = new THREE.BoxGeometry(0.045, 0.085, 0.02);
-      const guard = new THREE.Mesh(guardGeo, handleMat);
-      guard.position.set(0.14, -0.21, -0.27);
-      guard.rotation.x = 0.32;
-      group.add(guard);
-
       const gripGeo = new THREE.CylinderGeometry(0.022, 0.020, 0.16, 8);
-      const grip = new THREE.Mesh(gripGeo, handleMat);
+      const grip = new THREE.Mesh(gripGeo, new THREE.MeshLambertMaterial({ color: 0x1b1f24 }));
       grip.rotation.x = 0.32;
       grip.position.set(0.14, -0.24, -0.20);
       group.add(grip);
-    } else if (w.id === 'glock') {
-      const glockTex = this.getWeaponTexture('w_pist_glock18.png');
-      const slideMat = new THREE.MeshStandardMaterial({ map: glockTex, roughness: 0.4, metalness: 0.5 });
-      const frameMat = new THREE.MeshLambertMaterial({ color: 0x1c1e22 });
-
+    } else if (w.category === 'pistols') {
       const slideGeo = new THREE.BoxGeometry(0.046, 0.052, 0.25);
-      const slide = new THREE.Mesh(slideGeo, slideMat);
+      const slide = new THREE.Mesh(slideGeo, mat);
       slide.position.set(0.13, -0.17, -0.36);
       group.add(slide);
-
-      const frameGeo = new THREE.BoxGeometry(0.042, 0.038, 0.23);
-      const frame = new THREE.Mesh(frameGeo, frameMat);
-      frame.position.set(0.13, -0.21, -0.35);
-      group.add(frame);
-
       const gripGeo = new THREE.BoxGeometry(0.040, 0.13, 0.085);
-      const grip = new THREE.Mesh(gripGeo, frameMat);
+      const grip = new THREE.Mesh(gripGeo, new THREE.MeshLambertMaterial({ color: 0x1c1e22 }));
       grip.rotation.x = -0.32;
       grip.position.set(0.13, -0.27, -0.28);
       group.add(grip);
-
-      const barrelGeo = new THREE.CylinderGeometry(0.012, 0.012, 0.05, 6);
-      const barrel = new THREE.Mesh(barrelGeo, new THREE.MeshLambertMaterial({ color: 0x0a0a0a }));
-      barrel.rotation.x = Math.PI / 2;
-      barrel.position.set(0.13, -0.17, -0.49);
-      group.add(barrel);
-    } else if (w.id === 'usp') {
-      const uspTex = this.getWeaponTexture('w_pist_usp.png');
-      const slideMat = new THREE.MeshStandardMaterial({ map: uspTex, roughness: 0.35, metalness: 0.6 });
-      const frameMat = new THREE.MeshLambertMaterial({ color: 0x181a1e });
-
-      const slideGeo = new THREE.BoxGeometry(0.046, 0.052, 0.27);
-      const slide = new THREE.Mesh(slideGeo, slideMat);
-      slide.position.set(0.13, -0.17, -0.36);
-      group.add(slide);
-
-      const frameGeo = new THREE.BoxGeometry(0.042, 0.038, 0.25);
-      const frame = new THREE.Mesh(frameGeo, frameMat);
-      frame.position.set(0.13, -0.21, -0.35);
-      group.add(frame);
-
-      const gripGeo = new THREE.BoxGeometry(0.040, 0.13, 0.085);
-      const grip = new THREE.Mesh(gripGeo, frameMat);
-      grip.rotation.x = -0.32;
-      grip.position.set(0.13, -0.27, -0.28);
-      group.add(grip);
-
-      const silGeo = new THREE.CylinderGeometry(0.022, 0.022, 0.22, 6);
-      const silMat = new THREE.MeshStandardMaterial({ color: 0x1c2024, roughness: 0.45, metalness: 0.5 });
-      const sil = new THREE.Mesh(silGeo, silMat);
-      sil.rotation.x = Math.PI / 2;
-      sil.position.set(0.13, -0.17, -0.60);
-      group.add(sil);
-    } else if (w.id === 'deagle') {
-      const deagleTex = this.getWeaponTexture('w_pist_deagle.png');
-      const deagleMat = new THREE.MeshStandardMaterial({ map: deagleTex, roughness: 0.3, metalness: 0.7 });
-
-      const slideGeo = new THREE.BoxGeometry(0.052, 0.068, 0.30);
-      const slide = new THREE.Mesh(slideGeo, deagleMat);
-      slide.position.set(0.13, -0.16, -0.38);
-      group.add(slide);
-
-      const gripGeo = new THREE.BoxGeometry(0.044, 0.15, 0.095);
-      const grip = new THREE.Mesh(gripGeo, new THREE.MeshLambertMaterial({ color: 0x141619 }));
-      grip.rotation.x = -0.30;
-      grip.position.set(0.13, -0.27, -0.29);
-      group.add(grip);
-
-      const barrelGeo = new THREE.CylinderGeometry(0.018, 0.018, 0.06, 8);
-      const barrel = new THREE.Mesh(barrelGeo, new THREE.MeshLambertMaterial({ color: 0x080808 }));
-      barrel.rotation.x = Math.PI / 2;
-      barrel.position.set(0.13, -0.16, -0.54);
-      group.add(barrel);
-    } else if (w.id === 'ak47') {
-      const akTex = this.getWeaponTexture('w_rif_ak47.png');
-      const akMat = new THREE.MeshStandardMaterial({ map: akTex, roughness: 0.45, metalness: 0.4 });
-      const woodMat = new THREE.MeshLambertMaterial({ color: 0x6e3b1c });
-
-      const recGeo = new THREE.BoxGeometry(0.052, 0.088, 0.48);
-      const receiver = new THREE.Mesh(recGeo, akMat);
-      receiver.position.set(0.13, -0.17, -0.42);
-      group.add(receiver);
-
-      const barGeo = new THREE.CylinderGeometry(0.014, 0.014, 0.44, 8);
-      const barrel = new THREE.Mesh(barGeo, new THREE.MeshLambertMaterial({ color: 0x141618 }));
-      barrel.rotation.x = Math.PI / 2;
-      barrel.position.set(0.13, -0.16, -0.86);
-      group.add(barrel);
-
-      const woodGuard = new THREE.Mesh(new THREE.BoxGeometry(0.056, 0.065, 0.22), woodMat);
-      woodGuard.position.set(0.13, -0.17, -0.62);
-      group.add(woodGuard);
-
-      const magGeo = new THREE.BoxGeometry(0.038, 0.22, 0.095);
-      const mag = new THREE.Mesh(magGeo, new THREE.MeshLambertMaterial({ color: 0x22262a }));
-      mag.rotation.x = -0.38;
-      mag.position.set(0.13, -0.28, -0.40);
-      group.add(mag);
-
-      const stockGeo = new THREE.BoxGeometry(0.046, 0.11, 0.28);
-      const stock = new THREE.Mesh(stockGeo, woodMat);
-      stock.position.set(0.13, -0.21, -0.14);
-      group.add(stock);
-    } else if (w.id === 'm4a1' || w.id === 'm4a4' || w.id === 'm4a1s') {
-      const m4Tex = this.getWeaponTexture('w_rif_m4a1.png');
-      const m4Mat = new THREE.MeshStandardMaterial({ map: m4Tex, roughness: 0.4, metalness: 0.5 });
-
-      const recGeo = new THREE.BoxGeometry(0.052, 0.092, 0.46);
-      const receiver = new THREE.Mesh(recGeo, m4Mat);
-      receiver.position.set(0.13, -0.17, -0.42);
-      group.add(receiver);
-
-      const barGeo = new THREE.CylinderGeometry(0.015, 0.015, 0.42, 8);
-      const barrel = new THREE.Mesh(barGeo, new THREE.MeshLambertMaterial({ color: 0x121417 }));
-      barrel.rotation.x = Math.PI / 2;
-      barrel.position.set(0.13, -0.16, -0.84);
-      group.add(barrel);
-
-      const magGeo = new THREE.BoxGeometry(0.036, 0.20, 0.08);
-      const mag = new THREE.Mesh(magGeo, new THREE.MeshLambertMaterial({ color: 0x2a2e34 }));
-      mag.rotation.x = -0.22;
-      mag.position.set(0.13, -0.28, -0.38);
-      group.add(mag);
-
-      const stockGeo = new THREE.BoxGeometry(0.044, 0.10, 0.26);
-      const stock = new THREE.Mesh(stockGeo, new THREE.MeshLambertMaterial({ color: 0x1e2227 }));
-      stock.position.set(0.13, -0.20, -0.15);
-      group.add(stock);
-    } else if (w.id === 'awp') {
-      const awpTex = this.getWeaponTexture('w_snip_awp.png');
-      const awpMat = new THREE.MeshStandardMaterial({ map: awpTex, roughness: 0.4, metalness: 0.4 });
-
-      const bodyGeo = new THREE.BoxGeometry(0.058, 0.10, 0.65);
-      const body = new THREE.Mesh(bodyGeo, awpMat);
-      body.position.set(0.13, -0.18, -0.46);
-      group.add(body);
-
-      const barGeo = new THREE.CylinderGeometry(0.016, 0.016, 0.55, 8);
-      const barrel = new THREE.Mesh(barGeo, new THREE.MeshLambertMaterial({ color: 0x16181b }));
-      barrel.rotation.x = Math.PI / 2;
-      barrel.position.set(0.13, -0.16, -1.04);
-      group.add(barrel);
-
-      const scopeGeo = new THREE.CylinderGeometry(0.024, 0.026, 0.32, 12);
-      const scope = new THREE.Mesh(scopeGeo, new THREE.MeshLambertMaterial({ color: 0x141618 }));
-      scope.rotation.x = Math.PI / 2;
-      scope.position.set(0.13, -0.09, -0.46);
-      group.add(scope);
-
-      const stockGeo = new THREE.BoxGeometry(0.052, 0.12, 0.34);
-      const stock = new THREE.Mesh(stockGeo, awpMat);
-      stock.position.set(0.13, -0.21, -0.14);
-      group.add(stock);
-    } else if (w.id === 'c4') {
-      // Dynamic Textured C4 Bomb with LCD ("7355608") & Keypad
-      const canvas = document.createElement('canvas');
-      canvas.width = 128;
-      canvas.height = 128;
-      const ctx = canvas.getContext('2d');
-      ctx.fillStyle = '#1c1f24';
-      ctx.fillRect(0, 0, 128, 128);
-      ctx.fillStyle = '#0a0d0a';
-      ctx.fillRect(8, 8, 112, 35);
-      ctx.fillStyle = '#ff2222';
-      ctx.font = 'bold 18px monospace';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText('7355608', 64, 25);
-      ctx.fillStyle = '#2e333b';
-      for (let r = 0; r < 4; r++) {
-        for (let c = 0; c < 3; c++) {
-          ctx.fillRect(16 + c * 34, 48 + r * 18, 26, 14);
-        }
-      }
-      const c4Tex = new THREE.CanvasTexture(canvas);
-
-      const c4Mat = new THREE.MeshLambertMaterial({ color: 0x826c52 });
-      const c4Brick = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.16, 0.1), c4Mat);
-      c4Brick.position.set(0.03, -0.22, -0.28);
-      c4Brick.rotation.set(-0.25, 0, 0);
-      group.add(c4Brick);
-
-      const tapeMat = new THREE.MeshLambertMaterial({ color: 0x666b72 });
-      const tape = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.05, 0.11), tapeMat);
-      tape.position.set(0.03, -0.19, -0.28);
-      tape.rotation.set(-0.25, 0, 0);
-      group.add(tape);
-
-      const keypadMat = new THREE.MeshStandardMaterial({ map: c4Tex, roughness: 0.4 });
-      const keypad = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, 0.02), keypadMat);
-      keypad.position.set(0.06, -0.21, -0.23);
-      keypad.rotation.set(-0.25, 0, 0);
-      group.add(keypad);
-
-      const ledGeo = new THREE.SphereGeometry(0.016, 6, 6);
-      const ledMat = new THREE.MeshBasicMaterial({ color: 0xff0000 });
-      const led = new THREE.Mesh(ledGeo, ledMat);
-      led.position.set(0.06, -0.14, -0.23);
-      group.add(led);
-
-      const wireMat = new THREE.MeshBasicMaterial({ color: 0xdd2222 });
-      const wire = new THREE.Mesh(new THREE.CylinderGeometry(0.005, 0.005, 0.15, 6), wireMat);
-      wire.position.set(-0.04, -0.20, -0.23);
-      wire.rotation.set(-0.25, 0, 0.4);
-      group.add(wire);
-    } else if (w.id === 'smokegrenade') {
-      const smkTex = this.getWeaponTexture('w_eq_smokegrenade.png');
-      const canMat = new THREE.MeshStandardMaterial({ map: smkTex, roughness: 0.4 });
-      const canGeo = new THREE.CylinderGeometry(0.042, 0.042, 0.16, 12);
-      const can = new THREE.Mesh(canGeo, canMat);
-      can.position.set(0.13, -0.20, -0.38);
-      group.add(can);
-
-      const pinGeo = new THREE.TorusGeometry(0.018, 0.005, 6, 12);
-      const pin = new THREE.Mesh(pinGeo, new THREE.MeshLambertMaterial({ color: 0xcccccc }));
-      pin.position.set(0.13, -0.11, -0.38);
-      group.add(pin);
-    } else if (w.category === 'equipment' || w.id === 'flashbang' || w.id === 'hegrenade') {
-      const texPath = w.id === 'flashbang' ? 'w_eq_flashbang.png' : 'w_eq_fraggrenade.png';
-      const grenTex = this.getWeaponTexture(texPath);
-      const grenMat = new THREE.MeshStandardMaterial({ map: grenTex, roughness: 0.4 });
-
+    } else if (w.id === 'smokegrenade' || w.id === 'flashbang' || w.id === 'hegrenade' || w.id === 'molotov') {
       const grenGeo = new THREE.CylinderGeometry(0.040, 0.040, 0.15, 12);
-      const gren = new THREE.Mesh(grenGeo, grenMat);
+      const gren = new THREE.Mesh(grenGeo, mat);
       gren.position.set(0.13, -0.20, -0.38);
       group.add(gren);
-
-      const pinGeo = new THREE.TorusGeometry(0.018, 0.005, 6, 12);
-      const pin = new THREE.Mesh(pinGeo, new THREE.MeshLambertMaterial({ color: 0xcccccc }));
-      pin.position.set(0.13, -0.11, -0.38);
-      group.add(pin);
     } else {
-      // General Rifle / SMG textured weapon model (Famas, Galil, MP5, P90, XM1014)
-      const texPath = w.id === 'famas' ? 'w_rif_famas.png' :
-                      w.id === 'galil' ? 'w_rif_galil.png' :
-                      w.id === 'p90' ? 'w_smg_p90.png' :
-                      w.id === 'mp5' ? 'w_smg_mp5.png' :
-                      w.id === 'xm1014' ? 'w_shot_xm1014.png' :
-                      w.id === 'aug' ? 'w_rif_aug.png' :
-                      w.id === 'ssg08' ? 'w_snip_scout.png' :
-                      w.id === 'mac10' ? 'w_smg_mac10.png' :
-                      w.id === 'ump45' ? 'w_smg_ump45.png' :
-                      'w_rif_m4a1.png';
-      const tex = this.getWeaponTexture(texPath);
-      const mat = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.4 });
-
+      // Generic rifle/SMG/shotgun shape
       const bodyGeo = new THREE.BoxGeometry(0.052, 0.095, 0.48);
       const body = new THREE.Mesh(bodyGeo, mat);
       body.position.set(0.13, -0.17, -0.42);
       group.add(body);
-
       const barGeo = new THREE.CylinderGeometry(0.015, 0.015, 0.35, 8);
       const bar = new THREE.Mesh(barGeo, new THREE.MeshLambertMaterial({ color: 0x16181b }));
       bar.rotation.x = Math.PI / 2;

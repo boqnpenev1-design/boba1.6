@@ -576,29 +576,56 @@ class CS2NetworkManager {
     rightArmGroup.add(rGlove);
     torsoGroup.add(rightArmGroup);
 
-    // Operator Weapon Model (Textured with authentic weapon PNG)
+    // Operator Weapon Model (Real FBX mesh if available, else textured box)
     const weaponGroup = new THREE.Group();
     weaponGroup.position.set(0.08, 0.28, 0.38);
 
-    const weaponTex = isCT ? texLoader.load('textures/w_rif_m4a1.png') : texLoader.load('textures/w_rif_ak47.png');
-    const gunMat = new THREE.MeshStandardMaterial({ map: weaponTex, roughness: 0.4, metalness: 0.5 });
-    const woodMat = new THREE.MeshLambertMaterial({ color: 0x6e3b1c });
+    // Try to use real FBX mesh from player's weapon cache
+    let usedRealModel = false;
+    if (window.csGameManager && window.csGameManager.player &&
+        window.csGameManager.player.weaponModelsLoaded &&
+        window.csGameManager.player.weaponMeshCache) {
+      const meshName = isCT ? 'w_rif_m4a1' : 'w_rif_ak47';
+      const cached = window.csGameManager.player.weaponMeshCache[meshName];
+      if (cached) {
+        const clone = cached.clone(true);
+        const texFile = isCT ? 'w_rif_m4a1.png' : 'w_rif_ak47.png';
+        const tex = new THREE.TextureLoader().load('models/' + texFile);
+        clone.traverse((child) => {
+          if (child.isMesh) {
+            child.material = new THREE.MeshLambertMaterial({ map: tex, side: THREE.DoubleSide });
+          }
+        });
+        if (clone.isMesh) {
+          clone.material = new THREE.MeshLambertMaterial({ map: tex, side: THREE.DoubleSide });
+        }
+        clone.scale.set(0.0018, 0.0018, 0.0018);
+        clone.rotation.y = Math.PI;
+        weaponGroup.add(clone);
+        usedRealModel = true;
+      }
+    }
 
-    const gunBody = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.09, 0.55), gunMat);
-    weaponGroup.add(gunBody);
-    const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.016, 0.35, 6), gunMat);
-    barrel.rotation.x = Math.PI / 2;
-    barrel.position.set(0, 0.02, 0.38);
-    weaponGroup.add(barrel);
+    if (!usedRealModel) {
+      const weaponTex = isCT ? texLoader.load('models/w_rif_m4a1.png') : texLoader.load('models/w_rif_ak47.png');
+      const gunMat = new THREE.MeshLambertMaterial({ map: weaponTex });
 
-    const stock = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.12, 0.26), isCT ? gunMat : woodMat);
-    stock.position.set(0, -0.04, -0.32);
-    weaponGroup.add(stock);
+      const gunBody = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.09, 0.55), gunMat);
+      weaponGroup.add(gunBody);
+      const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.016, 0.35, 6), gunMat);
+      barrel.rotation.x = Math.PI / 2;
+      barrel.position.set(0, 0.02, 0.38);
+      weaponGroup.add(barrel);
 
-    const mag = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.20, 0.08), gunMat);
-    mag.rotation.x = -0.3;
-    mag.position.set(0, -0.12, 0.08);
-    weaponGroup.add(mag);
+      const stock = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.12, 0.26), gunMat);
+      stock.position.set(0, -0.04, -0.32);
+      weaponGroup.add(stock);
+
+      const mag = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.20, 0.08), gunMat);
+      mag.rotation.x = -0.3;
+      mag.position.set(0, -0.12, 0.08);
+      weaponGroup.add(mag);
+    }
 
     // Muzzle Flash Mesh & Light
     const flashGeo = new THREE.SphereGeometry(0.09, 8, 8);
