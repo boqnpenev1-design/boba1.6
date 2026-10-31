@@ -21,13 +21,15 @@ document.addEventListener('DOMContentLoaded', () => {
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.25));
   renderer.shadowMap.enabled = false;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.0;
   container.appendChild(renderer.domElement);
 
-  // Fast Competitive Lighting (Hemisphere + Sun Directional)
-  const hemiLight = new THREE.HemisphereLight(0xffffff, 0xb89d7b, 0.75);
+  // Fast Competitive Lighting (Soft Desert Sun - zero blowout)
+  const hemiLight = new THREE.HemisphereLight(0xfffaed, 0x8a765a, 0.55);
   scene.add(hemiLight);
 
-  const sunLight = new THREE.DirectionalLight(0xfffaed, 0.85);
+  const sunLight = new THREE.DirectionalLight(0xfffaed, 0.65);
   sunLight.position.set(50, 90, 40);
   scene.add(sunLight);
 
@@ -277,12 +279,14 @@ document.addEventListener('DOMContentLoaded', () => {
     'c4': 'c4.svg',
     'defuser': 'defuser.svg',
     'armor': 'kevlar.svg',
-    'helmet': 'assaultsuit.svg'
+    'kevlar': 'kevlar.svg',
+    'helmet': 'assaultsuit.svg',
+    'assaultsuit': 'assaultsuit.svg'
   };
 
   function getWeaponSVG(id) {
     const file = WEAPON_SVG_MAP[id] || 'ak47.svg';
-    return `<img src="icons/weapons/${file}" class="buy-menu-img" alt="${id}">`;
+    return `<img src="icons/weapons/${file}" class="buy-menu-img" alt="${id}" onerror="this.src='icons/weapons/ak47.svg'">`;
   }
 
   function renderBuyItems(category) {
@@ -301,7 +305,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const svgIcon = getWeaponSVG(weapon.id);
       const isPurchased = gameManager.purchaseHistory.some(p => p.id === weapon.id);
-      const refundBtnHtml = isPurchased ? `<button class="btn-card-revert" data-wid="${weapon.id}">↩ Revert (+$${weapon.cost})</button>` : '';
+      const refundBtnHtml = isPurchased ? `<button class="btn-card-revert" data-wid="${weapon.id}">↩ REFUND (+$${weapon.cost})</button>` : '';
 
       card.innerHTML = `
         <div class="wc-header">
@@ -317,7 +321,7 @@ document.addEventListener('DOMContentLoaded', () => {
         ${refundBtnHtml}
       `;
 
-      // Buy click
+      // Buy / Refund click
       card.addEventListener('click', (e) => {
         if (e.target.classList.contains('btn-card-revert')) {
           e.stopPropagation();
@@ -335,14 +339,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function refundWeapon(weapon) {
     const idx = gameManager.purchaseHistory.findIndex(p => p.id === weapon.id);
-    if (idx === -1) return;
-    gameManager.purchaseHistory.splice(idx, 1);
+    if (idx !== -1) {
+      gameManager.purchaseHistory.splice(idx, 1);
+    }
     gameManager.player.money.add(weapon.cost);
 
     if (weapon.category === 'equipment') {
-      if (weapon.type === 'armor') gameManager.player.armor.set(0);
-      else if (weapon.type === 'helmet') { gameManager.player.hasHelmet = false; }
-      else if (weapon.type === 'kit') { gameManager.player.hasDefuseKit = false; }
+      if (weapon.id === 'kevlar' || weapon.id === 'armor') gameManager.player.armor.set(0);
+      else if (weapon.id === 'helmet') { gameManager.player.hasHelmet = false; }
+      else if (weapon.id === 'defuser') { gameManager.player.hasDefuseKit = false; }
       else if (weapon.slot === 4) {
         const gIdx = gameManager.player.grenades.findIndex(g => g.id === weapon.id);
         if (gIdx !== -1) gameManager.player.grenades.splice(gIdx, 1);

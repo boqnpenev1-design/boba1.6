@@ -157,11 +157,11 @@ class CS2Player {
     this.weaponRig = new THREE.Group();
     this.viewmodelGroup.add(this.weaponRig);
 
-    // Muzzle Flash
+    // Muzzle Flash (Subtle realistic muzzle spark, zero screen-blocking circle)
     this.muzzleLight = new THREE.PointLight(0xffaa33, 0, 8);
     this.muzzleLight.position.set(0.16, -0.12, -0.65);
-    const flashGeo = new THREE.SphereGeometry(0.065, 5, 5);
-    const flashMat = new THREE.MeshBasicMaterial({ color: 0xffdd66 });
+    const flashGeo = new THREE.SphereGeometry(0.010, 8, 8);
+    const flashMat = new THREE.MeshBasicMaterial({ color: 0xffcc33 });
     this.muzzleFlashMesh = new THREE.Mesh(flashGeo, flashMat);
     this.muzzleFlashMesh.position.set(0.16, -0.12, -0.65);
     this.muzzleFlashMesh.visible = false;
@@ -289,16 +289,16 @@ class CS2Player {
     'defuser': 'w_eq_defuser.png'
   };
 
-  // Viewmodel positioning per weapon category: authentic CS scale & barrel pointing forward into crosshair
+  // Viewmodel positioning per weapon category: authentic forward orientation into crosshair
   static WEAPON_VIEWMODEL = {
-    'pistols':    { pos: [0.14, -0.15, -0.28], scale: 0.018, rot: [Math.PI / 2, 0, Math.PI] },
-    'smgs':       { pos: [0.15, -0.16, -0.30], scale: 0.017, rot: [Math.PI / 2, 0, Math.PI] },
-    'rifles':     { pos: [0.15, -0.15, -0.28], scale: 0.016, rot: [Math.PI / 2, 0, Math.PI] },
-    'shotguns':   { pos: [0.15, -0.16, -0.30], scale: 0.016, rot: [Math.PI / 2, 0, Math.PI] },
-    'machineguns':{ pos: [0.14, -0.16, -0.30], scale: 0.016, rot: [Math.PI / 2, 0, Math.PI] },
-    'snipers':    { pos: [0.14, -0.15, -0.28], scale: 0.016, rot: [Math.PI / 2, 0, Math.PI] },
-    'equipment':  { pos: [0.14, -0.15, -0.28], scale: 0.018, rot: [Math.PI / 2, 0, Math.PI] },
-    'knife':      { pos: [0.15, -0.15, -0.26], scale: 0.016, rot: [0, Math.PI, 0] }
+    'pistols':    { pos: [0.14, -0.15, -0.28], scale: 0.018, rot: [Math.PI / 2, 0, 0] },
+    'smgs':       { pos: [0.15, -0.16, -0.30], scale: 0.017, rot: [Math.PI / 2, 0, 0] },
+    'rifles':     { pos: [0.15, -0.15, -0.28], scale: 0.016, rot: [Math.PI / 2, 0, 0] },
+    'shotguns':   { pos: [0.15, -0.16, -0.30], scale: 0.016, rot: [Math.PI / 2, 0, 0] },
+    'machineguns':{ pos: [0.14, -0.16, -0.30], scale: 0.016, rot: [Math.PI / 2, 0, 0] },
+    'snipers':    { pos: [0.14, -0.15, -0.28], scale: 0.016, rot: [Math.PI / 2, 0, 0] },
+    'equipment':  { pos: [0.14, -0.15, -0.28], scale: 0.018, rot: [Math.PI / 2, 0, 0] },
+    'knife':      { pos: [0.15, -0.15, -0.26], scale: 0.016, rot: [Math.PI / 2, 0, 0] }
   };
 
   // Loads the FBX file containing all CSS weapon meshes
@@ -915,11 +915,32 @@ class CS2Player {
 
     // Position weapon on the ground in front of the player
     const fwd = new THREE.Vector3(-Math.sin(this.yaw), 0, -Math.cos(this.yaw));
-    const dropPos = this.position.clone().addScaledVector(fwd, 1.2);
-    dropPos.y = (this.lastGroundY !== undefined ? this.lastGroundY : 0.0) + 0.08;
+    const dropPos = this.position.clone().addScaledVector(fwd, 1.1);
+    let finalGroundY = (this.lastGroundY !== undefined ? this.lastGroundY : 0.0);
+    if (this.map && this.map.groundMeshes && this.map.groundMeshes.length > 0) {
+      const gRay = new THREE.Raycaster(new THREE.Vector3(dropPos.x, this.position.y + 1.0, dropPos.z), new THREE.Vector3(0, -1, 0), 0.1, 15);
+      const gHits = gRay.intersectObjects(this.map.groundMeshes, false);
+      if (gHits.length > 0) {
+        finalGroundY = gHits[0].point.y;
+      }
+    }
+    dropPos.y = finalGroundY + 0.08;
     dropGroup.position.copy(dropPos);
+    dropGroup.position.y += 0.35; // Dropping arc starting height
     dropGroup.rotation.y = this.yaw + 1.2;
     this.scene.add(dropGroup);
+
+    // Dropping physics animation: animate drop to final ground position
+    const startY = dropGroup.position.y;
+    const targetY = finalGroundY + 0.08;
+    const dropStartTime = performance.now();
+    const animDrop = () => {
+      const elapsed = performance.now() - dropStartTime;
+      const progress = Math.min(1.0, elapsed / 220);
+      dropGroup.position.y = startY + (targetY - startY) * (progress * progress);
+      if (progress < 1.0) requestAnimationFrame(animDrop);
+    };
+    requestAnimationFrame(animDrop);
 
     // Register in world dropped items pool with timestamp
     if (!window._droppedItems) window._droppedItems = [];
@@ -958,13 +979,19 @@ class CS2Player {
     window.csAudio.playWeaponEquip('knife');
   }
 
-  // Pick up dropped weapon (walk-over proximity or pressing [E])
+  // Pick up dropped weapon (strict proximity < 1.6m or pressing [E])
   checkPickupItems() {
-    if (!window._droppedItems || window._droppedItems.length === 0) return;
-    const feetY = this.position.y - this.playerHeight;
     const actionPrompt = document.getElementById('action-prompt');
     const actionText = document.getElementById('action-prompt-text');
 
+    if (!window._droppedItems || window._droppedItems.length === 0) {
+      if (actionPrompt && actionText && actionText.textContent.includes('PICK UP') && !this.isPlanting && !this.isDefusing) {
+        actionPrompt.classList.add('hidden');
+      }
+      return;
+    }
+
+    const feetY = this.position.y - this.playerHeight;
     let nearbyPrompt = null;
 
     for (let i = window._droppedItems.length - 1; i >= 0; i--) {
@@ -974,12 +1001,13 @@ class CS2Player {
       const horizDist = Math.hypot(dx, dz);
       const vertDist = Math.abs(feetY - item.pos.y);
 
-      if (horizDist < 2.4 && vertDist < 2.2) {
+      // Strict proximity check: Must be close to the dropped weapon (< 1.6m)
+      if (horizDist < 1.6 && vertDist < 1.4) {
         nearbyPrompt = `PRESS [E] TO PICK UP ${item.weapon.name}`;
 
         const timeSinceDrop = performance.now() - (item.droppedAt || 0);
         const slotEmpty = !this.inventory[item.slot];
-        const wantPickup = (this.keys[this.keybinds.use] && timeSinceDrop > 250) || (horizDist < 1.4 && slotEmpty && timeSinceDrop > 1200);
+        const wantPickup = (this.keys[this.keybinds.use] && timeSinceDrop > 250) || (horizDist < 1.1 && slotEmpty && timeSinceDrop > 1000);
 
         if (wantPickup) {
           const targetSlot = item.slot;
@@ -1010,6 +1038,8 @@ class CS2Player {
     if (nearbyPrompt && actionPrompt && actionText && !this.isPlanting && !this.isDefusing) {
       actionText.textContent = nearbyPrompt;
       actionPrompt.classList.remove('hidden');
+    } else if (actionPrompt && actionText && actionText.textContent.includes('PICK UP') && !this.isPlanting && !this.isDefusing) {
+      actionPrompt.classList.add('hidden');
     }
   }
 
@@ -1258,17 +1288,6 @@ class CS2Player {
         }
       }
     }
-
-    // Spawn authentic CS2 bullet tracer extending from forward barrel tip to impact point
-    const muzzlePos = new THREE.Vector3();
-    this.muzzleFlashMesh.getWorldPosition(muzzlePos);
-    const targetPoint = new THREE.Vector3();
-    if (wallObstacles.length > 0 && wallObstacles[0].distance < 80) {
-      targetPoint.copy(wallObstacles[0].point);
-    } else {
-      targetPoint.copy(this.camera.position).addScaledVector(this.shootCamDir, 75);
-    }
-    this.spawnTracer(muzzlePos, targetPoint);
 
     // Hit players with authentic headshot/body multiplier, hit sound, and strict penetration rules
     if (gameManager && gameManager.net) {
@@ -1608,6 +1627,12 @@ class CS2Player {
     if (this.isScoped) this.toggleScope();
     document.getElementById('action-prompt').classList.add('hidden');
     document.getElementById('interaction-bar-container').classList.add('hidden');
+
+    // Drop weapons on death where player died
+    if (this.inventory[1]) this.dropWeaponBySlot(1);
+    if (this.inventory[2]) this.dropWeaponBySlot(2);
+    if (this.inventory[4]) this.dropWeaponBySlot(4);
+
     this.enterSpectatorMode();
     if (window.csGameManager) {
       window.csGameManager.onEntityKilled(attackerName || 'Enemy', 'You', weaponName || 'Weapon', false, this.team);
@@ -1615,6 +1640,15 @@ class CS2Player {
         window.csGameManager.net.sendDeath(attackerName || 'Enemy', 'Player', weaponName || 'Weapon', false, this.team);
       }
     }
+  }
+
+  // Clear bullet holes on round reset
+  clearBulletHoles() {
+    if (!this.bulletHolePool) return;
+    for (let i = 0; i < this.bulletHolePool.length; i++) {
+      this.bulletHolePool[i].visible = false;
+    }
+    this.bulletHolePoolIndex = 0;
   }
 
   // Raycast down from current position to snap to true ground (called after map OBJ loads)
@@ -1830,15 +1864,39 @@ class CS2Player {
     const playerRadius = 0.52;
     const colliders = this.map.colliders;
 
-    // High-performance single-feeler obstacle check at waist height (solid crates block walkover)
+    // High-performance spatial candidate mesh filter: only raycasts against nearby ground meshes
+    const getNearbyMeshes = (px, pz) => {
+      if (!this.map || !this.map.groundMeshes || this.map.groundMeshes.length === 0) return [];
+      const cands = [];
+      const meshes = this.map.groundMeshes;
+      for (let m = 0; m < meshes.length; m++) {
+        const mesh = meshes[m];
+        if (mesh.geometry && mesh.geometry.boundingBox) {
+          const bb = mesh.geometry.boundingBox;
+          const minX = bb.min.x * 0.045 - 3.5;
+          const maxX = bb.max.x * 0.045 + 3.5;
+          const minZ = -bb.max.y * 0.045 - 3.5;
+          const maxZ = -bb.min.y * 0.045 + 3.5;
+          if (px >= minX && px <= maxX && pz >= minZ && pz <= maxZ) {
+            cands.push(mesh);
+          }
+        } else {
+          cands.push(mesh);
+        }
+      }
+      return cands.length > 0 ? cands : meshes;
+    };
+
+    // Feeler obstacle check at waist height (solid crates block walkover)
     const checkMeshWall = (dirX, dirZ, dist) => {
-      if (!this.map || !this.map.groundMeshes || this.map.groundMeshes.length === 0) return false;
+      const candidates = getNearbyMeshes(oldX, oldZ);
+      if (candidates.length === 0) return false;
       this.wallDir.set(dirX, 0, dirZ).normalize();
       const currentFeetY = this.position.y - this.playerHeight;
       this.wallOrigin.set(oldX, currentFeetY + 0.85, oldZ);
       this.wallRaycaster.set(this.wallOrigin, this.wallDir);
       this.wallRaycaster.far = dist;
-      const hits = this.wallRaycaster.intersectObjects(this.map.groundMeshes, false);
+      const hits = this.wallRaycaster.intersectObjects(candidates, false);
       return hits.length > 0 && hits[0].distance < dist;
     };
 
@@ -1902,16 +1960,17 @@ class CS2Player {
     this.position.y += this.velocity.y * dt;
 
     let targetGroundY = (this.lastGroundY !== undefined) ? this.lastGroundY : -5.8;
-    if (this.map && this.map.groundMeshes && this.map.groundMeshes.length > 0) {
+    const groundCandidates = getNearbyMeshes(this.position.x, this.position.z);
+    if (groundCandidates.length > 0) {
       this.downOrigin.set(this.position.x, this.position.y + 0.5, this.position.z);
       this.downRaycaster.set(this.downOrigin, this.downDir);
       this.downRaycaster.far = 12.0;
-      const hits = this.downRaycaster.intersectObjects(this.map.groundMeshes, false);
+      const hits = this.downRaycaster.intersectObjects(groundCandidates, false);
       let foundGround = false;
       let highestGroundY = -999;
       for (let i = 0; i < hits.length; i++) {
         const ptY = hits[i].point.y;
-        if (ptY <= (this.position.y - this.playerHeight + 0.8) && ptY > highestGroundY && ptY <= 6.8) {
+        if (ptY <= (this.position.y - this.playerHeight + 0.8) && ptY > highestGroundY && ptY <= 16.0) {
           highestGroundY = ptY;
           foundGround = true;
         }
@@ -1943,7 +2002,8 @@ class CS2Player {
       window.csAudio.playLand();
     }
 
-    // 4. Climbable site platforms & crates
+    // 4. Climbable site platforms & crates (solid footing on top, blocks walking through sides)
+    const currentFeetY = this.position.y - this.playerHeight;
     for (let i = 0; i < colliders.length; i++) {
       const c = colliders[i];
       if (!c.isClimbable) continue;
@@ -1951,16 +2011,33 @@ class CS2Player {
       if (
         this.position.x + playerRadius > box.min.x &&
         this.position.x - playerRadius < box.max.x &&
-        this.position.z + playerRadius > box.min.z &&
-        this.position.z - playerRadius < box.max.z
+        oldZ + playerRadius > box.min.z &&
+        oldZ - playerRadius < box.max.z
       ) {
-        if (this.velocity.y <= 0 && this.position.y >= c.topY + 0.1) {
+        if (currentFeetY >= c.topY - 0.45 && this.velocity.y <= 0) {
           this.position.y = c.topY + this.playerHeight;
           this.velocity.y = 0;
           this.isGrounded = true;
-        } else if (this.position.y < c.topY + 0.3) {
+          this.lastGroundY = c.topY;
+        } else if (currentFeetY < c.topY - 0.45) {
           this.position.x = oldX;
+          this.velocity.x = 0;
+        }
+      }
+      if (
+        oldX + playerRadius > box.min.x &&
+        oldX - playerRadius < box.max.x &&
+        this.position.z + playerRadius > box.min.z &&
+        this.position.z - playerRadius < box.max.z
+      ) {
+        if (currentFeetY >= c.topY - 0.45 && this.velocity.y <= 0) {
+          this.position.y = c.topY + this.playerHeight;
+          this.velocity.y = 0;
+          this.isGrounded = true;
+          this.lastGroundY = c.topY;
+        } else if (currentFeetY < c.topY - 0.45) {
           this.position.z = oldZ;
+          this.velocity.z = 0;
         }
       }
     }

@@ -15,18 +15,57 @@ class CS2AudioSystem {
 
     // Audio file mappings
     this.soundPaths = {
-      // Weapons
+      // Rifles & Snipers
       ak47: 'weapons/ak47/ak47_01.wav',
-      m4a1: 'weapons/m4a1/m4a1_01.wav',
-      m4a4: 'weapons/m4a1/m4a1_01.wav',
+      m4a1: 'weapons/m4a1/m4a1_silencer_01.wav',
+      m4a1s: 'weapons/m4a1/m4a1_silencer_01.wav',
+      m4a4: 'weapons/m4a1/m4a1_us_01.wav',
+      galil: 'weapons/galilar/galil_01.wav',
+      galilar: 'weapons/galilar/galil_01.wav',
+      famas: 'weapons/famas/famas_01.wav',
+      aug: 'weapons/aug/aug_01.wav',
+      sg553: 'weapons/sg556/sg556_01.wav',
+      sg556: 'weapons/sg556/sg556_01.wav',
       awp: 'weapons/awp/awp_01.wav',
-      deagle: 'weapons/deagle/deagle_01.wav',
+      ssg08: 'weapons/ssg08/ssg08_01.wav',
+      scout: 'weapons/ssg08/ssg08_01.wav',
+      g3sg1: 'weapons/g3sg1/g3sg1_01.wav',
+      scar20: 'weapons/scar20/scar20_01.wav',
+
+      // Pistols
       glock: 'weapons/glock18/glock_01.wav',
+      glock18: 'weapons/glock18/glock_01.wav',
       usp: 'weapons/usp/usp_01.wav',
+      usp_unsilenced: 'weapons/usp/usp_unsilenced_01.wav',
+      p250: 'weapons/p250/p250_01.wav',
+      deagle: 'weapons/deagle/deagle_01.wav',
+      dualberettas: 'weapons/elite/elites_01.wav',
+      elite: 'weapons/elite/elites_01.wav',
+      fiveseven: 'weapons/fiveseven/fiveseven_01.wav',
+      tec9: 'weapons/tec9/tec9_02.wav',
+      cz75: 'weapons/cz75a/cz75_01.wav',
+      cz75a: 'weapons/cz75a/cz75_01.wav',
+      revolver: 'weapons/revolver/revolver-1_01.wav',
+
+      // SMGs & Heavy
+      mac10: 'weapons/mac10/mac10_01.wav',
+      mp9: 'weapons/mp9/mp9_01.wav',
+      mp7: 'weapons/mp7/mp7_01.wav',
+      mp5: 'weapons/mp5/mp5_01.wav',
+      mp5sd: 'weapons/mp5/mp5_01.wav',
+      ump45: 'weapons/ump45/ump45_02.wav',
       p90: 'weapons/p90/p90_01.wav',
+      bizon: 'weapons/bizon/bizon_01.wav',
+      nova: 'weapons/nova/nova-1.wav',
       xm1014: 'weapons/xm1014/xm1014-1.wav',
+      mag7: 'weapons/mag7/mag7_01.wav',
+      sawedoff: 'weapons/sawedoff/sawedoff-1.wav',
+      m249: 'weapons/m249/m249-1.wav',
+      negev: 'weapons/negev/negev_01.wav',
+
+      // Melee & Utility
       knife_slash: 'weapons/knife/knife_deploy1.wav',
-      knife_hit: 'weapons/knife/knife_hit1.wav',
+      knife_hit: 'weapons/knife/knife_hit_01.wav',
 
       // Authentic CS2 Weapon Reload Sounds
       ak47_clipout: 'weapons/ak47/ak47_clipout.wav',
@@ -227,16 +266,36 @@ class CS2AudioSystem {
     }
   }
 
-  // Gunfire
+  // Gunfire with authentic per-weapon CS audio sample lookup
   playGunshot(weaponType = 'rifle', weaponId = 'ak47', isSilenced = false) {
-    if (weaponId === 'ak47') this.playSound('ak47', 'sfx');
-    else if (weaponId === 'awp' || weaponType === 'sniper') this.playSound('awp', 'sfx');
-    else if (weaponId === 'deagle') this.playSound('deagle', 'sfx');
-    else if (weaponId === 'usp' || isSilenced) this.playSound('usp', 'sfx', 0.6);
-    else if (weaponId === 'glock') this.playSound('glock', 'sfx');
-    else if (weaponType === 'shotgun') this.playSound('xm1014', 'sfx');
-    else if (weaponType === 'smg') this.playSound('p90', 'sfx');
-    else this.playSound('m4a1', 'sfx');
+    const wid = (weaponId || 'ak47').toLowerCase().replace(/[^a-z0-9]/g, '');
+    let key = wid;
+
+    if (wid === 'm4a1' || wid === 'm4a1s') {
+      key = isSilenced ? 'm4a1' : 'm4a4';
+    } else if (wid === 'usp') {
+      key = isSilenced ? 'usp' : 'usp_unsilenced';
+    } else if (wid === 'galilar') {
+      key = 'galil';
+    } else if (wid === 'sg553') {
+      key = 'sg556';
+    }
+
+    if (this.soundPaths[key]) {
+      this.playSound(key, 'sfx');
+    } else if (this.soundPaths[wid]) {
+      this.playSound(wid, 'sfx');
+    } else if (weaponType === 'sniper' || wid.includes('awp') || wid.includes('scout') || wid.includes('ssg')) {
+      this.playSound('awp', 'sfx');
+    } else if (weaponType === 'shotgun') {
+      this.playSound('xm1014', 'sfx');
+    } else if (weaponType === 'smg') {
+      this.playSound('p90', 'sfx');
+    } else if (weaponType === 'pistol') {
+      this.playSound('glock', 'sfx');
+    } else {
+      this.playSound('ak47', 'sfx');
+    }
   }
 
   playKnifeSlash() {

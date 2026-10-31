@@ -96,6 +96,17 @@ class CS2GameManager {
     this.createC4Prop();
   }
 
+  clearAllDroppedItems() {
+    if (window._droppedItems && Array.isArray(window._droppedItems)) {
+      window._droppedItems.forEach(item => {
+        if (item && item.mesh && this.scene) {
+          this.scene.remove(item.mesh);
+        }
+      });
+      window._droppedItems = [];
+    }
+  }
+
   // Highly visible 3D C4 Prop with authentic CS digital display & flashing beacon light
   createC4Prop() {
     const group = new THREE.Group();
@@ -255,6 +266,14 @@ class CS2GameManager {
     this.c4Timer = 40.0;
     this.c4Mesh.visible = false;
     this.purchaseHistory = [];
+
+    // Clean up dropped weapons from previous round
+    this.clearAllDroppedItems();
+
+    // Clean up bullet decals from previous round
+    if (this.player && this.player.clearBulletHoles) {
+      this.player.clearBulletHoles();
+    }
 
     // Reset HUD & Victory/MVP Overlay
     const roundEndOverlay = document.getElementById('round-end-overlay');
@@ -472,14 +491,20 @@ class CS2GameManager {
     const overlay = document.getElementById('round-end-overlay');
     const winTitle = document.getElementById('round-winner-title');
     const winReason = document.getElementById('round-winner-reason');
+    const mvpBox = document.getElementById('round-mvp-box');
     const mvpNameEl = document.getElementById('round-mvp-name');
     const mvpReasonEl = document.getElementById('round-mvp-reason');
     if (overlay && winTitle && winReason) {
       winTitle.textContent = (winner === 'CT') ? 'COUNTER-TERRORISTS WIN' : 'TERRORISTS WIN';
       winTitle.className = `round-end-title ${winner === 'CT' ? 'ct-win' : 't-win'}`;
       winReason.textContent = reason;
-      if (mvpNameEl) mvpNameEl.textContent = mvpName;
-      if (mvpReasonEl) mvpReasonEl.textContent = `for eliminating ${maxKills} opponents`;
+      if (maxKills > 0) {
+        if (mvpBox) mvpBox.classList.remove('hidden');
+        if (mvpNameEl) mvpNameEl.textContent = mvpName;
+        if (mvpReasonEl) mvpReasonEl.textContent = `for eliminating ${maxKills} opponents`;
+      } else {
+        if (mvpBox) mvpBox.classList.add('hidden');
+      }
       overlay.classList.remove('hidden');
     }
 
@@ -624,7 +649,7 @@ class CS2GameManager {
         const site = this.mapBuilder.bombZones[i];
         const dist = Math.hypot(this.player.position.x - site.x, this.player.position.z - site.z);
         const dy = Math.abs(playerFeetY - (site.y || 0));
-        if (dist <= site.radius && dy < 3.2) {
+        if (dist <= site.radius && dy < 2.0) {
           inSite = site.id;
           siteY = site.y || 0.1;
           break;
@@ -653,6 +678,7 @@ class CS2GameManager {
             this.player.plantProgress = 0;
             this.player.inventory[5] = null;
             progressTrack.classList.add('hidden');
+            actionPrompt.classList.add('hidden');
             const plantPos = { x: this.player.position.x, y: siteY, z: this.player.position.z };
             this.onC4Planted(plantPos, `BOMBSITE ${inSite}`);
 
@@ -671,6 +697,12 @@ class CS2GameManager {
           progressTrack.classList.add('hidden');
         }
       } else {
+        if (promptText && promptText.innerText.includes('PLANT')) {
+          actionPrompt.classList.add('hidden');
+        }
+      }
+    } else if (this.c4Planted) {
+      if (promptText && promptText.innerText.includes('PLANT')) {
         actionPrompt.classList.add('hidden');
       }
     }
@@ -797,8 +829,8 @@ class CS2GameManager {
       ctx.fillText(site.id, pt.x, pt.y);
     }
 
-    // C4 Planted Indicator on Radar
-    if (this.c4Planted && this.c4Pos) {
+    // C4 Planted Indicator on Radar (Only visible to Terrorist team)
+    if (this.c4Planted && this.c4Pos && this.player.team === 'T') {
       const pt = toRadar(this.c4Pos.x, this.c4Pos.z);
       const pulse = 1 + 0.3 * Math.sin(performance.now() * 0.008);
       ctx.fillStyle = '#ff2211';

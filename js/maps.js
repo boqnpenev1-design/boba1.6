@@ -124,6 +124,9 @@ class CS2MapBuilder {
             }
             if (child.material) {
               child.material.side = THREE.DoubleSide;
+              if (child.material.specular) child.material.specular.setHex(0x000000);
+              if (typeof child.material.shininess !== 'undefined') child.material.shininess = 0;
+              if (typeof child.material.roughness !== 'undefined') child.material.roughness = 0.95;
             }
             this.groundMeshes.push(child);
           }
@@ -168,11 +171,11 @@ class CS2MapBuilder {
     // BOMBSITES & BUY ZONES (100% Authentic Dust 2 Geometry)
     // ==========================================================
 
-    // Bombsite A: Positioned directly at the platform crates (Pic 6)
-    this.addBombsiteZone('A', 51.5, 4.81, -115.0, 9.0);
+    // Bombsite A: Positioned directly at the platform crates
+    this.addBombsiteZone('A', 51.3, 4.81, -113.5, 8.5);
 
     // Bombsite B: Positioned directly in the courtyard center between crates
-    this.addBombsiteZone('B', -67.5, 0.89, -108.0, 9.0);
+    this.addBombsiteZone('B', -65.3, 0.89, -112.7, 8.5);
 
     // Authentic Buy Zones matching CT & T Spawns
     this.buyZones.CT = { minX: -25, maxX: 15, minZ: -115, maxZ: -85 };

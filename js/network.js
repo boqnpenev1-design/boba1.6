@@ -690,7 +690,18 @@ class CS2NetworkManager {
     this.remotePlayers = {};
   }
 
+  cleanupStalePlayers() {
+    const now = performance.now();
+    Object.keys(this.remotePlayers).forEach(id => {
+      const p = this.remotePlayers[id];
+      if (p && p.lastSeen && (now - p.lastSeen > 3500)) {
+        this.removeRemotePlayer(id);
+      }
+    });
+  }
+
   updateRemotePlayer(id, data) {
+    this.cleanupStalePlayers();
     if (!this.remotePlayers[id]) {
       const model = this.createTacticalCharacterModel(data.team);
       this.gm.scene.add(model);
@@ -711,8 +722,9 @@ class CS2NetworkManager {
     p.pos = data.pos;
     p.team = data.team;
     p.mesh.position.set(data.pos.x, data.pos.y - 2.0, data.pos.z);
-    p.mesh.rotation.y = data.yaw;
+    p.mesh.rotation.y = data.yaw + Math.PI; // Correct 180deg alignment so operator faces where they are looking
     p.mesh.visible = (data.inMatch !== false && data.health > 0);
+    p.lastSeen = performance.now();
 
     const now = performance.now();
     const dt = p.lastTime ? Math.max(0.001, Math.min(0.1, (now - p.lastTime) / 1000)) : 0.016;
