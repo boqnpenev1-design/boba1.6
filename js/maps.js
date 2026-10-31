@@ -86,30 +86,118 @@ class CS2MapBuilder {
         obj.scale.set(0.045, 0.045, 0.045);
         obj.position.set(0, 0, 0);
 
-        obj.traverse((child) => {
-          if (child.isMesh) {
-            if (child.geometry) {
-              child.geometry.computeVertexNormals();
-              child.geometry.computeBoundingBox();
-              child.geometry.computeBoundingSphere();
-            }
-            if (child.material) {
-              const mats = Array.isArray(child.material) ? child.material : [child.material];
-              mats.forEach(m => {
-                if (!m) return;
-                m.side = THREE.FrontSide;
-                if (m.specular) m.specular.setHex(0x000000);
-                if (typeof m.shininess !== 'undefined') m.shininess = 0;
-                if (typeof m.roughness !== 'undefined') m.roughness = 1.0;
-                if (typeof m.metalness !== 'undefined') m.metalness = 0.0;
-              });
-            }
-            this.groundMeshes.push(child);
+        // Batch geometry by unique material to collapse ~1,580 draw calls to ~34
+        const materialBuckets = new Map();
+        const getBucket = (mat) => {
+          if (!mat) return null;
+          let b = materialBuckets.get(mat);
+          if (!b) {
+            b = { mat, positions: [], normals: [], uvs: [] };
+            materialBuckets.set(mat, b);
           }
+          return b;
+        };
+
+        const meshesToDispose = [];
+        obj.traverse((child) => {
+          if (child.isMesh && child.geometry) {
+            meshesToDispose.push(child);
+            child.updateMatrix();
+            const matrix = child.matrix;
+            const normalMatrix = new THREE.Matrix3().getNormalMatrix(matrix);
+
+            const geo = child.geometry;
+            const posAttr = geo.attributes.position;
+            const normAttr = geo.attributes.normal;
+            const uvAttr = geo.attributes.uv;
+            const index = geo.index;
+
+            const vPos = new THREE.Vector3();
+            const vNorm = new THREE.Vector3();
+
+            const groups = (geo.groups && geo.groups.length > 0)
+              ? geo.groups
+              : [{ start: 0, count: index ? index.count : (posAttr ? posAttr.count : 0), materialIndex: 0 }];
+
+            for (let g = 0; g < groups.length; g++) {
+              const grp = groups[g];
+              let mat = null;
+              if (Array.isArray(child.material)) {
+                mat = child.material[grp.materialIndex] || child.material[0];
+              } else {
+                mat = child.material;
+              }
+              const bucket = getBucket(mat);
+              if (!bucket || !posAttr) continue;
+
+              const start = grp.start;
+              const count = grp.count;
+
+              for (let i = 0; i < count; i++) {
+                const vi = index ? index.getX(start + i) : (start + i);
+
+                vPos.fromBufferAttribute(posAttr, vi);
+                if (!matrix.isIdentity()) vPos.applyMatrix4(matrix);
+                bucket.positions.push(vPos.x, vPos.y, vPos.z);
+
+                if (normAttr) {
+                  vNorm.fromBufferAttribute(normAttr, vi);
+                  if (!matrix.isIdentity()) vNorm.applyMatrix3(normalMatrix).normalize();
+                  bucket.normals.push(vNorm.x, vNorm.y, vNorm.z);
+                }
+
+                if (uvAttr) {
+                  bucket.uvs.push(uvAttr.getX(vi), uvAttr.getY(vi));
+                }
+              }
+            }
+          }
+        });
+
+        // Dispose original fragmented meshes
+        for (let i = 0; i < meshesToDispose.length; i++) {
+          const m = meshesToDispose[i];
+          if (m.parent) m.parent.remove(m);
+          if (m.geometry) m.geometry.dispose();
+        }
+        while (obj.children.length > 0) {
+          obj.remove(obj.children[0]);
+        }
+
+        // Build 1 consolidated BufferGeometry & Mesh per unique material
+        this.groundMeshes = [];
+        materialBuckets.forEach((bucket) => {
+          if (bucket.positions.length === 0) return;
+
+          const newGeo = new THREE.BufferGeometry();
+          newGeo.setAttribute('position', new THREE.Float32BufferAttribute(bucket.positions, 3));
+          if (bucket.normals.length === bucket.positions.length) {
+            newGeo.setAttribute('normal', new THREE.Float32BufferAttribute(bucket.normals, 3));
+          } else {
+            newGeo.computeVertexNormals();
+          }
+          if (bucket.uvs.length > 0) {
+            newGeo.setAttribute('uv', new THREE.Float32BufferAttribute(bucket.uvs, 2));
+          }
+
+          newGeo.computeBoundingBox();
+          newGeo.computeBoundingSphere();
+
+          const m = bucket.mat;
+          m.side = THREE.FrontSide;
+          if (m.specular) m.specular.setHex(0x000000);
+          if (typeof m.shininess !== 'undefined') m.shininess = 0;
+          if (typeof m.roughness !== 'undefined') m.roughness = 1.0;
+          if (typeof m.metalness !== 'undefined') m.metalness = 0.0;
+
+          const newMesh = new THREE.Mesh(newGeo, m);
+          obj.add(newMesh);
+          this.groundMeshes.push(newMesh);
         });
 
         this.mapGroup.add(obj);
         this.mapLoaded = true;
+        console.log(`[MAP] Batched Dust 2 into ${this.groundMeshes.length} consolidated meshes (Draw calls ~${this.groundMeshes.length}).`);
         // Fire callback so player can re-snap to true ground
         if (this.onMapLoaded) this.onMapLoaded();
       };

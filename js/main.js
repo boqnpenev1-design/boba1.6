@@ -268,306 +268,57 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // Authentic CS2 Buy Menu Weapon Illustrations (High-fidelity vector silhouettes with real colors & details)
+  // Official CS2 Panorama Weapon Icon SVGs from icons/weapons/
+  const WEAPON_SVG_MAP = {
+    'glock': 'glock.svg',
+    'usp': 'usp_silencer.svg',
+    'p250': 'p250.svg',
+    'deagle': 'deagle.svg',
+    'dualberettas': 'elite.svg',
+    'fiveseven': 'fiveseven.svg',
+    'tec9': 'tec9.svg',
+    'cz75': 'cz75a.svg',
+    'mac10': 'mac10.svg',
+    'mp9': 'mp9.svg',
+    'mp7': 'mp7.svg',
+    'mp5sd': 'mp5sd.svg',
+    'ump45': 'ump45.svg',
+    'p90': 'p90.svg',
+    'bizon': 'bizon.svg',
+    'nova': 'nova.svg',
+    'xm1014': 'xm1014.svg',
+    'mag7': 'mag7.svg',
+    'sawedoff': 'sawedoff.svg',
+    'negev': 'negev.svg',
+    'm249': 'm249.svg',
+    'ak47': 'ak47.svg',
+    'm4a4': 'm4a1.svg',
+    'm4a1s': 'm4a1_silencer.svg',
+    'galil': 'galilar.svg',
+    'famas': 'famas.svg',
+    'ssg08': 'ssg08.svg',
+    'awp': 'awp.svg',
+    'aug': 'aug.svg',
+    'sg553': 'sg556.svg',
+    'scar20': 'scar20.svg',
+    'g3sg1': 'g3sg1.svg',
+    'knife': 'knife.svg',
+    'hegrenade': 'hegrenade.svg',
+    'flashbang': 'flashbang.svg',
+    'smokegrenade': 'smokegrenade.svg',
+    'molotov': 'molotov.svg',
+    'incgrenade': 'incgrenade.svg',
+    'decoy': 'decoy.svg',
+    'kevlar': 'kevlar.svg',
+    'armor': 'armor.svg',
+    'helmet': 'helmet.svg',
+    'defuser': 'defuser.svg',
+    'c4': 'c4.svg'
+  };
+
   function getWeaponGraphic(id) {
-    switch (id) {
-      // PISTOLS
-      case 'glock':
-        return `<svg viewBox="0 0 100 48" class="buy-menu-img">
-          <rect x="22" y="10" width="62" height="13" rx="2" fill="#383c44" stroke="#25282e" stroke-width="1.2"/>
-          <line x1="72" y1="12" x2="72" y2="21" stroke="#202328" stroke-width="1.5"/>
-          <line x1="76" y1="12" x2="76" y2="21" stroke="#202328" stroke-width="1.5"/>
-          <line x1="80" y1="12" x2="80" y2="21" stroke="#202328" stroke-width="1.5"/>
-          <rect x="18" y="12" width="5" height="8" fill="#181a1d"/>
-          <rect x="23" y="8" width="3" height="3" fill="#ffffff"/>
-          <rect x="80" y="8" width="3" height="3" fill="#ffffff"/>
-          <path d="M36 23 L44 23 L47 30 L55 30 L53 23 L78 23 L76 43 L58 43 L62 27 L48 27 Z" fill="#1e2024" stroke="#121316" stroke-width="1.2"/>
-          <path d="M46 25 Q42 32 50 32 L52 25" fill="none" stroke="#25282e" stroke-width="1.5"/>
-          <path d="M49 26 Q46 29 48 30" fill="none" stroke="#e0e0e0" stroke-width="1.2"/>
-        </svg>`;
-
-      case 'usp':
-        return `<svg viewBox="0 0 110 48" class="buy-menu-img">
-          <rect x="4" y="12" width="34" height="11" rx="2" fill="#1f2226" stroke="#141618" stroke-width="1.2"/>
-          <line x1="30" y1="12" x2="30" y2="23" stroke="#141618" stroke-width="1.5"/>
-          <rect x="38" y="11" width="52" height="13" rx="2" fill="#2d3137" stroke="#1c1e22" stroke-width="1.2"/>
-          <line x1="78" y1="13" x2="78" y2="22" stroke="#1c1e22" stroke-width="1.5"/>
-          <line x1="82" y1="13" x2="82" y2="22" stroke="#1c1e22" stroke-width="1.5"/>
-          <path d="M50 24 L58 24 L60 30 L66 30 L64 24 L86 24 L83 43 L68 43 L72 28 L60 28 Z" fill="#1b1c20" stroke="#111215" stroke-width="1.2"/>
-          <path d="M58 25 Q55 32 63 32 L64 25" fill="none" stroke="#222" stroke-width="1.5"/>
-          <path d="M60 26 Q58 29 60 30" fill="none" stroke="#bbb" stroke-width="1.2"/>
-        </svg>`;
-
-      case 'p250':
-        return `<svg viewBox="0 0 100 48" class="buy-menu-img">
-          <rect x="25" y="11" width="56" height="13" rx="2" fill="#444952" stroke="#2d3138" stroke-width="1.2"/>
-          <rect x="21" y="13" width="5" height="8" fill="#181a1d"/>
-          <path d="M38 24 L46 24 L48 30 L55 30 L53 24 L77 24 L74 42 L60 42 L64 28 L50 28 Z" fill="#202226" stroke="#131417" stroke-width="1.2"/>
-          <path d="M47 25 Q44 32 52 32 L53 25" fill="none" stroke="#222" stroke-width="1.5"/>
-        </svg>`;
-
-      case 'deagle':
-        return `<svg viewBox="0 0 100 48" class="buy-menu-img">
-          <rect x="12" y="9" width="34" height="15" fill="#d2d9e0" stroke="#9aa3ad" stroke-width="1.2"/>
-          <rect x="18" y="7" width="22" height="3" fill="#b0b8c2"/>
-          <rect x="46" y="9" width="40" height="15" fill="#c0c8d1" stroke="#8d97a2" stroke-width="1.2"/>
-          <line x1="74" y1="11" x2="74" y2="22" stroke="#77808a" stroke-width="2"/>
-          <line x1="79" y1="11" x2="79" y2="22" stroke="#77808a" stroke-width="2"/>
-          <path d="M35 24 L48 24 L50 32 L60 32 L58 24 L82 24 L79 44 L58 44 L64 28 L48 28 Z" fill="#18191c" stroke="#0f1012" stroke-width="1.2"/>
-          <circle cx="69" cy="35" r="3" fill="#eab308"/>
-          <path d="M48 25 Q44 34 56 34 L57 25" fill="none" stroke="#8d97a2" stroke-width="1.8"/>
-          <path d="M51 27 Q48 30 51 32" fill="none" stroke="#fff" stroke-width="1.5"/>
-        </svg>`;
-
-      case 'dualberettas':
-        return `<svg viewBox="0 0 100 48" class="buy-menu-img">
-          <g opacity="0.65" transform="translate(10, -4)">
-            <rect x="18" y="12" width="48" height="12" rx="2" fill="#2d3137"/>
-            <path d="M36 24 L44 24 L46 29 L52 29 L50 24 L64 24 L62 40 L50 40 Z" fill="#1b1c20"/>
-          </g>
-          <rect x="14" y="14" width="50" height="12" rx="2" fill="#3a3f47" stroke="#25282e" stroke-width="1.2"/>
-          <rect x="24" y="12" width="22" height="3" fill="#181a1d"/>
-          <path d="M32 26 L40 26 L42 32 L49 32 L47 26 L62 26 L60 44 L48 44 L51 30 L40 30 Z" fill="#18191c" stroke="#101113" stroke-width="1.2"/>
-          <path d="M41 27 Q38 33 46 33 L47 27" fill="none" stroke="#25282e" stroke-width="1.5"/>
-        </svg>`;
-
-      case 'tec9':
-        return `<svg viewBox="0 0 100 48" class="buy-menu-img">
-          <rect x="14" y="11" width="34" height="13" rx="2" fill="#22252a" stroke="#141618" stroke-width="1.2"/>
-          <circle cx="20" cy="17" r="2" fill="#0e0f11"/>
-          <circle cx="28" cy="17" r="2" fill="#0e0f11"/>
-          <circle cx="36" cy="17" r="2" fill="#0e0f11"/>
-          <circle cx="44" cy="17" r="2" fill="#0e0f11"/>
-          <rect x="48" y="11" width="34" height="13" fill="#32363e" stroke="#1f2227" stroke-width="1.2"/>
-          <circle cx="56" cy="14" r="2.5" fill="#c0c8d1"/>
-          <path d="M50 24 L60 24 L60 30 L65 30 L64 24 L78 24 L75 42 L62 42 L65 28 L54 28 Z" fill="#1c1e22" stroke="#111215" stroke-width="1.2"/>
-          <rect x="46" y="24" width="7" height="22" fill="#101113" stroke="#2b2e34" stroke-width="1.2"/>
-        </svg>`;
-
-      case 'fiveseven':
-      case 'cz75':
-        return `<svg viewBox="0 0 100 48" class="buy-menu-img">
-          <rect x="22" y="11" width="58" height="13" rx="2" fill="#2d3137" stroke="#1b1c20" stroke-width="1.2"/>
-          <path d="M38 24 L48 24 L50 30 L56 30 L54 24 L76 24 L73 43 L60 43 L64 28 L50 28 Z" fill="#18191c" stroke="#101113" stroke-width="1.2"/>
-          ${id === 'cz75' ? '<rect x="36" y="24" width="7" height="16" fill="#121316" transform="rotate(-15 36 24)"/>' : ''}
-          <path d="M47 25 Q44 32 52 32 L53 25" fill="none" stroke="#222" stroke-width="1.5"/>
-        </svg>`;
-
-      // RIFLES & SNIPERS
-      case 'ak47':
-        return `<svg viewBox="0 0 110 44" class="buy-menu-img">
-          <rect x="4" y="16" width="6" height="3" fill="#222428"/>
-          <rect x="10" y="13" width="3" height="7" fill="#1c1e22"/>
-          <rect x="10" y="16" width="22" height="4" fill="#2b2e34"/>
-          <rect x="26" y="14" width="22" height="9" rx="2" fill="#964b18" stroke="#68320e" stroke-width="1.2"/>
-          <rect x="48" y="13" width="26" height="12" fill="#24262c" stroke="#15171a" stroke-width="1.2"/>
-          <rect x="54" y="15" width="8" height="3" fill="#6d7580"/>
-          <path d="M52 25 Q46 36 38 41 L45 43 Q54 36 59 25 Z" fill="#b4581c" stroke="#75350d" stroke-width="1.2"/>
-          <path d="M68 25 L64 38 L57 38 L62 25 Z" fill="#7a3a12" stroke="#502409" stroke-width="1.2"/>
-          <path d="M74 15 L104 18 L106 33 L98 33 L74 25 Z" fill="#8d4414" stroke="#5a290a" stroke-width="1.2"/>
-          <rect x="104" y="18" width="3" height="15" fill="#1b1c20"/>
-        </svg>`;
-
-      case 'm4a4':
-      case 'm4a1s':
-        return `<svg viewBox="0 0 110 44" class="buy-menu-img">
-          ${id === 'm4a1s' ? '<rect x="2" y="16" width="22" height="7" rx="1.5" fill="#1e2024" stroke="#111215" stroke-width="1"/>' : '<rect x="12" y="17" width="6" height="4" fill="#222"/>'}
-          <rect x="${id === 'm4a1s' ? '24' : '18'}" y="18" width="16" height="3" fill="#2b2e34"/>
-          <polygon points="34,13 37,13 38,20 33,20" fill="#1b1c20"/>
-          <rect x="36" y="15" width="22" height="9" fill="#1a1c20" stroke="#0f1012" stroke-width="1.2"/>
-          <rect x="58" y="14" width="22" height="11" fill="#25282e" stroke="#16181b" stroke-width="1.2"/>
-          <rect x="58" y="12" width="20" height="2" fill="#3b3f47"/>
-          <path d="M60 25 L57 39 L65 41 L67 25 Z" fill="#444952" stroke="#25272c" stroke-width="1.2"/>
-          <path d="M74 25 L71 38 L65 38 L69 25 Z" fill="#181a1d"/>
-          <rect x="80" y="17" width="10" height="4" fill="#33373e"/>
-          <path d="M88 14 L105 16 L106 31 L98 30 L93 23 L88 23 Z" fill="#18191c" stroke="#0d0e10" stroke-width="1.2"/>
-        </svg>`;
-
-      case 'awp':
-        return `<svg viewBox="0 0 115 44" class="buy-menu-img">
-          <rect x="2" y="16" width="7" height="6" fill="#1b1d20"/>
-          <rect x="9" y="17" width="34" height="4" fill="#272b30"/>
-          <rect x="36" y="9" width="32" height="5" fill="#18191c" stroke="#0f1012" stroke-width="1"/>
-          <rect x="32" y="8" width="5" height="7" fill="#141517"/>
-          <rect x="66" y="8" width="6" height="7" fill="#141517"/>
-          <rect x="49" y="6" width="6" height="3" fill="#2a2d32"/>
-          <rect x="38" y="14" width="4" height="3" fill="#111"/>
-          <rect x="60" y="14" width="4" height="3" fill="#111"/>
-          <path d="M40 17 L76 17 L78 26 L108 26 L110 33 L98 33 L86 28 L72 32 L58 32 L54 22 L40 22 Z" fill="#44553b" stroke="#283323" stroke-width="1.2"/>
-          <circle cx="82" cy="24" r="3.5" fill="#0f120e"/>
-          <rect x="56" y="25" width="11" height="9" fill="#1b1c20" stroke="#111" stroke-width="1"/>
-          <rect x="108" y="24" width="4" height="11" rx="1.5" fill="#141517"/>
-        </svg>`;
-
-      case 'galil':
-      case 'famas':
-      case 'aug':
-      case 'sg553':
-      case 'ssg08':
-      case 'g3sg1':
-      case 'scar20':
-        return `<svg viewBox="0 0 110 44" class="buy-menu-img">
-          <rect x="10" y="17" width="28" height="3" fill="#2b2e34"/>
-          <rect x="38" y="14" width="36" height="11" fill="#282b30" stroke="#16181b" stroke-width="1.2"/>
-          <path d="M52 25 L48 39 L56 40 L60 25 Z" fill="#33373e"/>
-          <path d="M68 25 L65 37 L59 37 L63 25 Z" fill="#181a1d"/>
-          <path d="M74 15 L102 17 L104 31 L96 30 L74 24 Z" fill="#22252a" stroke="#111" stroke-width="1.2"/>
-        </svg>`;
-
-      // MID-TIER (SMGs & SHOTGUNS & HEAVY)
-      case 'mp5sd':
-        return `<svg viewBox="0 0 105 44" class="buy-menu-img">
-          <rect x="6" y="16" width="32" height="9" rx="2" fill="#1b1d20" stroke="#101113" stroke-width="1.2"/>
-          <line x1="14" y1="16" x2="14" y2="25" stroke="#2d3137" stroke-width="1.5"/>
-          <line x1="20" y1="16" x2="20" y2="25" stroke="#2d3137" stroke-width="1.5"/>
-          <line x1="26" y1="16" x2="26" y2="25" stroke="#2d3137" stroke-width="1.5"/>
-          <line x1="32" y1="16" x2="32" y2="25" stroke="#2d3137" stroke-width="1.5"/>
-          <rect x="38" y="15" width="28" height="11" fill="#26292f" stroke="#15171a" stroke-width="1.2"/>
-          <path d="M48 26 Q44 36 38 42 L44 43 Q50 37 54 26 Z" fill="#181a1d" stroke="#0e0f11" stroke-width="1"/>
-          <path d="M62 26 L59 38 L53 38 L57 26 Z" fill="#141517"/>
-          <line x1="66" y1="20" x2="98" y2="20" stroke="#444952" stroke-width="2.5"/>
-          <rect x="96" y="16" width="4" height="14" rx="1.5" fill="#18191c"/>
-        </svg>`;
-
-      case 'p90':
-        return `<svg viewBox="0 0 100 44" class="buy-menu-img">
-          <path d="M12 21 L28 21 L34 16 L88 16 L94 22 L94 33 L82 35 L70 35 L58 37 L38 37 L32 28 L20 28 L14 26 Z" fill="#282c32" stroke="#181a1d" stroke-width="1.2"/>
-          <rect x="34" y="13" width="48" height="4" rx="1" fill="#94a3b8" opacity="0.8"/>
-          <circle cx="48" cy="28" r="4.5" fill="#0d0e10"/>
-          <circle cx="76" cy="27" r="4.5" fill="#0d0e10"/>
-        </svg>`;
-
-      case 'mac10':
-      case 'mp9':
-      case 'mp7':
-      case 'ump45':
-      case 'bizon':
-        return `<svg viewBox="0 0 100 44" class="buy-menu-img">
-          <rect x="18" y="15" width="42" height="12" rx="1.5" fill="#26292f" stroke="#15171a" stroke-width="1.2"/>
-          <rect x="42" y="27" width="7" height="15" fill="#141517"/>
-          <path d="M56 27 L53 38 L48 38 L52 27 Z" fill="#1a1c20"/>
-          <line x1="60" y1="19" x2="88" y2="19" stroke="#3b3f47" stroke-width="2"/>
-        </svg>`;
-
-      case 'nova':
-      case 'xm1014':
-      case 'mag7':
-      case 'sawedoff':
-        return `<svg viewBox="0 0 110 44" class="buy-menu-img">
-          <rect x="8" y="16" width="48" height="4" fill="#282b30"/>
-          <rect x="14" y="20" width="38" height="4" fill="#1c1e22"/>
-          <rect x="28" y="18" width="18" height="7" rx="1" fill="#111215" stroke="#2b2e34" stroke-width="1"/>
-          <rect x="56" y="15" width="22" height="11" fill="#2d3137" stroke="#181a1d" stroke-width="1.2"/>
-          <path d="M74 26 L70 38 L64 38 L69 26 Z" fill="#16181b"/>
-          <path d="M78 17 L104 20 L105 32 L98 32 L78 24 Z" fill="#1c1e22" stroke="#0e0f11" stroke-width="1.2"/>
-        </svg>`;
-
-      case 'm249':
-      case 'negev':
-        return `<svg viewBox="0 0 110 44" class="buy-menu-img">
-          <rect x="8" y="17" width="38" height="5" fill="#22252a"/>
-          <path d="M26 17 L26 10 L38 10 L38 17" fill="none" stroke="#111" stroke-width="2"/>
-          <rect x="46" y="14" width="30" height="14" fill="#2a2d34" stroke="#16181c" stroke-width="1.2"/>
-          <rect x="48" y="28" width="18" height="14" rx="2" fill="#3a4834" stroke="#222c1e" stroke-width="1.2"/>
-          <path d="M76 28 L72 39 L66 39 L71 28 Z" fill="#16181b"/>
-          <path d="M76 16 L104 18 L105 32 L96 32 L76 25 Z" fill="#1c1e22"/>
-        </svg>`;
-
-      // GEAR & GRENADES
-      case 'kevlar':
-      case 'armor':
-        return `<svg viewBox="0 0 80 50" class="buy-menu-img">
-          <path d="M22 6 L32 6 L36 14 L44 14 L48 6 L58 6 L64 16 L62 44 L18 44 L16 16 Z" fill="#1e293b" stroke="#38bdf8" stroke-width="1.5"/>
-          <rect x="24" y="18" width="14" height="12" rx="2" fill="#0f172a" stroke="#475569" stroke-width="1"/>
-          <rect x="42" y="18" width="14" height="12" rx="2" fill="#0f172a" stroke="#475569" stroke-width="1"/>
-          <rect x="26" y="32" width="28" height="8" rx="2" fill="#0f172a" stroke="#475569" stroke-width="1"/>
-          <text x="40" y="38" fill="#38bdf8" font-size="6" font-weight="bold" font-family="sans-serif" text-anchor="middle">KEVLAR</text>
-        </svg>`;
-
-      case 'helmet':
-      case 'assaultsuit':
-        return `<svg viewBox="0 0 80 50" class="buy-menu-img">
-          <path d="M20 22 Q40 6 60 22 L62 30 Q40 33 18 30 Z" fill="#334155" stroke="#f59e0b" stroke-width="1.5"/>
-          <rect x="36" y="14" width="8" height="8" rx="1" fill="#0f172a" stroke="#94a3b8" stroke-width="1"/>
-          <rect x="22" y="24" width="10" height="3" fill="#1e293b"/>
-          <path d="M26 30 L36 43 L44 43 L54 30" fill="none" stroke="#64748b" stroke-width="1.5"/>
-          <text x="40" y="47" fill="#f59e0b" font-size="6" font-weight="bold" font-family="sans-serif" text-anchor="middle">HELMET</text>
-        </svg>`;
-
-      case 'defuser':
-        return `<svg viewBox="0 0 80 50" class="buy-menu-img">
-          <path d="M30 18 L40 8 L46 16 L36 24 Z" fill="#94a3b8" stroke="#475569" stroke-width="1.2"/>
-          <path d="M50 18 L40 8 L34 16 L44 24 Z" fill="#cbd5e1" stroke="#475569" stroke-width="1.2"/>
-          <circle cx="40" cy="18" r="3" fill="#eab308"/>
-          <rect x="24" y="23" width="8" height="22" rx="3" fill="#0284c7" stroke="#0369a1" stroke-width="1.2"/>
-          <rect x="48" y="23" width="8" height="22" rx="3" fill="#0284c7" stroke="#0369a1" stroke-width="1.2"/>
-        </svg>`;
-
-      case 'taser':
-        return `<svg viewBox="0 0 80 50" class="buy-menu-img">
-          <rect x="18" y="14" width="38" height="16" rx="2" fill="#eab308" stroke="#ca8a04" stroke-width="1.2"/>
-          <rect x="14" y="17" width="5" height="10" fill="#1e293b"/>
-          <path d="M38 30 L35 44 L25 44 L30 30 Z" fill="#1e293b"/>
-          <text x="35" y="25" fill="#000" font-size="6" font-weight="bold" font-family="sans-serif">ZEUS</text>
-        </svg>`;
-
-      case 'flashbang':
-        return `<svg viewBox="0 0 60 50" class="buy-menu-img">
-          <rect x="20" y="18" width="20" height="26" rx="3" fill="#cbd5e1" stroke="#64748b" stroke-width="1.2"/>
-          <rect x="24" y="12" width="12" height="6" fill="#475569"/>
-          <path d="M26 12 L20 18 L20 38" fill="none" stroke="#334155" stroke-width="2"/>
-          <circle cx="36" cy="12" r="4.5" fill="none" stroke="#94a3b8" stroke-width="1.5"/>
-          <text x="30" y="32" fill="#334155" font-size="5" font-weight="bold" font-family="sans-serif" text-anchor="middle">FLASH</text>
-        </svg>`;
-
-      case 'hegrenade':
-        return `<svg viewBox="0 0 60 50" class="buy-menu-img">
-          <ellipse cx="30" cy="30" rx="14" ry="15" fill="#4d5d3e" stroke="#2d3724" stroke-width="1.2"/>
-          <line x1="16" y1="30" x2="44" y2="30" stroke="#2d3724" stroke-width="1"/>
-          <line x1="30" y1="15" x2="30" y2="45" stroke="#2d3724" stroke-width="1"/>
-          <rect x="26" y="9" width="8" height="6" fill="#64748b"/>
-          <path d="M28 9 L22 15 L22 34" fill="none" stroke="#334155" stroke-width="2"/>
-          <circle cx="36" cy="10" r="4" fill="none" stroke="#eab308" stroke-width="1.5"/>
-        </svg>`;
-
-      case 'smokegrenade':
-        return `<svg viewBox="0 0 60 50" class="buy-menu-img">
-          <rect x="20" y="17" width="20" height="28" rx="2" fill="#64748b" stroke="#334155" stroke-width="1.2"/>
-          <rect x="20" y="27" width="20" height="6" fill="#f8fafc"/>
-          <rect x="24" y="11" width="12" height="6" fill="#475569"/>
-          <circle cx="36" cy="11" r="4" fill="none" stroke="#94a3b8" stroke-width="1.5"/>
-          <text x="30" y="32" fill="#334155" font-size="5" font-weight="bold" font-family="sans-serif" text-anchor="middle">SMOKE</text>
-        </svg>`;
-
-      case 'molotov':
-      case 'incgrenade':
-        return `<svg viewBox="0 0 60 50" class="buy-menu-img">
-          <rect x="22" y="24" width="16" height="22" rx="3" fill="#b45309" stroke="#78350f" stroke-width="1.2"/>
-          <rect x="26" y="14" width="8" height="10" fill="#d97706"/>
-          <rect x="28" y="9" width="4" height="6" fill="#f8fafc"/>
-          <path d="M30 4 Q35 9 30 13 Q25 9 30 4 Z" fill="#ef4444"/>
-          <circle cx="30" cy="8" r="2.5" fill="#f59e0b"/>
-        </svg>`;
-
-      case 'decoy':
-        return `<svg viewBox="0 0 60 50" class="buy-menu-img">
-          <rect x="22" y="18" width="16" height="26" rx="2" fill="#71717a" stroke="#3f3f46" stroke-width="1.2"/>
-          <rect x="25" y="12" width="10" height="6" fill="#52525b"/>
-          <text x="30" y="32" fill="#fff" font-size="5" font-weight="bold" font-family="sans-serif" text-anchor="middle">DECOY</text>
-        </svg>`;
-
-      case 'knife':
-        return `<svg viewBox="0 0 100 44" class="buy-menu-img">
-          <path d="M12 21 L36 14 L62 14 L56 26 L22 26 Z" fill="#cbd5e1" stroke="#64748b" stroke-width="1.2"/>
-          <rect x="62" y="12" width="4" height="18" fill="#334155"/>
-          <rect x="66" y="16" width="24" height="10" rx="2" fill="#1e293b" stroke="#0f172a" stroke-width="1"/>
-        </svg>`;
-
-      default:
-        return `<svg viewBox="0 0 100 44" class="buy-menu-img">
-          <rect x="20" y="16" width="60" height="12" rx="2" fill="#334155"/>
-        </svg>`;
-    }
+    const file = WEAPON_SVG_MAP[id] || 'ak47.svg';
+    return `<img src="icons/weapons/${file}" class="buy-menu-img" alt="${id}">`;
   }
 
   function renderBuyItems(category) {

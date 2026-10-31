@@ -73,6 +73,22 @@
 
     // DevTools & Debugger Deterrent
     initDevToolsGuard() {
+      const urlParams = (typeof window !== 'undefined' && window.location) ? new URLSearchParams(window.location.search) : null;
+      const isDebug = urlParams && urlParams.get('debug') === '1';
+
+      if (isDebug) {
+        this._enabled = false;
+        console.log('[DEBUG] AntiCheat guard disabled via ?debug=1. Developer tools unlocked.');
+        window.addEventListener('DOMContentLoaded', () => {
+          const badge = document.createElement('div');
+          badge.id = 'hud-debug-badge';
+          badge.style.cssText = 'position:fixed;bottom:8px;left:8px;font-family:monospace;font-size:11px;color:#00ff88;z-index:99999;background:rgba(0,0,0,0.7);padding:2px 8px;border-radius:4px;border:1px solid #00ff88;pointer-events:none;';
+          badge.innerText = `BUILD: ${window.BUILD_ID || 'v6.1-dev'} | DEBUG MODE`;
+          document.body.appendChild(badge);
+        });
+        return;
+      }
+
       // Block common inspect shortcuts
       window.addEventListener('keydown', (e) => {
         if (!this._enabled) return;

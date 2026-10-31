@@ -21,10 +21,17 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE20: true
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Inject Commit Version & Build ID
+        run: |
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          sed -i -E "s/\?v=[0-9a-zA-Z._-]+/?v=${SHORT_SHA}/g" index.html
+          sed -i "s/BUILD_ID = 'dev-build'/BUILD_ID = '${SHORT_SHA}'/g" index.html
 
       - name: Setup Pages
         uses: actions/configure-pages@v5

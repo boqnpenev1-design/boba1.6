@@ -1,16 +1,25 @@
-// CS2 WebRTC Multiplayer Engine: Real-Time Gunfire Audio Sync, Footsteps Sync,
-// Mid-Round Spectator POV Join Sync, Round State Lockstep, and 3D Operator Models
+// CS2 Dedicated WebSocket Multiplayer Engine
+// Connected directly to authoritative Node.js server (Render free-tier wss://cs2-server-1zcq.onrender.com)
+// Features: 20Hz persistent input loop, 100ms snapshot interpolation,
+// authentic SAS & Phoenix GLB 3D models, forward facing yaw, and Render server wake-up overlay
 
 class CS2NetworkManager {
   constructor(gameManager) {
     this.gm = gameManager;
-    this.peer = null;
-    this.isHost = false;
-    this.connections = [];
-    this.hostConnection = null;
-    this.roomId = null;
-    this.remotePlayers = {}; // id -> { mesh, data, team, pos, lastPos, lastStepTime }
+    this.ws = null;
+    this.playerId = null;
     this.isConnected = false;
+    this.isHost = false; // Dedicated server is the authoritative host
+    this.connections = [];
+    this.hostConnection = { open: false };
+    this.remotePlayers = {}; // id -> { mesh, data, team, name, pos, buffer: [] }
+    this.inputInterval = null;
+    this.reconnectTimeout = null;
+    this.wakeOverlay = null;
+    this.wakeTimerInterval = null;
+    this.connectStartTime = 0;
+
+    // Load authentic CS character models
     this.gltfLoader = typeof THREE.GLTFLoader !== 'undefined' ? new THREE.GLTFLoader() : null;
     this.ctModel = null;
     this.tModel = null;
@@ -19,450 +28,448 @@ class CS2NetworkManager {
       // 1. Counter-Terrorist: Genuine CS2 SAS Operator Model
       this.gltfLoader.load('ctm_sas__cs2_agent_model.glb', (gltf) => {
         this.ctModel = gltf.scene;
-        console.log('Authentic CS2 CT (SAS) agent loaded successfully');
+        console.log('Authentic CS2 CT (SAS) agent loaded');
         Object.values(this.remotePlayers).forEach(p => {
           if (p && p.mesh && p.team === 'CT' && !p.hasAuthenticModel) {
             this.applyAuthenticModel(p.mesh, 'CT');
             p.hasAuthenticModel = true;
           }
         });
-      }, undefined, (e) => console.warn('CT model load note:', e));
+      }, undefined, (e) => console.warn('CT model note:', e));
 
-      // 2. Terrorist: Genuine CS:GO/CS2 Phoenix Operator Model
+      // 2. Terrorist: Genuine CS Phoenix Operator Model
       this.gltfLoader.load('tm_phoenix_v2-_csgo_terrorist_characters.glb', (gltf) => {
         this.tModel = gltf.scene;
-        console.log('Authentic CS T (Phoenix) agent loaded successfully');
+        console.log('Authentic CS T (Phoenix) agent loaded');
         Object.values(this.remotePlayers).forEach(p => {
           if (p && p.mesh && p.team === 'T' && !p.hasAuthenticModel) {
             this.applyAuthenticModel(p.mesh, 'T');
             p.hasAuthenticModel = true;
           }
         });
-      }, undefined, (e) => console.warn('T model load note:', e));
+      }, undefined, (e) => console.warn('T model note:', e));
     }
   }
 
-  generateRoomCode() {
-    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-    let code = 'CS-';
-    for (let i = 0; i < 4; i++) {
-      code += chars.charAt(Math.floor(Math.random() * chars.length));
+  // Creates or updates the non-intrusive "WAKING SERVER..." overlay for Render cold starts
+  showWakingOverlay(statusText = 'WAKING DEDICATED CS2 SERVER...') {
+    if (!this.wakeOverlay) {
+      this.wakeOverlay = document.createElement('div');
+      this.wakeOverlay.id = 'cs2-server-wake-overlay';
+      this.wakeOverlay.style.cssText = `
+        position: fixed;
+        bottom: 24px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(13, 18, 25, 0.95);
+        border: 2px solid #ffae35;
+        border-radius: 6px;
+        padding: 12px 24px;
+        color: #ffffff;
+        font-family: 'Rajdhani', sans-serif;
+        font-weight: 700;
+        font-size: 14px;
+        letter-spacing: 1px;
+        z-index: 99999;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.8);
+      `;
+      document.body.appendChild(this.wakeOverlay);
     }
-    return code;
+    this.wakeOverlay.innerHTML = `
+      <div style="width: 10px; height: 10px; border-radius: 50%; background: #ffae35; animation: pulse 1s infinite alternate;"></div>
+      <div>
+        <div style="color: #ffae35; font-size: 15px;">${statusText}</div>
+        <div style="color: #8899aa; font-size: 12px; font-weight: 500;">Render free-tier cold start (~30-50s) &bull; Elapsed: <span id="cs2-wake-elapsed">0</span>s</div>
+      </div>
+    `;
+    this.wakeOverlay.style.display = 'flex';
+
+    if (!this.wakeTimerInterval) {
+      const startMs = Date.now();
+      this.wakeTimerInterval = setInterval(() => {
+        const el = document.getElementById('cs2-wake-elapsed');
+        if (el) el.innerText = Math.floor((Date.now() - startMs) / 1000);
+      }, 1000);
+    }
   }
 
-  autoJoinPublicServer(mapName, onReady) {
-    const targetRoom = `cs2-pub-${mapName.toLowerCase()}`;
-    this.roomId = targetRoom;
-
-    const clientPeer = new Peer({
-      debug: 1,
-      config: {
-        iceServers: [
-          { urls: 'stun:stun.l.google.com:19302' },
-          { urls: 'stun:stun1.l.google.com:19302' }
-        ]
-      }
-    });
-
-    let connectedAsClient = false;
-    const timeout = setTimeout(() => {
-      if (!connectedAsClient) {
-        clientPeer.destroy();
-        this.hostPublicServer(targetRoom, onReady);
-      }
-    }, 1800);
-
-    clientPeer.on('open', () => {
-      const conn = clientPeer.connect(targetRoom, { reliable: true });
-      this.hostConnection = conn;
-
-      conn.on('open', () => {
-        clearTimeout(timeout);
-        connectedAsClient = true;
-        this.peer = clientPeer;
-        this.isHost = false;
-        this.isConnected = true;
-        const statusEl = document.getElementById('sb-net-status');
-        if (statusEl) statusEl.innerText = `ONLINE PUBLIC SERVER &bull; CLIENT (${targetRoom.toUpperCase()})`;
-
-        conn.on('data', (data) => {
-          this.handleClientReceivedPacket(data);
-        });
-
-        conn.on('close', () => {
-          this.isConnected = false;
-          this.clearAllRemotePlayers();
-        });
-
-        if (onReady) onReady('client');
-      });
-
-      conn.on('error', () => {
-        if (!connectedAsClient) {
-          clearTimeout(timeout);
-          clientPeer.destroy();
-          this.hostPublicServer(targetRoom, onReady);
-        }
-      });
-    });
-
-    clientPeer.on('error', () => {
-      if (!connectedAsClient) {
-        clearTimeout(timeout);
-        clientPeer.destroy();
-        this.hostPublicServer(targetRoom, onReady);
-      }
-    });
+  hideWakingOverlay() {
+    if (this.wakeOverlay) {
+      this.wakeOverlay.style.display = 'none';
+    }
+    if (this.wakeTimerInterval) {
+      clearInterval(this.wakeTimerInterval);
+      this.wakeTimerInterval = null;
+    }
   }
 
-  hostPublicServer(roomName, onReady) {
-    this.isHost = true;
-    this.roomId = roomName;
+  // Connects to dedicated authoritative WebSocket server
+  autoJoinPublicServer(mapName = 'dust2', onReady = null) {
+    const serverUrl = window.SERVER_URL || 'wss://cs2-server-1zcq.onrender.com';
+    console.log(`Connecting to CS2 Dedicated Server: ${serverUrl}`);
 
-    this.peer = new Peer(roomName, {
-      debug: 1,
-      config: {
-        iceServers: [
-          { urls: 'stun:stun.l.google.com:19302' },
-          { urls: 'stun:stun1.l.google.com:19302' }
-        ]
+    this.connectStartTime = Date.now();
+    let wakeShown = false;
+    const wakeTimer = setTimeout(() => {
+      if (!this.isConnected) {
+        wakeShown = true;
+        this.showWakingOverlay();
       }
-    });
+    }, 2200);
 
-    this.peer.on('open', () => {
+    try {
+      this.ws = new WebSocket(serverUrl);
+    } catch (e) {
+      console.warn('WebSocket init exception:', e);
+      clearTimeout(wakeTimer);
+      return;
+    }
+
+    this.ws.onopen = () => {
+      clearTimeout(wakeTimer);
+      this.hideWakingOverlay();
       this.isConnected = true;
+      this.hostConnection.open = true;
+
+      const callsign = window.cs2PlayerCallsign || 'OPERATOR';
+      const team = (this.gm.player && this.gm.player.team) ? this.gm.player.team : 'CT';
+
+      // Send authoritative join packet
+      this.send({
+        type: 'join',
+        callsign: callsign,
+        team: team
+      });
+
+      // Start 20Hz persistent player input loop
+      this.startInputLoop();
+
       const statusEl = document.getElementById('sb-net-status');
-      if (statusEl) statusEl.innerText = `ONLINE PUBLIC SERVER &bull; HOST (${roomName.toUpperCase()})`;
-      if (onReady) onReady('host');
-    });
+      if (statusEl) statusEl.innerHTML = `ONLINE DEDICATED SERVER &bull; CONNECTED`;
 
-    this.peer.on('connection', (conn) => {
-      this.connections.push(conn);
-      this.setupHostConnectionHandlers(conn);
-
-      // CRITICAL: Send live match state to joining player
-      conn.send({
-        type: 'match_sync',
-        phase: this.gm.phase,
-        phaseTimer: this.gm.phaseTimer,
-        phaseEndTime: this.gm.phaseEndTime,
-        liveRoundStartTime: this.gm.liveRoundStartTime,
-        ctScore: this.gm.ctScore,
-        tScore: this.gm.tScore,
-        round: this.gm.currentRound,
-        c4Planted: this.gm.c4Planted,
-        c4Pos: this.gm.c4Pos,
-        c4Site: this.gm.c4Site
-      });
-    });
-
-    this.peer.on('error', (err) => {
-      console.warn("Public host peer warning:", err);
-    });
-  }
-
-  createLobby(onReady) {
-    const code = this.generateRoomCode();
-    this.isHost = true;
-    this.roomId = code;
-
-    this.peer = new Peer(code.toLowerCase(), {
-      debug: 1,
-      config: {
-        iceServers: [
-          { urls: 'stun:stun.l.google.com:19302' },
-          { urls: 'stun:stun1.l.google.com:19302' }
-        ]
-      }
-    });
-
-    this.peer.on('open', () => {
-      this.isConnected = true;
-      if (onReady) onReady(code);
-    });
-
-    this.peer.on('connection', (conn) => {
-      this.connections.push(conn);
-      this.setupHostConnectionHandlers(conn);
-    });
-
-    this.peer.on('error', (err) => {
-      console.warn("PeerJS connection error:", err);
-    });
-  }
-
-  joinLobby(roomCode, onConnected, onError) {
-    this.isHost = false;
-    this.roomId = roomCode.toUpperCase();
-
-    this.peer = new Peer({
-      debug: 1,
-      config: {
-        iceServers: [
-          { urls: 'stun:stun.l.google.com:19302' },
-          { urls: 'stun:stun1.l.google.com:19302' }
-        ]
-      }
-    });
-
-    this.peer.on('open', () => {
-      const conn = this.peer.connect(this.roomId.toLowerCase(), { reliable: true });
-      this.hostConnection = conn;
-
-      conn.on('open', () => {
-        this.isConnected = true;
-        if (onConnected) onConnected();
-      });
-
-      conn.on('data', (data) => {
-        this.handleClientReceivedPacket(data);
-      });
-
-      conn.on('close', () => {
-        this.isConnected = false;
-        this.clearAllRemotePlayers();
-      });
-    });
-
-    this.peer.on('error', (err) => {
-      if (onError) onError(err);
-    });
-  }
-
-  setupHostConnectionHandlers(conn) {
-    const sendSync = () => {
-      conn.send({
-        type: 'match_sync',
-        phase: this.gm.phase,
-        phaseTimer: this.gm.phaseTimer,
-        phaseEndTime: this.gm.phaseEndTime,
-        liveRoundStartTime: this.gm.liveRoundStartTime,
-        ctScore: this.gm.ctScore,
-        tScore: this.gm.tScore,
-        round: this.gm.currentRound,
-        c4Planted: this.gm.c4Planted,
-        c4Pos: this.gm.c4Pos,
-        c4Site: this.gm.c4Site
-      });
+      if (onReady) onReady('client');
     };
 
-    if (conn.open) {
-      sendSync();
-    } else {
-      conn.on('open', sendSync);
+    this.ws.onmessage = (event) => {
+      try {
+        const packet = JSON.parse(event.data);
+        this.handleServerPacket(packet);
+      } catch (err) {
+        console.warn('Packet parse error:', err);
+      }
+    };
+
+    this.ws.onclose = () => {
+      this.isConnected = false;
+      this.hostConnection.open = false;
+      this.stopInputLoop();
+      this.clearAllRemotePlayers();
+
+      const statusEl = document.getElementById('sb-net-status');
+      if (statusEl) statusEl.innerHTML = `RECONNECTING TO SERVER...`;
+
+      // Automatic reconnection attempt after 3s
+      if (!this.reconnectTimeout) {
+        this.reconnectTimeout = setTimeout(() => {
+          this.reconnectTimeout = null;
+          if (this.gm.playerInMatch !== false) {
+            this.autoJoinPublicServer(mapName, onReady);
+          }
+        }, 3000);
+      }
+    };
+
+    this.ws.onerror = (err) => {
+      console.warn('CS2 Server WebSocket Note:', err.message || err);
+    };
+  }
+
+  startInputLoop() {
+    this.stopInputLoop();
+    // 20Hz = 50ms interval (persists in background tabs)
+    this.inputInterval = setInterval(() => {
+      if (!this.isConnected || !this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+      const p = this.gm.player;
+      if (!p) return;
+
+      this.send({
+        type: 'player_input',
+        pos: { x: p.position.x, y: p.position.y, z: p.position.z },
+        yaw: p.yaw,
+        pitch: p.pitch,
+        crouch: p.isCrouched,
+        weapon: p.activeWeapon ? p.activeWeapon.id : 'knife'
+      });
+    }, 50);
+  }
+
+  stopInputLoop() {
+    if (this.inputInterval) {
+      clearInterval(this.inputInterval);
+      this.inputInterval = null;
+    }
+  }
+
+  send(packet) {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      try {
+        this.ws.send(JSON.stringify(packet));
+      } catch (e) {}
+    }
+  }
+
+  broadcast(packet) {
+    this.send(packet);
+  }
+
+  // Dispatch incoming server messages
+  handleServerPacket(packet) {
+    switch (packet.type) {
+      case 'match_sync':
+        this.playerId = packet.playerId;
+        this.gm.matchId = packet.matchId;
+        this.gm.currentRound = packet.currentRound || 1;
+        this.gm.score.CT = packet.ctScore || 0;
+        this.gm.score.T = packet.tScore || 0;
+        this.gm.phase = packet.phase || 'freeze';
+        this.gm.roundTime = packet.phaseTimer || 15;
+        this.gm.phaseEndTime = packet.phaseEndTime || (performance.now() + 15000);
+
+        if (packet.c4Planted) {
+          this.gm.c4Planted = true;
+          this.gm.c4Pos = packet.c4Pos;
+          this.gm.c4Site = packet.c4Site;
+        }
+
+        if (packet.c4CarrierId === this.playerId && this.gm.player) {
+          this.gm.player.inventory[5] = CS2_WEAPONS.c4;
+        }
+
+        if (packet.inMatch === false && packet.phase === 'live' && this.gm.player) {
+          this.gm.player.enterSpectatorMode();
+        }
+        this.gm.updateHUD();
+        break;
+
+      case 'snapshot':
+        this.handleSnapshot(packet);
+        break;
+
+      case 'phase_change':
+        this.gm.phase = packet.phase;
+        this.gm.roundTime = packet.timer;
+        this.gm.phaseEndTime = packet.phaseEndTime || (performance.now() + packet.timer * 1000);
+        this.gm.updateHUD();
+        break;
+
+      case 'round_start':
+        this.gm.currentRound = packet.round;
+        this.gm.phase = packet.phase || 'freeze';
+        this.gm.roundTime = packet.timer || 15;
+        this.gm.phaseEndTime = packet.phaseEndTime || (performance.now() + 15000);
+        this.gm.score.CT = packet.ctScore || 0;
+        this.gm.score.T = packet.tScore || 0;
+        this.gm.c4Planted = false;
+
+        // Reset player round state
+        if (this.gm.player) {
+          this.gm.player.health.set(100);
+          this.gm.player.isAlive = true;
+          this.gm.player.isSpectating = false;
+          this.gm.player.inventory[5] = (packet.c4CarrierId === this.playerId) ? CS2_WEAPONS.c4 : null;
+          this.gm.player.respawn();
+        }
+        this.gm.updateHUD();
+        break;
+
+      case 'round_end':
+        this.gm.score.CT = packet.ctScore;
+        this.gm.score.T = packet.tScore;
+        this.gm.phase = 'round_over';
+        this.gm.onRoundEnd(packet.winner, packet.reason, packet.mvp);
+        break;
+
+      case 'halftime_swap':
+        this.gm.score.CT = packet.ctScore;
+        this.gm.score.T = packet.tScore;
+        if (this.gm.player) {
+          this.gm.player.team = (this.gm.player.team === 'CT') ? 'T' : 'CT';
+          this.gm.player.money.set(800);
+          this.gm.player.hasHelmet = false;
+          this.gm.player.armor.set(0);
+        }
+        this.gm.updateHUD();
+        break;
+
+      case 'c4_planted':
+        this.gm.onC4Planted(packet.pos, packet.site);
+        break;
+
+      case 'bomb_exploded':
+        this.gm.spawnC4ExplosionEffect(packet.pos);
+        break;
+
+      case 'bomb_defused':
+        this.gm.onBombDefused(packet.defuserName || 'Counter-Terrorist');
+        break;
+
+      case 'player_damaged':
+        if (packet.targetId === this.playerId && this.gm.player) {
+          this.gm.player.takeDamage(packet.damage, packet.attackerId, 'bullet', false, this.gm);
+        }
+        break;
+
+      case 'player_killed':
+        this.gm.addKillFeed(packet.attackerName, packet.victimName, packet.weapon, packet.isHeadshot);
+        if (packet.victimId === this.playerId && this.gm.player) {
+          this.gm.player.takeDamage(500, packet.attackerName, packet.weapon, packet.isHeadshot, this.gm);
+        }
+        break;
+
+      case 'c4_dropped':
+        if (packet.pos && this.gm.player) {
+          // Visual dropped C4 is handled by gameManager
+        }
+        break;
+
+      case 'c4_picked_up':
+        if (packet.carrierId === this.playerId && this.gm.player) {
+          this.gm.player.inventory[5] = CS2_WEAPONS.c4;
+          this.gm.player.updateSlotHUD();
+          window.csAudio.playWeaponEquip('knife');
+        }
+        break;
+
+      case 'kicked_idle':
+        alert(packet.message || 'DISCONNECTED FOR INACTIVITY');
+        window.location.reload();
+        break;
+    }
+  }
+
+  // Process 25Hz server state snapshot
+  handleSnapshot(packet) {
+    if (!packet || !packet.players) return;
+
+    this.gm.roundTime = packet.timer;
+    this.gm.score.CT = packet.ctScore;
+    this.gm.score.T = packet.tScore;
+    this.gm.currentRound = packet.round;
+    this.gm.phase = packet.phase;
+
+    // Update HUD living player counts from snapshot
+    const ctAlive = packet.players.filter(p => p.team === 'CT' && p.isAlive).length;
+    const tAlive = packet.players.filter(p => p.team === 'T' && p.isAlive).length;
+    const ctEl = document.getElementById('hud-ct-alive');
+    const tEl = document.getElementById('hud-t-alive');
+    if (ctEl) ctEl.innerText = `${ctAlive} ALIVE`;
+    if (tEl) tEl.innerText = `${tAlive} ALIVE`;
+
+    const now = performance.now();
+    const seenIds = new Set();
+
+    for (let i = 0; i < packet.players.length; i++) {
+      const sp = packet.players[i];
+      if (sp.id === this.playerId) {
+        // Sync local economy & server-authoritative death
+        if (sp.money !== undefined && Math.abs(sp.money - this.gm.player.money.get()) > 50) {
+          this.gm.player.money.set(sp.money);
+        }
+        continue;
+      }
+
+      seenIds.add(sp.id);
+      this.updateRemotePlayerFromSnapshot(sp, now);
     }
 
-    conn.on('data', (data) => {
-      this.handleHostReceivedPacket(conn, data);
+    // Clean up disconnected players
+    Object.keys(this.remotePlayers).forEach(id => {
+      if (!seenIds.has(id)) {
+        this.removeRemotePlayer(id);
+      }
     });
 
-    conn.on('close', () => {
-      const idx = this.connections.indexOf(conn);
-      if (idx !== -1) this.connections.splice(idx, 1);
-      if (conn.peer) {
-        this.removeRemotePlayer(conn.peer);
-        this.broadcast({ type: 'player_leave', peerId: conn.peer });
+    // Interpolate remote player positions
+    this.renderInterpolatedPlayers(now);
+  }
+
+  updateRemotePlayerFromSnapshot(sp, now) {
+    if (!this.remotePlayers[sp.id]) {
+      const model = this.createTacticalCharacterModel(sp.team, sp.callsign);
+      this.gm.scene.add(model);
+      this.remotePlayers[sp.id] = {
+        mesh: model,
+        team: sp.team,
+        name: sp.callsign || `Agent_${sp.id.substring(0, 5)}`,
+        pos: new THREE.Vector3(sp.pos.x, sp.pos.y, sp.pos.z),
+        yaw: sp.yaw || 0,
+        pitch: sp.pitch || 0,
+        isAlive: sp.isAlive,
+        buffer: []
+      };
+    }
+
+    const rp = this.remotePlayers[sp.id];
+    rp.team = sp.team;
+    rp.isAlive = sp.isAlive;
+    rp.mesh.visible = (sp.inMatch !== false && sp.isAlive);
+
+    // Push into snapshot interpolation buffer (100ms render delay)
+    rp.buffer.push({
+      t: now,
+      pos: new THREE.Vector3(sp.pos.x, sp.pos.y - 1.75, sp.pos.z),
+      yaw: sp.yaw || 0,
+      pitch: sp.pitch || 0
+    });
+
+    // Keep buffer trimmed
+    if (rp.buffer.length > 20) {
+      rp.buffer.shift();
+    }
+  }
+
+  // Smooth 100ms snapshot interpolation for remote players
+  renderInterpolatedPlayers(now) {
+    const renderTime = now - 100; // 100ms buffer delay
+
+    Object.values(this.remotePlayers).forEach(rp => {
+      if (!rp || !rp.mesh || !rp.mesh.visible || rp.buffer.length < 2) return;
+
+      const buf = rp.buffer;
+      // Drop older snapshots
+      while (buf.length >= 2 && buf[1].t <= renderTime) {
+        buf.shift();
+      }
+
+      if (buf.length >= 2 && buf[0].t <= renderTime && renderTime <= buf[1].t) {
+        const s0 = buf[0];
+        const s1 = buf[1];
+        const span = s1.t - s0.t;
+        const frac = span > 0 ? (renderTime - s0.t) / span : 0;
+
+        rp.mesh.position.lerpVectors(s0.pos, s1.pos, frac);
+
+        // Interpolate yaw angle smoothly
+        let dy = s1.yaw - s0.yaw;
+        while (dy > Math.PI) dy -= Math.PI * 2;
+        while (dy < -Math.PI) dy += Math.PI * 2;
+        rp.mesh.rotation.y = s0.yaw + dy * frac;
+      } else if (buf.length > 0) {
+        const latest = buf[buf.length - 1];
+        rp.mesh.position.copy(latest.pos);
+        rp.mesh.rotation.y = latest.yaw;
       }
     });
   }
 
-  triggerRemoteShootVisuals(shooterId) {
-    const p = this.remotePlayers[shooterId];
-    if (p && p.rig) {
-      if (p.rig.muzzleFlash) p.rig.muzzleFlash.visible = true;
-      if (p.rig.muzzleLight) p.rig.muzzleLight.intensity = 2.5;
-      if (p.rig.weapon) p.rig.weapon.position.z -= 0.12;
-      setTimeout(() => {
-        if (p.rig.muzzleFlash) p.rig.muzzleFlash.visible = false;
-        if (p.rig.muzzleLight) p.rig.muzzleLight.intensity = 0;
-      }, 65);
-    }
-  }
-
-  handleHostReceivedPacket(senderConn, data) {
-    if (data.type === 'player_update') {
-      this.updateRemotePlayer(data.id, data);
-      this.broadcast(data, senderConn);
-    } else if (data.type === 'shoot') {
-      // Play gunshot audio for host and trigger remote operator muzzle flash/recoil
-      window.csAudio.playGunshot(data.weaponType || 'rifle', data.weaponId || 'ak47', data.isSilenced || false);
-      this.triggerRemoteShootVisuals(data.shooterId);
-      this.broadcast(data, senderConn);
-    } else if (data.type === 'player_death') {
-      this.gm.onEntityKilled(data.attacker, data.victim, data.weapon, data.isHeadshot, data.victimTeam);
-      this.broadcast(data, senderConn);
-    } else if (data.type === 'damage') {
-      const isForHost = data.targetId === 'host' || 
-                        (this.peer && data.targetId.toLowerCase() === this.peer.id.toLowerCase()) || 
-                        (this.isHost && this.connections.length <= 1);
-      if (isForHost) {
-        this.gm.player.takeDamage(data.amount, data.attacker, data.weapon);
-      } else {
-        this.broadcast(data, null);
-      }
-    } else if (data.type === 'plant_c4') {
-      this.gm.onC4Planted(data.pos, data.site);
-      this.broadcast(data, senderConn);
-    } else if (data.type === 'defuse_c4') {
-      this.gm.onC4Defused();
-      this.broadcast(data, senderConn);
-    }
-  }
-
-  handleClientReceivedPacket(data) {
-    if (data.type === 'player_leave') {
-      this.removeRemotePlayer(data.peerId);
-    } else if (data.type === 'player_update') {
-      this.updateRemotePlayer(data.id, data);
-    } else if (data.type === 'shoot') {
-      window.csAudio.playGunshot(data.weaponType || 'rifle', data.weaponId || 'ak47', data.isSilenced || false);
-      this.triggerRemoteShootVisuals(data.shooterId);
-    } else if (data.type === 'player_death') {
-      this.gm.onEntityKilled(data.attacker, data.victim, data.weapon, data.isHeadshot, data.victimTeam);
-    } else if (data.type === 'damage') {
-      const isForClient = !data.targetId || 
-                          data.targetId === 'client' || 
-                          (this.peer && data.targetId.toLowerCase() === this.peer.id.toLowerCase()) || 
-                          (!this.isHost);
-      if (isForClient) {
-        this.gm.player.takeDamage(data.amount, data.attacker, data.weapon);
-      }
-    } else if (data.type === 'plant_c4') {
-      this.gm.onC4Planted(data.pos, data.site);
-    } else if (data.type === 'defuse_c4') {
-      this.gm.onC4Defused();
-    } else if (data.type === 'timer_sync') {
-      this.gm.phase = data.phase;
-      this.gm.phaseEndTime = data.phaseEndTime;
-      this.gm.liveRoundStartTime = data.liveRoundStartTime;
-      this.gm.ctScore = data.ctScore;
-      this.gm.tScore = data.tScore;
-      this.gm.currentRound = data.round;
-      if (data.phase === 'live' && this.gm.player.health.get() <= 0 && !this.gm.player.isSpectating) {
-        this.gm.player.enterSpectatorMode();
-      }
-    } else if (data.type === 'match_sync') {
-      // Sync match state from host
-      this.gm.phase = data.phase;
-      this.gm.phaseTimer = data.phaseTimer;
-      if (data.phaseEndTime) this.gm.phaseEndTime = data.phaseEndTime;
-      if (data.liveRoundStartTime) this.gm.liveRoundStartTime = data.liveRoundStartTime;
-      this.gm.ctScore = data.ctScore;
-      this.gm.tScore = data.tScore;
-      this.gm.currentRound = data.round;
-      if (data.c4Planted && data.c4Pos) {
-        this.gm.onC4Planted(data.c4Pos, data.c4Site);
-      }
-      // If round is currently LIVE, mid-round joining player MUST enter spectator mode until next round!
-      if (data.phase === 'live') {
-        this.gm.player.enterSpectatorMode();
-      }
-    } else if (data.type === 'round_start') {
-      this.gm.currentRound = data.round;
-      if (this.gm.player.isSpectating) {
-        this.gm.player.exitSpectatorMode();
-      }
-      this.gm.startRound();
-      if (data.phaseEndTime) {
-        this.gm.phaseEndTime = data.phaseEndTime;
-      }
-    } else if (data.type === 'round_end') {
-      this.gm.endRound(data.winner, data.reason);
-    }
-  }
-
-  broadcast(data, excludeConn = null) {
-    for (let i = 0; i < this.connections.length; i++) {
-      const conn = this.connections[i];
-      if (conn !== excludeConn && conn.open) {
-        conn.send(data);
-      }
-    }
-  }
-
-  sendShoot(weaponType, weaponId, isSilenced, pos) {
-    const packet = {
-      type: 'shoot',
-      shooterId: this.peer ? this.peer.id : 'local',
-      weaponType: weaponType,
-      weaponId: weaponId,
-      isSilenced: isSilenced,
-      pos: pos
-    };
-    if (this.isHost) {
-      this.broadcast(packet, null);
-    } else if (this.hostConnection && this.hostConnection.open) {
-      this.hostConnection.send(packet);
-    }
-  }
-
-  sendDeath(attacker, victim, weapon, isHeadshot, victimTeam) {
-    const packet = {
-      type: 'player_death',
-      attacker: attacker,
-      victim: victim,
-      weapon: weapon,
-      isHeadshot: isHeadshot,
-      victimTeam: victimTeam
-    };
-    if (this.isHost) {
-      this.broadcast(packet, null);
-    } else if (this.hostConnection && this.hostConnection.open) {
-      this.hostConnection.send(packet);
-    }
-  }
-
-  sendDamage(targetId, amount, weapon, isHeadshot = false) {
-    const packet = {
-      type: 'damage',
-      targetId: targetId,
-      attacker: this.peer ? this.peer.id : 'Player',
-      amount: amount,
-      weapon: weapon,
-      isHeadshot: isHeadshot
-    };
-    if (this.isHost) {
-      this.broadcast(packet, null);
-    } else if (this.hostConnection && this.hostConnection.open) {
-      this.hostConnection.send(packet);
-    }
-  }
-
-  sendPlayerState(player) {
-    if (!this.isConnected || !this.peer) return;
-
-    const inMatch = this.gm.playerInMatch !== false && this.gm.phase !== 'unselected';
-
-    const callsign = player.name || window.cs2PlayerCallsign || (player.team === 'CT' ? 'SAS OPERATOR' : 'PHOENIX CELL');
-
-    const packet = {
-      type: 'player_update',
-      id: this.peer.id,
-      name: callsign,
-      team: player.team,
-      pos: { x: player.position.x, y: player.position.y, z: player.position.z },
-      yaw: player.yaw,
-      pitch: player.pitch,
-      health: player.health.get(),
-      weapon: player.activeWeapon ? player.activeWeapon.id : 'knife',
-      hasC4: !!player.inventory[5],
-      isCrouched: player.isCrouched,
-      inMatch: inMatch
-    };
-
-    if (this.isHost) {
-      this.broadcast(packet, null);
-    } else if (this.hostConnection && this.hostConnection.open) {
-      this.hostConnection.send(packet);
-    }
-  }
-
-  createTacticalCharacterModel(team) {
+  createTacticalCharacterModel(team, callsign = 'OPERATOR') {
     const group = new THREE.Group();
 
-    // 1. Full-Body Hitbox Cylinder for authentic hit detection
-    const hitboxGeo = new THREE.CylinderGeometry(0.52, 0.52, 2.0, 12);
+    // 1. Full-Body Hitbox Cylinder for hit detection
+    const hitboxGeo = new THREE.CylinderGeometry(0.52, 0.52, 2.0, 10);
     const hitboxMat = new THREE.MeshBasicMaterial({ visible: false });
     const hitbox = new THREE.Mesh(hitboxGeo, hitboxMat);
     hitbox.position.y = 1.0;
@@ -477,7 +484,7 @@ class CS2NetworkManager {
     ctx.fillStyle = (team === 'CT') ? '#44aaff' : '#ffaa33';
     ctx.font = 'bold 36px Rajdhani, sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('OPERATOR', 128, 44);
+    ctx.fillText(callsign, 128, 44);
     const nameTex = new THREE.CanvasTexture(nameCanvas);
     const namePlane = new THREE.Mesh(
       new THREE.PlaneGeometry(1.4, 0.35),
@@ -488,7 +495,7 @@ class CS2NetworkManager {
     group.nameTagMesh = namePlane;
     group.nameCanvas = nameCanvas;
 
-    // 3. Attach authentic CS character mesh (CT = SAS agent, T = Phoenix agent)
+    // 3. Attach authentic CS character model (CT = SAS GLB, T = Phoenix GLB)
     this.applyAuthenticModel(group, team);
     if ((team === 'CT' && this.ctModel) || (team === 'T' && this.tModel)) {
       group.hasAuthenticModel = true;
@@ -524,21 +531,14 @@ class CS2NetworkManager {
   }
 
   removeRemotePlayer(id) {
-    if (!id) return;
     const p = this.remotePlayers[id];
-    if (p) {
-      if (p.mesh && this.gm && this.gm.scene) {
-        this.gm.scene.remove(p.mesh);
-        p.mesh.traverse(child => {
-          if (child.geometry) child.geometry.dispose();
-          if (child.material) {
-            if (Array.isArray(child.material)) child.material.forEach(m => m.dispose());
-            else child.material.dispose();
-          }
-        });
+    if (p && p.mesh) {
+      this.gm.scene.remove(p.mesh);
+      if (p.mesh.characterMesh) {
+        p.mesh.remove(p.mesh.characterMesh);
       }
-      delete this.remotePlayers[id];
     }
+    delete this.remotePlayers[id];
   }
 
   clearAllRemotePlayers() {
@@ -548,121 +548,62 @@ class CS2NetworkManager {
     this.remotePlayers = {};
   }
 
-  cleanupStalePlayers() {
-    const now = performance.now();
-    Object.keys(this.remotePlayers).forEach(id => {
-      const p = this.remotePlayers[id];
-      if (p && p.lastSeen && (now - p.lastSeen > 3500)) {
-        this.removeRemotePlayer(id);
-      }
+  // Outgoing gameplay actions
+  sendPlayerState(player) {
+    // Handled by 20Hz inputInterval
+  }
+
+  sendShoot(audioType, weaponId, isSilenced, pos) {
+    window.csAudio.playGunshot(audioType, weaponId, isSilenced);
+  }
+
+  sendDamage(targetId, amount, weapon = 'gun', isHeadshot = false) {
+    this.send({
+      type: 'damage_hit',
+      targetId: targetId,
+      damage: amount,
+      weapon: weapon,
+      isHeadshot: isHeadshot
     });
   }
 
-  updateRemotePlayer(id, data) {
-    this.cleanupStalePlayers();
-    if (!this.remotePlayers[id]) {
-      const model = this.createTacticalCharacterModel(data.team);
-      this.gm.scene.add(model);
-      this.remotePlayers[id] = {
-        mesh: model,
-        rig: model.rig,
-        data: data,
-        team: data.team,
-        name: data.name || `Operator_${id.substring(0, 5)}`,
-        pos: data.pos,
-        lastPos: null,
-        walkCycle: 0,
-        lastStepTime: 0
-      };
-    }
-
-    const p = this.remotePlayers[id];
-    if (data.name && data.name !== p.name) {
-      p.name = data.name;
-      if (p.mesh && p.mesh.nameCanvas && p.mesh.nameTagMesh) {
-        const ctx = p.mesh.nameCanvas.getContext('2d');
-        ctx.clearRect(0, 0, 256, 64);
-        ctx.fillStyle = (data.team === 'CT') ? '#44aaff' : '#ffaa33';
-        ctx.font = 'bold 36px Rajdhani, sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText(data.name, 128, 44);
-        if (p.mesh.nameTagMesh.material.map) p.mesh.nameTagMesh.material.map.needsUpdate = true;
-      }
-    }
-    p.data = data;
-    p.pos = data.pos;
-    p.team = data.team;
-    p.mesh.position.set(data.pos.x, data.pos.y - 1.75, data.pos.z);
-    p.mesh.rotation.y = data.yaw; // Operator faces forward towards their look direction
-    p.mesh.visible = (data.inMatch !== false && data.health > 0);
-    p.lastSeen = performance.now();
-
-    const now = performance.now();
-    const dt = p.lastTime ? Math.max(0.001, Math.min(0.1, (now - p.lastTime) / 1000)) : 0.016;
-    p.lastTime = now;
-
-    // Movement & Footstep Audio Sync for remote operators
-    if (p.lastPos) {
-      const distMoved = Math.hypot(data.pos.x - p.lastPos.x, data.pos.z - p.lastPos.z);
-      if (distMoved > 0.10 && now - p.lastStepTime > 340) {
-        p.lastStepTime = now;
-        window.csAudio.playFootstep();
-      }
-    }
-
-    if (p.rig) {
-      // Stance: Crouch vs Standing
-      if (data.isCrouched) {
-        p.rig.torso.position.y = 0.72;
-        p.rig.leftLeg.position.y = 0.72;
-        p.rig.rightLeg.position.y = 0.72;
-      } else {
-        p.rig.torso.position.y = 0.95;
-        p.rig.leftLeg.position.y = 0.90;
-        p.rig.rightLeg.position.y = 0.90;
-      }
-
-      // 1. Aim Pitch
-      if (data.pitch !== undefined) {
-        p.rig.torso.rotation.x = Math.max(-0.6, Math.min(0.6, -data.pitch));
-      }
-
-      // 2. Movement & Leg Animation
-      if (p.lastPos) {
-        const distMoved = Math.hypot(data.pos.x - p.lastPos.x, data.pos.z - p.lastPos.z);
-
-        if (distMoved > 0.005) {
-          p.walkCycle += distMoved * 4.2;
-          p.rig.leftLeg.rotation.x = Math.sin(p.walkCycle) * 0.65;
-          p.rig.rightLeg.rotation.x = -Math.sin(p.walkCycle) * 0.65;
-          p.rig.torso.position.y = 0.95 + Math.abs(Math.sin(p.walkCycle * 2)) * 0.04;
-
-          if (distMoved > 0.10 && now - p.lastStepTime > 340) {
-            p.lastStepTime = now;
-            window.csAudio.playFootstep();
-          }
-        } else {
-          // Idle breathing pose
-          p.rig.leftLeg.rotation.x *= 0.82;
-          p.rig.rightLeg.rotation.x *= 0.82;
-          p.rig.torso.position.y = 0.95 + Math.sin(now * 0.003) * 0.012;
-        }
-
-        // Airborne jumping pose
-        if (Math.abs(data.pos.y - p.lastPos.y) > 0.08) {
-          p.rig.leftLeg.rotation.x = -0.32;
-          p.rig.rightLeg.rotation.x = -0.22;
-        }
-      }
-
-      // 3. Gun recoil recovery
-      if (p.rig.weapon.position.z < 0.38) {
-        p.rig.weapon.position.z += (0.38 - p.rig.weapon.position.z) * 0.25;
-      }
-    }
-
-    p.lastPos = { x: data.pos.x, y: data.pos.y, z: data.pos.z };
+  sendPlantC4(site, pos) {
+    this.send({
+      type: 'plant_c4',
+      site: site,
+      pos: pos
+    });
   }
+
+  sendDefuseProgress(progress) {
+    this.send({
+      type: 'defuse_progress',
+      progress: progress
+    });
+  }
+
+  sendPickupC4() {
+    this.send({
+      type: 'pickup_c4'
+    });
+  }
+
+  sendSelectTeam(team) {
+    this.send({
+      type: 'select_team',
+      team: team
+    });
+  }
+
+  sendBuyItem(cost, weaponId) {
+    this.send({
+      type: 'buy_item',
+      cost: cost,
+      weaponId: weaponId
+    });
+  }
+
+  sendDeath(attacker, victim, weapon, isHeadshot, victimTeam) {}
 }
 
 window.CS2NetworkManager = CS2NetworkManager;

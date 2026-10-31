@@ -589,7 +589,6 @@ class CS2GameManager {
         const ringS = 1.0 + el * 10.0;
         ring.scale.set(ringS, ringS, ringS);
         ringMat.opacity = Math.max(0, 0.9 - el * 0.9);
-        expLight.intensity = Math.max(0, 28 * (1 - el / 1.2));
       }
     }, 16);
   }
@@ -707,16 +706,24 @@ class CS2GameManager {
             this.player.inventory[5] = null;
             progressTrack.classList.add('hidden');
             actionPrompt.classList.add('hidden');
-            const plantPos = { x: this.player.position.x, y: siteY, z: this.player.position.z };
+            // Determine exact contact ground/box surface Y via downward raycast
+            let plantY = (siteY !== undefined) ? siteY : (this.player.position.y - this.player.playerHeight);
+            if (this.mapBuilder && this.mapBuilder.groundMeshes && this.mapBuilder.groundMeshes.length > 0) {
+              const downOrigin = new THREE.Vector3(this.player.position.x, this.player.position.y + 0.5, this.player.position.z);
+              const downDir = new THREE.Vector3(0, -1, 0);
+              const rc = new THREE.Raycaster(downOrigin, downDir, 0.05, 6.0);
+              const gHits = rc.intersectObjects(this.mapBuilder.groundMeshes, false);
+              if (gHits.length > 0) {
+                plantY = gHits[0].point.y;
+              }
+            }
+
+            const plantPos = { x: this.player.position.x, y: plantY + 0.02, z: this.player.position.z };
             this.onC4Planted(plantPos, `BOMBSITE ${inSite}`);
 
             // Broadcast to network
             if (this.net) {
-              if (this.net.isHost) {
-                this.net.broadcast({ type: 'plant_c4', pos: plantPos, site: `BOMBSITE ${inSite}` });
-              } else if (this.net.hostConnection && this.net.hostConnection.open) {
-                this.net.hostConnection.send({ type: 'plant_c4', pos: plantPos, site: `BOMBSITE ${inSite}` });
-              }
+              this.net.sendPlantC4(inSite, plantPos);
             }
           }
           return;
@@ -1048,6 +1055,28 @@ class CS2GameManager {
 
     this.player.update(dt, currentTime, this);
     this.handleObjectives(dt);
+
+    // Step dropped items physics trajectory (gravity, velocity, spin, bounce & settle flat)
+    if (window._droppedItems && window._droppedItems.length > 0) {
+      for (let i = 0; i < window._droppedItems.length; i++) {
+        const item = window._droppedItems[i];
+        if (!item || item.isResting || !item.velocity) continue;
+        item.velocity.y -= 9.8 * dt;
+        item.mesh.position.addScaledVector(item.velocity, dt);
+        if (item.angularVelocity) {
+          item.mesh.rotation.x += item.angularVelocity.x * dt;
+          item.mesh.rotation.y += item.angularVelocity.y * dt;
+        }
+        if (item.mesh.position.y <= item.groundY + 0.06) {
+          item.mesh.position.y = item.groundY + 0.06;
+          item.velocity.set(0, 0, 0);
+          if (item.angularVelocity) item.angularVelocity.set(0, 0, 0);
+          item.mesh.rotation.x = Math.PI / 2; // Lie flat on ground
+          item.isResting = true;
+        }
+      }
+    }
+
     this.updateHUD();
 
     if (currentTime - this.lastRadarTime > 100) {

@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Counter-Strike 2 Browser Edition | Dust II</title>
+  <link rel="icon" type="image/x-icon" href="favicon.ico">
   <meta name="description" content="Play CS2 directly in your web browser! Official Dust 2 3D server, full arsenal, MR12 competitive online play, and authentic CS2 mechanics.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -18,7 +19,10 @@
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/MTLLoader.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/OBJLoader.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/utils/SkeletonUtils.js"></script>
-  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+  <script>
+    window.BUILD_ID = 'dev-build';
+    window.SERVER_URL = (new URLSearchParams(window.location.search).get('server')) || 'wss://cs2-server-1zcq.onrender.com';
+  </script>
 </head>
 <body>
   <!-- 3D Canvas Viewport -->
