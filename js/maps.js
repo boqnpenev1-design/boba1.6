@@ -53,38 +53,9 @@ class CS2MapBuilder {
     return this.addObstacle(x, y, z, w, h, d, null, isClimbable, false);
   }
 
-  addBombsiteZone(id, x, y, z, radius = 7.5) {
-    this.bombZones.push({ id, x, y, z, radius });
-
-    const ringGeo = new THREE.RingGeometry(radius - 0.5, radius, 32);
-    const ringMat = new THREE.MeshBasicMaterial({
-      color: 0xff3322,
-      side: THREE.DoubleSide,
-      transparent: true,
-      opacity: 0.95
-    });
-    const ringMesh = new THREE.Mesh(ringGeo, ringMat);
-    ringMesh.rotation.x = -Math.PI / 2;
-    ringMesh.position.set(x, y + 0.05, z);
-    this.mapGroup.add(ringMesh);
-
-    const canvas = document.createElement('canvas');
-    canvas.width = 128;
-    canvas.height = 128;
-    const ctx = canvas.getContext('2d');
-    ctx.fillStyle = '#ff2211';
-    ctx.font = 'bold 96px Chakra Petch, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(id, 64, 64);
-    const textTex = new THREE.CanvasTexture(canvas);
-
-    const planeGeo = new THREE.PlaneGeometry(3.5, 3.5);
-    const planeMat = new THREE.MeshBasicMaterial({ map: textTex, transparent: true });
-    const textMesh = new THREE.Mesh(planeGeo, planeMat);
-    textMesh.rotation.x = -Math.PI / 2;
-    textMesh.position.set(x, y + 0.08, z);
-    this.mapGroup.add(textMesh);
+  addBombsiteZone(id, x, y, z, radius = 8.5, bounds = null) {
+    // Stores bombsite volumes matching the authentic OBJ target decals (SandCCrete2 & SandRoadTgtB)
+    this.bombZones.push({ id, x, y, z, radius, bounds });
   }
 
   isInBuyZone(team, pos) {
@@ -123,10 +94,15 @@ class CS2MapBuilder {
               child.geometry.computeBoundingSphere();
             }
             if (child.material) {
-              child.material.side = THREE.DoubleSide;
-              if (child.material.specular) child.material.specular.setHex(0x000000);
-              if (typeof child.material.shininess !== 'undefined') child.material.shininess = 0;
-              if (typeof child.material.roughness !== 'undefined') child.material.roughness = 0.95;
+              const mats = Array.isArray(child.material) ? child.material : [child.material];
+              mats.forEach(m => {
+                if (!m) return;
+                m.side = THREE.FrontSide;
+                if (m.specular) m.specular.setHex(0x000000);
+                if (typeof m.shininess !== 'undefined') m.shininess = 0;
+                if (typeof m.roughness !== 'undefined') m.roughness = 1.0;
+                if (typeof m.metalness !== 'undefined') m.metalness = 0.0;
+              });
             }
             this.groundMeshes.push(child);
           }
@@ -155,27 +131,35 @@ class CS2MapBuilder {
     // ==========================================================
     // MAP BOUNDARIES & OBSTACLES (Outer Perimeter Limits & Anti-Escape Clips)
     // ==========================================================
-    // Outer skybox boundaries preventing walking off into void
-    this.addCollider(0, -15, -145, 260, 45, 12); // North limit
-    this.addCollider(0, -15, 52, 260, 45, 12);   // South limit
-    this.addCollider(-102, -15, -50, 12, 45, 260); // West limit
-    this.addCollider(74, -15, -50, 12, 45, 260);  // East limit
+    // Outer skybox boundaries preventing walking off into void (Taller 60m physical barriers)
+    this.addCollider(0, -15, -145, 260, 60, 15);   // North limit
+    this.addCollider(0, -15, 52, 260, 60, 15);     // South limit
+    this.addCollider(-102, -15, -50, 15, 60, 260); // West limit
+    this.addCollider(74, -15, -50, 15, 60, 260);   // East limit
 
     // Canyon Cliff Top Invisible Barrier Clips (Blocks escaping onto mountain ridges, TUNNEL FREED)
-    this.addCollider(-50, 12.0, -10, 80, 20, 10);  // Canyon wall ridge above mid
-    this.addCollider(-20, 12.0, -60, 40, 20, 25);  // Canyon ridge above double doors
-    this.addCollider(55, 12.0, -120, 30, 20, 60);  // Canyon ridge east of A site
-    this.addCollider(-85, 10.0, -90, 25, 20, 50);  // Wall above B site back plateau
+    this.addCollider(-50, 12.0, -10, 80, 25, 12);  // Canyon wall ridge above mid
+    this.addCollider(-20, 12.0, -60, 40, 25, 25);  // Canyon ridge above double doors
+    this.addCollider(55, 12.0, -120, 30, 25, 60);  // Canyon ridge east of A site
+    this.addCollider(-85, 10.0, -90, 25, 25, 50);  // Wall above B site back plateau
 
     // ==========================================================
     // BOMBSITES & BUY ZONES (100% Authentic Dust 2 Geometry)
     // ==========================================================
 
-    // Bombsite A: Positioned directly at the platform crates
-    this.addBombsiteZone('A', 51.3, 4.81, -113.5, 8.5);
+    // Bombsite A: Positioned directly at the platform crates (Matching material_15 floor decal & radar bounds)
+    this.addBombsiteZone('A', 51.85, 4.32, -108.7, 10.5, {
+      minX: 46.0, maxX: 58.0,
+      minZ: -114.0, maxZ: -104.0,
+      minY: 2.5, maxY: 6.8
+    });
 
-    // Bombsite B: Positioned directly in the courtyard center between crates
-    this.addBombsiteZone('B', -65.3, 0.89, -112.7, 8.5);
+    // Bombsite B: Courtyard zone matching material_25 SandRoadTgtB decal and radar orange bounds
+    this.addBombsiteZone('B', -72.0, 0.0, -121.0, 11.5, {
+      minX: -79.0, maxX: -65.0,
+      minZ: -128.0, maxZ: -114.0,
+      minY: -1.0, maxY: 4.0
+    });
 
     // Authentic Buy Zones matching CT & T Spawns
     this.buyZones.CT = { minX: -25, maxX: 15, minZ: -115, maxZ: -85 };

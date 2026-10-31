@@ -94,7 +94,7 @@ class CS2AudioSystem {
 
       p90_clipout: 'weapons/p90/p90_clipout.wav',
       p90_clipin: 'weapons/p90/p90_clipin.wav',
-      p90_boltpull: 'weapons/p90/p90_boltpull.wav',
+      p90_boltpull: 'weapons/p90/p90_boltback.wav',
 
       xm1014_shell: 'weapons/xm1014/xm1014_insertshell_01.wav',
       zoom: 'weapons/awp/zoom.wav',
@@ -159,13 +159,10 @@ class CS2AudioSystem {
       this.initialized = true;
 
       // Preload primary audio buffers
-      this.preloadSample('ak47', this.soundPaths.ak47);
-      this.preloadSample('awp', this.soundPaths.awp);
-      this.preloadSample('deagle', this.soundPaths.deagle);
-      this.preloadSample('usp', this.soundPaths.usp);
-      this.preloadSample('glock', this.soundPaths.glock);
-      this.preloadSample('c4_beep', this.soundPaths.c4_beep);
-      this.preloadSample('c4_explode', this.soundPaths.c4_explode);
+      const primaryKeys = ['ak47', 'm4a1', 'm4a4', 'awp', 'deagle', 'usp', 'glock', 'mp5sd', 'p90', 'knife_slash', 'knife_hit', 'c4_beep', 'c4_explode', 'c4_plant', 'c4_defuse', 'jump', 'land', 'footstep_1', 'footstep_2'];
+      primaryKeys.forEach(k => {
+        if (this.soundPaths[k]) this.preloadSample(k, this.soundPaths[k]);
+      });
     } catch (e) {
       console.warn("AudioContext init postponed", e);
     }

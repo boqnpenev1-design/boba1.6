@@ -1,718 +1,3717 @@
-// CS2 Complete Weapon Arsenal & Equipment Database with 3D Model Links
-
 const CS2_WEAPONS = {
-  // ==================== PISTOLS ====================
-  glock: {
-    id: 'glock',
-    name: 'Glock-18',
-    category: 'pistols',
-    slot: 2,
-    team: 'T',
-    cost: 200,
-    clip: 20,
-    reserve: 120,
-    damage: 30,
-    armorPen: 0.47,
-    fireRate: 0.15,
-    spread: 0.015,
-    recoil: 0.02,
-    audioType: 'pistol',
-    killReward: 300,
-    modelPath: null,
-    color: '#8b8475'
+  "glock": {
+    "id": "glock",
+    "name": "Glock-18",
+    "category": "pistols",
+    "slot": 2,
+    "team": "T",
+    "cost": 200,
+    "clip": 20,
+    "reserve": 120,
+    "damage": 30,
+    "armorPen": 0.47,
+    "fireRate": 0.15,
+    "spread": 0.015,
+    "recoil": 0.02,
+    "reloadTime": 2.25,
+    "isAuto": false,
+    "pellets": 1,
+    "recoilPattern": null,
+    "audioType": "pistol",
+    "killReward": 300,
+    "color": "#8b8475"
   },
-  usp: {
-    id: 'usp',
-    name: 'USP-S',
-    category: 'pistols',
-    slot: 2,
-    team: 'CT',
-    cost: 200,
-    clip: 12,
-    reserve: 48,
-    damage: 35,
-    armorPen: 0.50,
-    fireRate: 0.17,
-    spread: 0.008,
-    recoil: 0.016,
-    audioType: 'pistol',
-    isSilenced: true,
-    killReward: 300,
-    modelPath: 'source/USPS.glb',
-    color: '#34495e'
+  "usp": {
+    "id": "usp",
+    "name": "USP-S",
+    "category": "pistols",
+    "slot": 2,
+    "team": "CT",
+    "cost": 200,
+    "clip": 12,
+    "reserve": 48,
+    "damage": 35,
+    "armorPen": 0.5,
+    "fireRate": 0.17,
+    "spread": 0.008,
+    "recoil": 0.016,
+    "reloadTime": 2.2,
+    "isAuto": false,
+    "isSilenced": true,
+    "pellets": 1,
+    "recoilPattern": null,
+    "audioType": "pistol",
+    "killReward": 300,
+    "color": "#34495e"
   },
-  p250: {
-    id: 'p250',
-    name: 'P250',
-    category: 'pistols',
-    slot: 2,
-    team: 'ANY',
-    cost: 300,
-    clip: 13,
-    reserve: 52,
-    damage: 38,
-    armorPen: 0.64,
-    fireRate: 0.15,
-    spread: 0.012,
-    recoil: 0.022,
-    audioType: 'pistol',
-    killReward: 300,
-    modelPath: null,
-    color: '#7f8c8d'
+  "p250": {
+    "id": "p250",
+    "name": "P250",
+    "category": "pistols",
+    "slot": 2,
+    "team": "ANY",
+    "cost": 300,
+    "clip": 13,
+    "reserve": 52,
+    "damage": 38,
+    "armorPen": 0.64,
+    "fireRate": 0.15,
+    "spread": 0.012,
+    "recoil": 0.022,
+    "reloadTime": 2.25,
+    "isAuto": false,
+    "pellets": 1,
+    "recoilPattern": null,
+    "audioType": "pistol",
+    "killReward": 300,
+    "color": "#7f8c8d"
   },
-  deagle: {
-    id: 'deagle',
-    name: 'Desert Eagle',
-    category: 'pistols',
-    slot: 2,
-    team: 'ANY',
-    cost: 700,
-    clip: 7,
-    reserve: 42,
-    damage: 53,
-    armorPen: 0.85,
-    fireRate: 0.22,
-    spread: 0.014,
-    recoil: 0.045,
-    audioType: 'pistol',
-    killReward: 300,
-    modelPath: 'source/DEAGLE.glb',
-    color: '#bdc3c7'
+  "deagle": {
+    "id": "deagle",
+    "name": "Desert Eagle",
+    "category": "pistols",
+    "slot": 2,
+    "team": "ANY",
+    "cost": 700,
+    "clip": 7,
+    "reserve": 35,
+    "damage": 53,
+    "armorPen": 0.85,
+    "fireRate": 0.22,
+    "spread": 0.01,
+    "recoil": 0.045,
+    "reloadTime": 2.2,
+    "isAuto": false,
+    "pellets": 1,
+    "recoilPattern": null,
+    "audioType": "pistol",
+    "killReward": 300,
+    "color": "#bdc3c7"
   },
-  dualberettas: {
-    id: 'dualberettas',
-    name: 'Dual Berettas',
-    category: 'pistols',
-    slot: 2,
-    team: 'ANY',
-    cost: 400,
-    clip: 30,
-    reserve: 120,
-    damage: 38,
-    armorPen: 0.57,
-    fireRate: 0.12,
-    spread: 0.02,
-    recoil: 0.025,
-    audioType: 'pistol',
-    killReward: 300,
-    modelPath: null,
-    color: '#2c3e50'
+  "dualberettas": {
+    "id": "dualberettas",
+    "name": "Dual Berettas",
+    "category": "pistols",
+    "slot": 2,
+    "team": "ANY",
+    "cost": 400,
+    "clip": 30,
+    "reserve": 120,
+    "damage": 38,
+    "armorPen": 0.57,
+    "fireRate": 0.12,
+    "spread": 0.018,
+    "recoil": 0.02,
+    "reloadTime": 3.75,
+    "isAuto": false,
+    "pellets": 1,
+    "recoilPattern": null,
+    "audioType": "pistol",
+    "killReward": 300,
+    "color": "#16a085"
   },
-  fiveseven: {
-    id: 'fiveseven',
-    name: 'Five-SeveN',
-    category: 'pistols',
-    slot: 2,
-    team: 'CT',
-    cost: 500,
-    clip: 20,
-    reserve: 100,
-    damage: 32,
-    armorPen: 0.91,
-    fireRate: 0.15,
-    spread: 0.011,
-    recoil: 0.02,
-    audioType: 'pistol',
-    killReward: 300,
-    modelPath: null,
-    color: '#2980b9'
+  "fiveseven": {
+    "id": "fiveseven",
+    "name": "Five-SeveN",
+    "category": "pistols",
+    "slot": 2,
+    "team": "CT",
+    "cost": 500,
+    "clip": 20,
+    "reserve": 100,
+    "damage": 32,
+    "armorPen": 0.91,
+    "fireRate": 0.15,
+    "spread": 0.011,
+    "recoil": 0.02,
+    "reloadTime": 2.25,
+    "isAuto": false,
+    "pellets": 1,
+    "recoilPattern": null,
+    "audioType": "pistol",
+    "killReward": 300,
+    "color": "#2980b9"
   },
-  tec9: {
-    id: 'tec9',
-    name: 'Tec-9',
-    category: 'pistols',
-    slot: 2,
-    team: 'T',
-    cost: 500,
-    clip: 18,
-    reserve: 120,
-    damage: 33,
-    armorPen: 0.83,
-    fireRate: 0.12,
-    spread: 0.016,
-    recoil: 0.024,
-    audioType: 'pistol',
-    killReward: 300,
-    modelPath: null,
-    color: '#e67e22'
+  "tec9": {
+    "id": "tec9",
+    "name": "Tec-9",
+    "category": "pistols",
+    "slot": 2,
+    "team": "T",
+    "cost": 500,
+    "clip": 18,
+    "reserve": 90,
+    "damage": 33,
+    "armorPen": 0.83,
+    "fireRate": 0.12,
+    "spread": 0.016,
+    "recoil": 0.024,
+    "reloadTime": 2.65,
+    "isAuto": false,
+    "pellets": 1,
+    "recoilPattern": null,
+    "audioType": "pistol",
+    "killReward": 300,
+    "color": "#d35400"
   },
-  cz75: {
-    id: 'cz75',
-    name: 'CZ75-Auto',
-    category: 'pistols',
-    slot: 2,
-    team: 'ANY',
-    cost: 500,
-    clip: 12,
-    reserve: 36,
-    damage: 31,
-    armorPen: 0.77,
-    fireRate: 0.10,
-    spread: 0.022,
-    recoil: 0.035,
-    audioType: 'pistol',
-    killReward: 100,
-    modelPath: null,
-    color: '#34495e'
+  "cz75": {
+    "id": "cz75",
+    "name": "CZ75-Auto",
+    "category": "pistols",
+    "slot": 2,
+    "team": "ANY",
+    "cost": 500,
+    "clip": 12,
+    "reserve": 12,
+    "damage": 31,
+    "armorPen": 0.77,
+    "fireRate": 0.1,
+    "spread": 0.022,
+    "recoil": 0.03,
+    "reloadTime": 2.8,
+    "isAuto": true,
+    "pellets": 1,
+    "recoilPattern": [
+      [
+        0.0075,
+        0
+      ],
+      [
+        0.015,
+        0.0038
+      ],
+      [
+        0.0225,
+        0.0063
+      ],
+      [
+        0.03,
+        0.0066
+      ],
+      [
+        0.0375,
+        0.0046
+      ],
+      [
+        0.045,
+        0.001
+      ],
+      [
+        0.0525,
+        -0.003
+      ],
+      [
+        0.06,
+        -0.0059
+      ],
+      [
+        0.065,
+        -0.0067
+      ],
+      [
+        0.065,
+        -0.0052
+      ],
+      [
+        0.065,
+        -0.0019
+      ],
+      [
+        0.065,
+        0.0021
+      ]
+    ],
+    "audioType": "pistol",
+    "killReward": 100,
+    "color": "#95a5a6"
   },
-
-  // ==================== MID-TIER (SMG & SHOTGUNS & LMG) ====================
-  mac10: {
-    id: 'mac10',
-    name: 'MAC-10',
-    category: 'mid-tier',
-    slot: 1,
-    team: 'T',
-    cost: 1050,
-    clip: 30,
-    reserve: 100,
-    damage: 29,
-    armorPen: 0.57,
-    fireRate: 0.075,
-    spread: 0.025,
-    recoil: 0.028,
-    audioType: 'smg',
-    killReward: 600,
-    modelPath: null,
-    color: '#7f8c8d'
+  "mac10": {
+    "id": "mac10",
+    "name": "MAC-10",
+    "category": "mid-tier",
+    "slot": 1,
+    "team": "T",
+    "cost": 1050,
+    "clip": 30,
+    "reserve": 100,
+    "damage": 29,
+    "armorPen": 0.57,
+    "fireRate": 0.075,
+    "spread": 0.024,
+    "recoil": 0.028,
+    "reloadTime": 2.55,
+    "isAuto": true,
+    "pellets": 1,
+    "recoilPattern": [
+      [
+        0.009,
+        0
+      ],
+      [
+        0.018,
+        0.0046
+      ],
+      [
+        0.027,
+        0.0075
+      ],
+      [
+        0.036,
+        0.0079
+      ],
+      [
+        0.045,
+        0.0055
+      ],
+      [
+        0.054,
+        0.0011
+      ],
+      [
+        0.063,
+        -0.0036
+      ],
+      [
+        0.065,
+        -0.0071
+      ],
+      [
+        0.065,
+        -0.0081
+      ],
+      [
+        0.065,
+        -0.0063
+      ],
+      [
+        0.065,
+        -0.0023
+      ],
+      [
+        0.065,
+        0.0025
+      ],
+      [
+        0.065,
+        0.0064
+      ],
+      [
+        0.065,
+        0.0081
+      ],
+      [
+        0.065,
+        0.0069
+      ],
+      [
+        0.065,
+        0.0033
+      ],
+      [
+        0.065,
+        -0.0014
+      ],
+      [
+        0.065,
+        -0.0057
+      ],
+      [
+        0.065,
+        -0.0079
+      ],
+      [
+        0.065,
+        -0.0074
+      ],
+      [
+        0.065,
+        -0.0043
+      ],
+      [
+        0.065,
+        0.0003
+      ],
+      [
+        0.065,
+        0.0048
+      ],
+      [
+        0.065,
+        0.0076
+      ],
+      [
+        0.065,
+        0.0078
+      ],
+      [
+        0.065,
+        0.0053
+      ],
+      [
+        0.065,
+        0.0009
+      ],
+      [
+        0.065,
+        -0.0038
+      ],
+      [
+        0.065,
+        -0.0072
+      ],
+      [
+        0.065,
+        -0.008
+      ]
+    ],
+    "audioType": "smg",
+    "killReward": 600,
+    "color": "#e67e22"
   },
-  mp9: {
-    id: 'mp9',
-    name: 'MP9',
-    category: 'mid-tier',
-    slot: 1,
-    team: 'CT',
-    cost: 1250,
-    clip: 30,
-    reserve: 120,
-    damage: 26,
-    armorPen: 0.60,
-    fireRate: 0.07,
-    spread: 0.022,
-    recoil: 0.026,
-    audioType: 'smg',
-    killReward: 600,
-    modelPath: null,
-    color: '#2980b9'
+  "mp9": {
+    "id": "mp9",
+    "name": "MP9",
+    "category": "mid-tier",
+    "slot": 1,
+    "team": "CT",
+    "cost": 1250,
+    "clip": 30,
+    "reserve": 120,
+    "damage": 26,
+    "armorPen": 0.6,
+    "fireRate": 0.07,
+    "spread": 0.02,
+    "recoil": 0.024,
+    "reloadTime": 2.1,
+    "isAuto": true,
+    "pellets": 1,
+    "recoilPattern": [
+      [
+        0.008,
+        0
+      ],
+      [
+        0.016,
+        0.0041
+      ],
+      [
+        0.024,
+        0.0067
+      ],
+      [
+        0.032,
+        0.007
+      ],
+      [
+        0.04,
+        0.0049
+      ],
+      [
+        0.048,
+        0.001
+      ],
+      [
+        0.056,
+        -0.0032
+      ],
+      [
+        0.064,
+        -0.0063
+      ],
+      [
+        0.065,
+        -0.0072
+      ],
+      [
+        0.065,
+        -0.0056
+      ],
+      [
+        0.065,
+        -0.002
+      ],
+      [
+        0.065,
+        0.0022
+      ],
+      [
+        0.065,
+        0.0057
+      ],
+      [
+        0.065,
+        0.0072
+      ],
+      [
+        0.065,
+        0.0062
+      ],
+      [
+        0.065,
+        0.003
+      ],
+      [
+        0.065,
+        -0.0013
+      ],
+      [
+        0.065,
+        -0.005
+      ],
+      [
+        0.065,
+        -0.0071
+      ],
+      [
+        0.065,
+        -0.0066
+      ],
+      [
+        0.065,
+        -0.0039
+      ],
+      [
+        0.065,
+        0.0002
+      ],
+      [
+        0.065,
+        0.0043
+      ],
+      [
+        0.065,
+        0.0068
+      ],
+      [
+        0.065,
+        0.007
+      ],
+      [
+        0.065,
+        0.0047
+      ],
+      [
+        0.065,
+        0.0008
+      ],
+      [
+        0.065,
+        -0.0034
+      ],
+      [
+        0.065,
+        -0.0064
+      ],
+      [
+        0.065,
+        -0.0071
+      ]
+    ],
+    "audioType": "smg",
+    "killReward": 600,
+    "color": "#3498db"
   },
-  mp7: {
-    id: 'mp7',
-    name: 'MP7',
-    category: 'mid-tier',
-    slot: 1,
-    team: 'ANY',
-    cost: 1500,
-    clip: 30,
-    reserve: 90,
-    damage: 29,
-    armorPen: 0.62,
-    fireRate: 0.08,
-    spread: 0.02,
-    recoil: 0.025,
-    audioType: 'smg',
-    killReward: 600,
-    modelPath: null,
-    color: '#34495e'
+  "mp7": {
+    "id": "mp7",
+    "name": "MP7",
+    "category": "mid-tier",
+    "slot": 1,
+    "team": "ANY",
+    "cost": 1500,
+    "clip": 30,
+    "reserve": 120,
+    "damage": 29,
+    "armorPen": 0.62,
+    "fireRate": 0.08,
+    "spread": 0.016,
+    "recoil": 0.022,
+    "reloadTime": 3.13,
+    "isAuto": true,
+    "pellets": 1,
+    "recoilPattern": [
+      [
+        0.0075,
+        0
+      ],
+      [
+        0.015,
+        0.0038
+      ],
+      [
+        0.0225,
+        0.0063
+      ],
+      [
+        0.03,
+        0.0066
+      ],
+      [
+        0.0375,
+        0.0046
+      ],
+      [
+        0.045,
+        0.001
+      ],
+      [
+        0.0525,
+        -0.003
+      ],
+      [
+        0.06,
+        -0.0059
+      ],
+      [
+        0.065,
+        -0.0067
+      ],
+      [
+        0.065,
+        -0.0052
+      ],
+      [
+        0.065,
+        -0.0019
+      ],
+      [
+        0.065,
+        0.0021
+      ],
+      [
+        0.065,
+        0.0054
+      ],
+      [
+        0.065,
+        0.0067
+      ],
+      [
+        0.065,
+        0.0058
+      ],
+      [
+        0.065,
+        0.0028
+      ],
+      [
+        0.065,
+        -0.0012
+      ],
+      [
+        0.065,
+        -0.0047
+      ],
+      [
+        0.065,
+        -0.0066
+      ],
+      [
+        0.065,
+        -0.0062
+      ],
+      [
+        0.065,
+        -0.0036
+      ],
+      [
+        0.065,
+        0.0002
+      ],
+      [
+        0.065,
+        0.004
+      ],
+      [
+        0.065,
+        0.0064
+      ],
+      [
+        0.065,
+        0.0065
+      ],
+      [
+        0.065,
+        0.0044
+      ],
+      [
+        0.065,
+        0.0007
+      ],
+      [
+        0.065,
+        -0.0032
+      ],
+      [
+        0.065,
+        -0.006
+      ],
+      [
+        0.065,
+        -0.0067
+      ]
+    ],
+    "audioType": "smg",
+    "killReward": 600,
+    "color": "#2c3e50"
   },
-  mp5sd: {
-    id: 'mp5sd',
-    name: 'MP5-SD',
-    category: 'mid-tier',
-    slot: 1,
-    team: 'ANY',
-    cost: 1500,
-    clip: 30,
-    reserve: 120,
-    damage: 27,
-    armorPen: 0.62,
-    fireRate: 0.08,
-    spread: 0.018,
-    recoil: 0.024,
-    audioType: 'smg',
-    isSilenced: true,
-    killReward: 600,
-    modelPath: null,
-    color: '#2c3e50'
+  "mp5sd": {
+    "id": "mp5sd",
+    "name": "MP5-SD",
+    "category": "mid-tier",
+    "slot": 1,
+    "team": "ANY",
+    "cost": 1500,
+    "clip": 30,
+    "reserve": 120,
+    "damage": 27,
+    "armorPen": 0.62,
+    "fireRate": 0.08,
+    "spread": 0.014,
+    "recoil": 0.02,
+    "reloadTime": 2.95,
+    "isAuto": true,
+    "isSilenced": true,
+    "pellets": 1,
+    "recoilPattern": [
+      [
+        0.007,
+        0
+      ],
+      [
+        0.014,
+        0.0036
+      ],
+      [
+        0.021,
+        0.0059
+      ],
+      [
+        0.028,
+        0.0061
+      ],
+      [
+        0.035,
+        0.0043
+      ],
+      [
+        0.042,
+        0.0009
+      ],
+      [
+        0.049,
+        -0.0028
+      ],
+      [
+        0.056,
+        -0.0055
+      ],
+      [
+        0.063,
+        -0.0063
+      ],
+      [
+        0.065,
+        -0.0049
+      ],
+      [
+        0.065,
+        -0.0018
+      ],
+      [
+        0.065,
+        0.002
+      ],
+      [
+        0.065,
+        0.005
+      ],
+      [
+        0.065,
+        0.0063
+      ],
+      [
+        0.065,
+        0.0054
+      ],
+      [
+        0.065,
+        0.0026
+      ],
+      [
+        0.065,
+        -0.0011
+      ],
+      [
+        0.065,
+        -0.0044
+      ],
+      [
+        0.065,
+        -0.0062
+      ],
+      [
+        0.065,
+        -0.0058
+      ],
+      [
+        0.065,
+        -0.0034
+      ],
+      [
+        0.065,
+        0.0002
+      ],
+      [
+        0.065,
+        0.0037
+      ],
+      [
+        0.065,
+        0.0059
+      ],
+      [
+        0.065,
+        0.0061
+      ],
+      [
+        0.065,
+        0.0041
+      ],
+      [
+        0.065,
+        0.0007
+      ],
+      [
+        0.065,
+        -0.003
+      ],
+      [
+        0.065,
+        -0.0056
+      ],
+      [
+        0.065,
+        -0.0063
+      ]
+    ],
+    "audioType": "smg",
+    "killReward": 600,
+    "color": "#34495e"
   },
-  ump45: {
-    id: 'ump45',
-    name: 'UMP-45',
-    category: 'mid-tier',
-    slot: 1,
-    team: 'ANY',
-    cost: 1200,
-    clip: 25,
-    reserve: 100,
-    damage: 35,
-    armorPen: 0.65,
-    fireRate: 0.09,
-    spread: 0.02,
-    recoil: 0.03,
-    audioType: 'smg',
-    killReward: 600,
-    modelPath: null,
-    color: '#16a085'
+  "ump45": {
+    "id": "ump45",
+    "name": "UMP-45",
+    "category": "mid-tier",
+    "slot": 1,
+    "team": "ANY",
+    "cost": 1200,
+    "clip": 25,
+    "reserve": 100,
+    "damage": 35,
+    "armorPen": 0.65,
+    "fireRate": 0.09,
+    "spread": 0.018,
+    "recoil": 0.026,
+    "reloadTime": 3.45,
+    "isAuto": true,
+    "pellets": 1,
+    "recoilPattern": [
+      [
+        0.01,
+        0
+      ],
+      [
+        0.02,
+        0.0051
+      ],
+      [
+        0.03,
+        0.0084
+      ],
+      [
+        0.04,
+        0.0088
+      ],
+      [
+        0.05,
+        0.0061
+      ],
+      [
+        0.06,
+        0.0013
+      ],
+      [
+        0.065,
+        -0.004
+      ],
+      [
+        0.065,
+        -0.0078
+      ],
+      [
+        0.065,
+        -0.009
+      ],
+      [
+        0.065,
+        -0.007
+      ],
+      [
+        0.065,
+        -0.0025
+      ],
+      [
+        0.065,
+        0.0028
+      ],
+      [
+        0.065,
+        0.0071
+      ],
+      [
+        0.065,
+        0.009
+      ],
+      [
+        0.065,
+        0.0077
+      ],
+      [
+        0.065,
+        0.0037
+      ],
+      [
+        0.065,
+        -0.0016
+      ],
+      [
+        0.065,
+        -0.0063
+      ],
+      [
+        0.065,
+        -0.0088
+      ],
+      [
+        0.065,
+        -0.0083
+      ],
+      [
+        0.065,
+        -0.0048
+      ],
+      [
+        0.065,
+        0.0003
+      ],
+      [
+        0.065,
+        0.0053
+      ],
+      [
+        0.065,
+        0.0085
+      ],
+      [
+        0.065,
+        0.0087
+      ]
+    ],
+    "audioType": "smg",
+    "killReward": 600,
+    "color": "#7f8c8d"
   },
-  p90: {
-    id: 'p90',
-    name: 'P90',
-    category: 'mid-tier',
-    slot: 1,
-    team: 'ANY',
-    cost: 2350,
-    clip: 50,
-    reserve: 100,
-    damage: 26,
-    armorPen: 0.69,
-    fireRate: 0.066,
-    spread: 0.026,
-    recoil: 0.024,
-    audioType: 'smg',
-    killReward: 300,
-    modelPath: null,
-    color: '#27ae60'
+  "p90": {
+    "id": "p90",
+    "name": "P90",
+    "category": "mid-tier",
+    "slot": 1,
+    "team": "ANY",
+    "cost": 2350,
+    "clip": 50,
+    "reserve": 100,
+    "damage": 26,
+    "armorPen": 0.69,
+    "fireRate": 0.066,
+    "spread": 0.02,
+    "recoil": 0.022,
+    "reloadTime": 3.35,
+    "isAuto": true,
+    "pellets": 1,
+    "recoilPattern": [
+      [
+        0.0065,
+        0
+      ],
+      [
+        0.013,
+        0.0033
+      ],
+      [
+        0.0195,
+        0.0055
+      ],
+      [
+        0.026,
+        0.0057
+      ],
+      [
+        0.0325,
+        0.004
+      ],
+      [
+        0.039,
+        0.0008
+      ],
+      [
+        0.0455,
+        -0.0026
+      ],
+      [
+        0.052,
+        -0.0051
+      ],
+      [
+        0.0585,
+        -0.0058
+      ],
+      [
+        0.065,
+        -0.0045
+      ],
+      [
+        0.065,
+        -0.0016
+      ],
+      [
+        0.065,
+        0.0018
+      ],
+      [
+        0.065,
+        0.0046
+      ],
+      [
+        0.065,
+        0.0058
+      ],
+      [
+        0.065,
+        0.005
+      ],
+      [
+        0.065,
+        0.0024
+      ],
+      [
+        0.065,
+        -0.001
+      ],
+      [
+        0.065,
+        -0.0041
+      ],
+      [
+        0.065,
+        -0.0057
+      ],
+      [
+        0.065,
+        -0.0054
+      ],
+      [
+        0.065,
+        -0.0031
+      ],
+      [
+        0.065,
+        0.0002
+      ],
+      [
+        0.065,
+        0.0035
+      ],
+      [
+        0.065,
+        0.0055
+      ],
+      [
+        0.065,
+        0.0056
+      ],
+      [
+        0.065,
+        0.0038
+      ],
+      [
+        0.065,
+        0.0006
+      ],
+      [
+        0.065,
+        -0.0028
+      ],
+      [
+        0.065,
+        -0.0052
+      ],
+      [
+        0.065,
+        -0.0058
+      ],
+      [
+        0.065,
+        -0.0044
+      ],
+      [
+        0.065,
+        -0.0014
+      ],
+      [
+        0.065,
+        0.002
+      ],
+      [
+        0.065,
+        0.0048
+      ],
+      [
+        0.065,
+        0.0058
+      ],
+      [
+        0.065,
+        0.0049
+      ],
+      [
+        0.065,
+        0.0022
+      ],
+      [
+        0.065,
+        -0.0012
+      ],
+      [
+        0.065,
+        -0.0042
+      ],
+      [
+        0.065,
+        -0.0058
+      ],
+      [
+        0.065,
+        -0.0053
+      ],
+      [
+        0.065,
+        -0.003
+      ],
+      [
+        0.065,
+        0.0004
+      ],
+      [
+        0.065,
+        0.0036
+      ],
+      [
+        0.065,
+        0.0056
+      ],
+      [
+        0.065,
+        0.0056
+      ],
+      [
+        0.065,
+        0.0037
+      ],
+      [
+        0.065,
+        0.0004
+      ],
+      [
+        0.065,
+        -0.0029
+      ],
+      [
+        0.065,
+        -0.0053
+      ]
+    ],
+    "audioType": "smg",
+    "killReward": 300,
+    "color": "#1abc9c"
   },
-  bizon: {
-    id: 'bizon',
-    name: 'PP-Bizon',
-    category: 'mid-tier',
-    slot: 1,
-    team: 'ANY',
-    cost: 1400,
-    clip: 64,
-    reserve: 120,
-    damage: 27,
-    armorPen: 0.57,
-    fireRate: 0.08,
-    spread: 0.028,
-    recoil: 0.022,
-    audioType: 'smg',
-    killReward: 600,
-    modelPath: null,
-    color: '#1abc9c'
+  "bizon": {
+    "id": "bizon",
+    "name": "PP-Bizon",
+    "category": "mid-tier",
+    "slot": 1,
+    "team": "ANY",
+    "cost": 1400,
+    "clip": 64,
+    "reserve": 120,
+    "damage": 27,
+    "armorPen": 0.47,
+    "fireRate": 0.08,
+    "spread": 0.022,
+    "recoil": 0.02,
+    "reloadTime": 2.45,
+    "isAuto": true,
+    "pellets": 1,
+    "recoilPattern": [
+      [
+        0.006,
+        0
+      ],
+      [
+        0.012,
+        0.003
+      ],
+      [
+        0.018,
+        0.005
+      ],
+      [
+        0.024,
+        0.0053
+      ],
+      [
+        0.03,
+        0.0036
+      ],
+      [
+        0.036,
+        0.0008
+      ],
+      [
+        0.042,
+        -0.0024
+      ],
+      [
+        0.048,
+        -0.0047
+      ],
+      [
+        0.054,
+        -0.0054
+      ],
+      [
+        0.06,
+        -0.0042
+      ],
+      [
+        0.065,
+        -0.0015
+      ],
+      [
+        0.065,
+        0.0017
+      ],
+      [
+        0.065,
+        0.0043
+      ],
+      [
+        0.065,
+        0.0054
+      ],
+      [
+        0.065,
+        0.0046
+      ],
+      [
+        0.065,
+        0.0022
+      ],
+      [
+        0.065,
+        -0.0009
+      ],
+      [
+        0.065,
+        -0.0038
+      ],
+      [
+        0.065,
+        -0.0053
+      ],
+      [
+        0.065,
+        -0.005
+      ],
+      [
+        0.065,
+        -0.0029
+      ],
+      [
+        0.065,
+        0.0002
+      ],
+      [
+        0.065,
+        0.0032
+      ],
+      [
+        0.065,
+        0.0051
+      ],
+      [
+        0.065,
+        0.0052
+      ],
+      [
+        0.065,
+        0.0035
+      ],
+      [
+        0.065,
+        0.0006
+      ],
+      [
+        0.065,
+        -0.0026
+      ],
+      [
+        0.065,
+        -0.0048
+      ],
+      [
+        0.065,
+        -0.0054
+      ],
+      [
+        0.065,
+        -0.0041
+      ],
+      [
+        0.065,
+        -0.0013
+      ],
+      [
+        0.065,
+        0.0019
+      ],
+      [
+        0.065,
+        0.0044
+      ],
+      [
+        0.065,
+        0.0054
+      ],
+      [
+        0.065,
+        0.0045
+      ],
+      [
+        0.065,
+        0.0021
+      ],
+      [
+        0.065,
+        -0.0011
+      ],
+      [
+        0.065,
+        -0.0039
+      ],
+      [
+        0.065,
+        -0.0053
+      ],
+      [
+        0.065,
+        -0.0049
+      ],
+      [
+        0.065,
+        -0.0027
+      ],
+      [
+        0.065,
+        0.0004
+      ],
+      [
+        0.065,
+        0.0033
+      ],
+      [
+        0.065,
+        0.0052
+      ],
+      [
+        0.065,
+        0.0052
+      ],
+      [
+        0.065,
+        0.0034
+      ],
+      [
+        0.065,
+        0.0004
+      ],
+      [
+        0.065,
+        -0.0027
+      ],
+      [
+        0.065,
+        -0.0049
+      ],
+      [
+        0.065,
+        -0.0053
+      ],
+      [
+        0.065,
+        -0.0039
+      ],
+      [
+        0.065,
+        -0.0012
+      ],
+      [
+        0.065,
+        0.002
+      ],
+      [
+        0.065,
+        0.0045
+      ],
+      [
+        0.065,
+        0.0054
+      ],
+      [
+        0.065,
+        0.0044
+      ],
+      [
+        0.065,
+        0.0019
+      ],
+      [
+        0.065,
+        -0.0013
+      ],
+      [
+        0.065,
+        -0.004
+      ],
+      [
+        0.065,
+        -0.0054
+      ],
+      [
+        0.065,
+        -0.0048
+      ],
+      [
+        0.065,
+        -0.0026
+      ],
+      [
+        0.065,
+        0.0005
+      ]
+    ],
+    "audioType": "smg",
+    "killReward": 600,
+    "color": "#16a085"
   },
-  nova: {
-    id: 'nova',
-    name: 'Nova',
-    category: 'mid-tier',
-    slot: 1,
-    team: 'ANY',
-    cost: 1050,
-    clip: 8,
-    reserve: 32,
-    damage: 26,
-    armorPen: 0.50,
-    fireRate: 0.88,
-    spread: 0.065,
-    recoil: 0.06,
-    audioType: 'shotgun',
-    killReward: 900,
-    pellets: 9,
-    modelPath: null,
-    color: '#8e44ad'
+  "nova": {
+    "id": "nova",
+    "name": "Nova",
+    "category": "mid-tier",
+    "slot": 1,
+    "team": "ANY",
+    "cost": 1050,
+    "clip": 8,
+    "reserve": 32,
+    "damage": 26,
+    "armorPen": 0.5,
+    "fireRate": 0.88,
+    "spread": 0.042,
+    "recoil": 0.06,
+    "reloadTime": 3.2,
+    "isAuto": false,
+    "pellets": 9,
+    "recoilPattern": null,
+    "audioType": "shotgun",
+    "killReward": 900,
+    "color": "#95a5a6"
   },
-  xm1014: {
-    id: 'xm1014',
-    name: 'XM1014',
-    category: 'mid-tier',
-    slot: 1,
-    team: 'ANY',
-    cost: 2000,
-    clip: 7,
-    reserve: 32,
-    damage: 20,
-    armorPen: 0.80,
-    fireRate: 0.25,
-    spread: 0.07,
-    recoil: 0.05,
-    audioType: 'shotgun',
-    killReward: 900,
-    pellets: 6,
-    modelPath: null,
-    color: '#9b59b6'
+  "xm1014": {
+    "id": "xm1014",
+    "name": "XM1014",
+    "category": "mid-tier",
+    "slot": 1,
+    "team": "ANY",
+    "cost": 2000,
+    "clip": 7,
+    "reserve": 32,
+    "damage": 20,
+    "armorPen": 0.8,
+    "fireRate": 0.35,
+    "spread": 0.048,
+    "recoil": 0.05,
+    "reloadTime": 2.85,
+    "isAuto": true,
+    "pellets": 8,
+    "recoilPattern": null,
+    "audioType": "shotgun",
+    "killReward": 900,
+    "color": "#7f8c8d"
   },
-  mag7: {
-    id: 'mag7',
-    name: 'MAG-7',
-    category: 'mid-tier',
-    slot: 1,
-    team: 'CT',
-    cost: 1300,
-    clip: 5,
-    reserve: 30,
-    damage: 30,
-    armorPen: 0.75,
-    fireRate: 0.85,
-    spread: 0.06,
-    recoil: 0.07,
-    audioType: 'shotgun',
-    killReward: 900,
-    pellets: 8,
-    modelPath: null,
-    color: '#2980b9'
+  "mag7": {
+    "id": "mag7",
+    "name": "MAG-7",
+    "category": "mid-tier",
+    "slot": 1,
+    "team": "CT",
+    "cost": 1300,
+    "clip": 5,
+    "reserve": 32,
+    "damage": 30,
+    "armorPen": 0.75,
+    "fireRate": 0.85,
+    "spread": 0.045,
+    "recoil": 0.065,
+    "reloadTime": 2.45,
+    "isAuto": false,
+    "pellets": 8,
+    "recoilPattern": null,
+    "audioType": "shotgun",
+    "killReward": 900,
+    "color": "#2980b9"
   },
-  sawedoff: {
-    id: 'sawedoff',
-    name: 'Sawed-Off',
-    category: 'mid-tier',
-    slot: 1,
-    team: 'T',
-    cost: 1100,
-    clip: 7,
-    reserve: 32,
-    damage: 32,
-    armorPen: 0.75,
-    fireRate: 0.85,
-    spread: 0.08,
-    recoil: 0.08,
-    audioType: 'shotgun',
-    killReward: 900,
-    pellets: 8,
-    modelPath: null,
-    color: '#d35400'
+  "sawedoff": {
+    "id": "sawedoff",
+    "name": "Sawed-Off",
+    "category": "mid-tier",
+    "slot": 1,
+    "team": "T",
+    "cost": 1100,
+    "clip": 7,
+    "reserve": 32,
+    "damage": 32,
+    "armorPen": 0.75,
+    "fireRate": 0.85,
+    "spread": 0.06,
+    "recoil": 0.07,
+    "reloadTime": 3.3,
+    "isAuto": false,
+    "pellets": 8,
+    "recoilPattern": null,
+    "audioType": "shotgun",
+    "killReward": 900,
+    "color": "#d35400"
   },
-  negev: {
-    id: 'negev',
-    name: 'Negev',
-    category: 'mid-tier',
-    slot: 1,
-    team: 'ANY',
-    cost: 1700,
-    clip: 150,
-    reserve: 300,
-    damage: 35,
-    armorPen: 0.71,
-    fireRate: 0.075,
-    spread: 0.035,
-    recoil: 0.035,
-    audioType: 'rifle',
-    killReward: 300,
-    modelPath: null,
-    color: '#34495e'
+  "negev": {
+    "id": "negev",
+    "name": "Negev",
+    "category": "mid-tier",
+    "slot": 1,
+    "team": "ANY",
+    "cost": 1700,
+    "clip": 150,
+    "reserve": 300,
+    "damage": 35,
+    "armorPen": 0.71,
+    "fireRate": 0.075,
+    "spread": 0.025,
+    "recoil": 0.028,
+    "reloadTime": 5.7,
+    "isAuto": true,
+    "pellets": 1,
+    "recoilPattern": [
+      [
+        0.009,
+        0
+      ],
+      [
+        0.018,
+        0
+      ],
+      [
+        0.027,
+        0
+      ],
+      [
+        0.036,
+        0
+      ],
+      [
+        0.045,
+        0
+      ],
+      [
+        0.054,
+        0
+      ],
+      [
+        0.063,
+        0
+      ],
+      [
+        0.072,
+        0
+      ],
+      [
+        0.081,
+        0
+      ],
+      [
+        0.09,
+        0
+      ],
+      [
+        0.099,
+        0
+      ],
+      [
+        0.108,
+        0
+      ],
+      [
+        0.11,
+        -0.0017
+      ],
+      [
+        0.11,
+        0.0013
+      ],
+      [
+        0.11,
+        0.0039
+      ],
+      [
+        0.11,
+        0.0056
+      ],
+      [
+        0.11,
+        0.0059
+      ],
+      [
+        0.11,
+        0.0048
+      ],
+      [
+        0.11,
+        0.0025
+      ],
+      [
+        0.11,
+        -0.0005
+      ],
+      [
+        0.11,
+        -0.0033
+      ],
+      [
+        0.11,
+        -0.0053
+      ],
+      [
+        0.11,
+        -0.006
+      ],
+      [
+        0.11,
+        -0.0053
+      ],
+      [
+        0.11,
+        -0.0032
+      ],
+      [
+        0.11,
+        -0.0004
+      ],
+      [
+        0.11,
+        0.0025
+      ],
+      [
+        0.11,
+        0.0048
+      ],
+      [
+        0.11,
+        0.0059
+      ],
+      [
+        0.11,
+        0.0056
+      ],
+      [
+        0.11,
+        0.0039
+      ],
+      [
+        0.11,
+        0.0012
+      ],
+      [
+        0.11,
+        -0.0017
+      ],
+      [
+        0.11,
+        -0.0043
+      ],
+      [
+        0.11,
+        -0.0058
+      ],
+      [
+        0.11,
+        -0.0059
+      ],
+      [
+        0.11,
+        -0.0045
+      ],
+      [
+        0.11,
+        -0.0021
+      ],
+      [
+        0.11,
+        0.0009
+      ],
+      [
+        0.11,
+        0.0036
+      ],
+      [
+        0.11,
+        0.0055
+      ],
+      [
+        0.11,
+        0.006
+      ],
+      [
+        0.11,
+        0.005
+      ],
+      [
+        0.11,
+        0.0028
+      ],
+      [
+        0.11,
+        -0.0001
+      ],
+      [
+        0.11,
+        -0.0029
+      ],
+      [
+        0.11,
+        -0.0051
+      ],
+      [
+        0.11,
+        -0.006
+      ],
+      [
+        0.11,
+        -0.0054
+      ],
+      [
+        0.11,
+        -0.0035
+      ],
+      [
+        0.11,
+        -0.0008
+      ],
+      [
+        0.11,
+        0.0022
+      ],
+      [
+        0.11,
+        0.0046
+      ],
+      [
+        0.11,
+        0.0059
+      ],
+      [
+        0.11,
+        0.0057
+      ],
+      [
+        0.11,
+        0.0042
+      ],
+      [
+        0.11,
+        0.0016
+      ],
+      [
+        0.11,
+        -0.0013
+      ],
+      [
+        0.11,
+        -0.004
+      ],
+      [
+        0.11,
+        -0.0056
+      ],
+      [
+        0.11,
+        -0.0059
+      ],
+      [
+        0.11,
+        -0.0048
+      ],
+      [
+        0.11,
+        -0.0024
+      ],
+      [
+        0.11,
+        0.0005
+      ],
+      [
+        0.11,
+        0.0033
+      ],
+      [
+        0.11,
+        0.0053
+      ],
+      [
+        0.11,
+        0.006
+      ],
+      [
+        0.11,
+        0.0052
+      ],
+      [
+        0.11,
+        0.0032
+      ],
+      [
+        0.11,
+        0.0003
+      ],
+      [
+        0.11,
+        -0.0026
+      ],
+      [
+        0.11,
+        -0.0049
+      ],
+      [
+        0.11,
+        -0.006
+      ],
+      [
+        0.11,
+        -0.0056
+      ],
+      [
+        0.11,
+        -0.0039
+      ],
+      [
+        0.11,
+        -0.0012
+      ],
+      [
+        0.11,
+        0.0018
+      ],
+      [
+        0.11,
+        0.0043
+      ],
+      [
+        0.11,
+        0.0058
+      ],
+      [
+        0.11,
+        0.0058
+      ],
+      [
+        0.11,
+        0.0045
+      ],
+      [
+        0.11,
+        0.002
+      ],
+      [
+        0.11,
+        -0.001
+      ],
+      [
+        0.11,
+        -0.0037
+      ],
+      [
+        0.11,
+        -0.0055
+      ],
+      [
+        0.11,
+        -0.006
+      ],
+      [
+        0.11,
+        -0.005
+      ],
+      [
+        0.11,
+        -0.0028
+      ],
+      [
+        0.11,
+        0.0001
+      ],
+      [
+        0.11,
+        0.003
+      ],
+      [
+        0.11,
+        0.0051
+      ],
+      [
+        0.11,
+        0.006
+      ],
+      [
+        0.11,
+        0.0054
+      ],
+      [
+        0.11,
+        0.0035
+      ],
+      [
+        0.11,
+        0.0007
+      ],
+      [
+        0.11,
+        -0.0022
+      ],
+      [
+        0.11,
+        -0.0046
+      ],
+      [
+        0.11,
+        -0.0059
+      ],
+      [
+        0.11,
+        -0.0057
+      ],
+      [
+        0.11,
+        -0.0042
+      ],
+      [
+        0.11,
+        -0.0016
+      ],
+      [
+        0.11,
+        0.0014
+      ],
+      [
+        0.11,
+        0.004
+      ],
+      [
+        0.11,
+        0.0057
+      ],
+      [
+        0.11,
+        0.0059
+      ],
+      [
+        0.11,
+        0.0047
+      ],
+      [
+        0.11,
+        0.0024
+      ],
+      [
+        0.11,
+        -0.0006
+      ],
+      [
+        0.11,
+        -0.0034
+      ],
+      [
+        0.11,
+        -0.0053
+      ],
+      [
+        0.11,
+        -0.006
+      ],
+      [
+        0.11,
+        -0.0052
+      ],
+      [
+        0.11,
+        -0.0031
+      ],
+      [
+        0.11,
+        -0.0003
+      ],
+      [
+        0.11,
+        0.0026
+      ],
+      [
+        0.11,
+        0.0049
+      ],
+      [
+        0.11,
+        0.006
+      ],
+      [
+        0.11,
+        0.0056
+      ],
+      [
+        0.11,
+        0.0038
+      ],
+      [
+        0.11,
+        0.0011
+      ],
+      [
+        0.11,
+        -0.0018
+      ],
+      [
+        0.11,
+        -0.0043
+      ],
+      [
+        0.11,
+        -0.0058
+      ],
+      [
+        0.11,
+        -0.0058
+      ],
+      [
+        0.11,
+        -0.0044
+      ],
+      [
+        0.11,
+        -0.002
+      ],
+      [
+        0.11,
+        0.001
+      ],
+      [
+        0.11,
+        0.0037
+      ],
+      [
+        0.11,
+        0.0055
+      ],
+      [
+        0.11,
+        0.006
+      ],
+      [
+        0.11,
+        0.005
+      ],
+      [
+        0.11,
+        0.0027
+      ],
+      [
+        0.11,
+        -0.0002
+      ],
+      [
+        0.11,
+        -0.003
+      ],
+      [
+        0.11,
+        -0.0051
+      ],
+      [
+        0.11,
+        -0.006
+      ],
+      [
+        0.11,
+        -0.0054
+      ],
+      [
+        0.11,
+        -0.0035
+      ],
+      [
+        0.11,
+        -0.0007
+      ],
+      [
+        0.11,
+        0.0023
+      ],
+      [
+        0.11,
+        0.0046
+      ],
+      [
+        0.11,
+        0.0059
+      ],
+      [
+        0.11,
+        0.0057
+      ],
+      [
+        0.11,
+        0.0041
+      ],
+      [
+        0.11,
+        0.0015
+      ],
+      [
+        0.11,
+        -0.0014
+      ],
+      [
+        0.11,
+        -0.0041
+      ],
+      [
+        0.11,
+        -0.0057
+      ],
+      [
+        0.11,
+        -0.0059
+      ],
+      [
+        0.11,
+        -0.0047
+      ]
+    ],
+    "audioType": "rifle",
+    "killReward": 300,
+    "color": "#c0392b"
   },
-  m249: {
-    id: 'm249',
-    name: 'M249',
-    category: 'mid-tier',
-    slot: 1,
-    team: 'ANY',
-    cost: 5750,
-    clip: 100,
-    reserve: 200,
-    damage: 32,
-    armorPen: 0.80,
-    fireRate: 0.08,
-    spread: 0.03,
-    recoil: 0.04,
-    audioType: 'rifle',
-    killReward: 300,
-    modelPath: null,
-    color: '#2c3e50'
+  "m249": {
+    "id": "m249",
+    "name": "M249",
+    "category": "mid-tier",
+    "slot": 1,
+    "team": "ANY",
+    "cost": 5200,
+    "clip": 100,
+    "reserve": 200,
+    "damage": 32,
+    "armorPen": 0.8,
+    "fireRate": 0.08,
+    "spread": 0.028,
+    "recoil": 0.035,
+    "reloadTime": 5.7,
+    "isAuto": true,
+    "pellets": 1,
+    "recoilPattern": [
+      [
+        0.009,
+        0
+      ],
+      [
+        0.018,
+        0
+      ],
+      [
+        0.027,
+        0
+      ],
+      [
+        0.036,
+        0
+      ],
+      [
+        0.045,
+        0
+      ],
+      [
+        0.054,
+        0
+      ],
+      [
+        0.063,
+        0
+      ],
+      [
+        0.072,
+        0
+      ],
+      [
+        0.081,
+        0
+      ],
+      [
+        0.09,
+        0
+      ],
+      [
+        0.099,
+        0
+      ],
+      [
+        0.108,
+        0
+      ],
+      [
+        0.11,
+        -0.0017
+      ],
+      [
+        0.11,
+        0.0013
+      ],
+      [
+        0.11,
+        0.0039
+      ],
+      [
+        0.11,
+        0.0056
+      ],
+      [
+        0.11,
+        0.0059
+      ],
+      [
+        0.11,
+        0.0048
+      ],
+      [
+        0.11,
+        0.0025
+      ],
+      [
+        0.11,
+        -0.0005
+      ],
+      [
+        0.11,
+        -0.0033
+      ],
+      [
+        0.11,
+        -0.0053
+      ],
+      [
+        0.11,
+        -0.006
+      ],
+      [
+        0.11,
+        -0.0053
+      ],
+      [
+        0.11,
+        -0.0032
+      ],
+      [
+        0.11,
+        -0.0004
+      ],
+      [
+        0.11,
+        0.0025
+      ],
+      [
+        0.11,
+        0.0048
+      ],
+      [
+        0.11,
+        0.0059
+      ],
+      [
+        0.11,
+        0.0056
+      ],
+      [
+        0.11,
+        0.0039
+      ],
+      [
+        0.11,
+        0.0012
+      ],
+      [
+        0.11,
+        -0.0017
+      ],
+      [
+        0.11,
+        -0.0043
+      ],
+      [
+        0.11,
+        -0.0058
+      ],
+      [
+        0.11,
+        -0.0059
+      ],
+      [
+        0.11,
+        -0.0045
+      ],
+      [
+        0.11,
+        -0.0021
+      ],
+      [
+        0.11,
+        0.0009
+      ],
+      [
+        0.11,
+        0.0036
+      ],
+      [
+        0.11,
+        0.0055
+      ],
+      [
+        0.11,
+        0.006
+      ],
+      [
+        0.11,
+        0.005
+      ],
+      [
+        0.11,
+        0.0028
+      ],
+      [
+        0.11,
+        -0.0001
+      ],
+      [
+        0.11,
+        -0.0029
+      ],
+      [
+        0.11,
+        -0.0051
+      ],
+      [
+        0.11,
+        -0.006
+      ],
+      [
+        0.11,
+        -0.0054
+      ],
+      [
+        0.11,
+        -0.0035
+      ],
+      [
+        0.11,
+        -0.0008
+      ],
+      [
+        0.11,
+        0.0022
+      ],
+      [
+        0.11,
+        0.0046
+      ],
+      [
+        0.11,
+        0.0059
+      ],
+      [
+        0.11,
+        0.0057
+      ],
+      [
+        0.11,
+        0.0042
+      ],
+      [
+        0.11,
+        0.0016
+      ],
+      [
+        0.11,
+        -0.0013
+      ],
+      [
+        0.11,
+        -0.004
+      ],
+      [
+        0.11,
+        -0.0056
+      ],
+      [
+        0.11,
+        -0.0059
+      ],
+      [
+        0.11,
+        -0.0048
+      ],
+      [
+        0.11,
+        -0.0024
+      ],
+      [
+        0.11,
+        0.0005
+      ],
+      [
+        0.11,
+        0.0033
+      ],
+      [
+        0.11,
+        0.0053
+      ],
+      [
+        0.11,
+        0.006
+      ],
+      [
+        0.11,
+        0.0052
+      ],
+      [
+        0.11,
+        0.0032
+      ],
+      [
+        0.11,
+        0.0003
+      ],
+      [
+        0.11,
+        -0.0026
+      ],
+      [
+        0.11,
+        -0.0049
+      ],
+      [
+        0.11,
+        -0.006
+      ],
+      [
+        0.11,
+        -0.0056
+      ],
+      [
+        0.11,
+        -0.0039
+      ],
+      [
+        0.11,
+        -0.0012
+      ],
+      [
+        0.11,
+        0.0018
+      ],
+      [
+        0.11,
+        0.0043
+      ],
+      [
+        0.11,
+        0.0058
+      ],
+      [
+        0.11,
+        0.0058
+      ],
+      [
+        0.11,
+        0.0045
+      ],
+      [
+        0.11,
+        0.002
+      ],
+      [
+        0.11,
+        -0.001
+      ],
+      [
+        0.11,
+        -0.0037
+      ],
+      [
+        0.11,
+        -0.0055
+      ],
+      [
+        0.11,
+        -0.006
+      ],
+      [
+        0.11,
+        -0.005
+      ],
+      [
+        0.11,
+        -0.0028
+      ],
+      [
+        0.11,
+        0.0001
+      ],
+      [
+        0.11,
+        0.003
+      ],
+      [
+        0.11,
+        0.0051
+      ],
+      [
+        0.11,
+        0.006
+      ],
+      [
+        0.11,
+        0.0054
+      ],
+      [
+        0.11,
+        0.0035
+      ],
+      [
+        0.11,
+        0.0007
+      ],
+      [
+        0.11,
+        -0.0022
+      ],
+      [
+        0.11,
+        -0.0046
+      ],
+      [
+        0.11,
+        -0.0059
+      ],
+      [
+        0.11,
+        -0.0057
+      ],
+      [
+        0.11,
+        -0.0042
+      ]
+    ],
+    "audioType": "rifle",
+    "killReward": 300,
+    "color": "#8e44ad"
   },
-
-  // ==================== RIFLES & SNIPERS ====================
-  ak47: {
-    id: 'ak47',
-    name: 'AK-47',
-    category: 'rifles',
-    slot: 1,
-    team: 'T',
-    cost: 2700,
-    clip: 30,
-    reserve: 90,
-    damage: 36,
-    armorPen: 0.77,
-    fireRate: 0.10,
-    spread: 0.014,
-    recoil: 0.036,
-    audioType: 'rifle',
-    killReward: 300,
-    modelPath: 'source/AK47.glb',
-    color: '#b75b28'
+  "ak47": {
+    "id": "ak47",
+    "name": "AK-47",
+    "category": "rifles",
+    "slot": 1,
+    "team": "T",
+    "cost": 2700,
+    "clip": 30,
+    "reserve": 90,
+    "damage": 36,
+    "armorPen": 0.77,
+    "fireRate": 0.1,
+    "spread": 0.01,
+    "recoil": 0.032,
+    "reloadTime": 2.43,
+    "isAuto": true,
+    "pellets": 1,
+    "recoilPattern": [
+      [
+        0.012,
+        0.0005
+      ],
+      [
+        0.024,
+        0.0005
+      ],
+      [
+        0.036,
+        0.0005
+      ],
+      [
+        0.048,
+        0.0005
+      ],
+      [
+        0.06,
+        0.0005
+      ],
+      [
+        0.065,
+        0.005
+      ],
+      [
+        0.071,
+        0.01
+      ],
+      [
+        0.077,
+        0.015
+      ],
+      [
+        0.083,
+        0.02
+      ],
+      [
+        0.089,
+        0.025
+      ],
+      [
+        0.0934,
+        0.025
+      ],
+      [
+        0.092,
+        0.018
+      ],
+      [
+        0.0934,
+        0.011
+      ],
+      [
+        0.0963,
+        0.004
+      ],
+      [
+        0.098,
+        -0.003
+      ],
+      [
+        0.097,
+        -0.01
+      ],
+      [
+        0.0941,
+        -0.017
+      ],
+      [
+        0.0921,
+        -0.024
+      ],
+      [
+        0.098,
+        -0.028
+      ],
+      [
+        0.099,
+        -0.02
+      ],
+      [
+        0.0972,
+        -0.012
+      ],
+      [
+        0.0944,
+        -0.004
+      ],
+      [
+        0.093,
+        0.004
+      ],
+      [
+        0.0944,
+        0.012
+      ],
+      [
+        0.0973,
+        0.02
+      ],
+      [
+        0.098,
+        0.022
+      ],
+      [
+        0.098,
+        0.014
+      ],
+      [
+        0.098,
+        0.006
+      ],
+      [
+        0.098,
+        -0.002
+      ],
+      [
+        0.098,
+        -0.01
+      ]
+    ],
+    "audioType": "rifle",
+    "killReward": 300,
+    "color": "#d35400"
   },
-  m4a4: {
-    id: 'm4a4',
-    name: 'M4A4',
-    category: 'rifles',
-    slot: 1,
-    team: 'CT',
-    cost: 3100,
-    clip: 30,
-    reserve: 90,
-    damage: 33,
-    armorPen: 0.70,
-    fireRate: 0.09,
-    spread: 0.012,
-    recoil: 0.030,
-    audioType: 'rifle',
-    killReward: 300,
-    modelPath: 'source/M4A4.glb',
-    color: '#42576c'
+  "m4a4": {
+    "id": "m4a4",
+    "name": "M4A4",
+    "category": "rifles",
+    "slot": 1,
+    "team": "CT",
+    "cost": 3100,
+    "clip": 30,
+    "reserve": 90,
+    "damage": 33,
+    "armorPen": 0.7,
+    "fireRate": 0.09,
+    "spread": 0.008,
+    "recoil": 0.026,
+    "reloadTime": 3.1,
+    "isAuto": true,
+    "pellets": 1,
+    "recoilPattern": [
+      [
+        0.009,
+        0.0002
+      ],
+      [
+        0.018,
+        0.0002
+      ],
+      [
+        0.027,
+        0.0002
+      ],
+      [
+        0.036,
+        0.0002
+      ],
+      [
+        0.045,
+        0.0002
+      ],
+      [
+        0.048,
+        0.004
+      ],
+      [
+        0.053,
+        0.0075
+      ],
+      [
+        0.058,
+        0.011
+      ],
+      [
+        0.063,
+        0.0145
+      ],
+      [
+        0.068,
+        0.018
+      ],
+      [
+        0.0709,
+        0.018
+      ],
+      [
+        0.07,
+        0.013
+      ],
+      [
+        0.0709,
+        0.008
+      ],
+      [
+        0.0728,
+        0.003
+      ],
+      [
+        0.074,
+        -0.002
+      ],
+      [
+        0.0733,
+        -0.007
+      ],
+      [
+        0.0714,
+        -0.012
+      ],
+      [
+        0.0701,
+        -0.017
+      ],
+      [
+        0.074,
+        -0.018
+      ],
+      [
+        0.074,
+        -0.012
+      ],
+      [
+        0.074,
+        -0.006
+      ],
+      [
+        0.074,
+        0
+      ],
+      [
+        0.074,
+        0.006
+      ],
+      [
+        0.074,
+        0.012
+      ],
+      [
+        0.074,
+        0.018
+      ],
+      [
+        0.075,
+        0.016
+      ],
+      [
+        0.075,
+        0.01
+      ],
+      [
+        0.075,
+        0.004
+      ],
+      [
+        0.075,
+        -0.002
+      ],
+      [
+        0.075,
+        -0.008
+      ]
+    ],
+    "audioType": "rifle",
+    "killReward": 300,
+    "color": "#2980b9"
   },
-  m4a1s: {
-    id: 'm4a1s',
-    name: 'M4A1-S',
-    category: 'rifles',
-    slot: 1,
-    team: 'CT',
-    cost: 2900,
-    clip: 20,
-    reserve: 80,
-    damage: 38,
-    armorPen: 0.70,
-    fireRate: 0.10,
-    spread: 0.009,
-    recoil: 0.024,
-    audioType: 'rifle',
-    isSilenced: true,
-    killReward: 300,
-    modelPath: 'source/M4A1.glb',
-    color: '#2980b9'
+  "m4a1s": {
+    "id": "m4a1s",
+    "name": "M4A1-S",
+    "category": "rifles",
+    "slot": 1,
+    "team": "CT",
+    "cost": 2900,
+    "clip": 20,
+    "reserve": 80,
+    "damage": 38,
+    "armorPen": 0.7,
+    "fireRate": 0.1,
+    "spread": 0.006,
+    "recoil": 0.02,
+    "reloadTime": 3.1,
+    "isAuto": true,
+    "isSilenced": true,
+    "pellets": 1,
+    "recoilPattern": [
+      [
+        0.008,
+        0
+      ],
+      [
+        0.016,
+        0
+      ],
+      [
+        0.024,
+        0
+      ],
+      [
+        0.032,
+        0
+      ],
+      [
+        0.035,
+        0
+      ],
+      [
+        0.04,
+        0.003
+      ],
+      [
+        0.045,
+        0.006
+      ],
+      [
+        0.05,
+        0.009
+      ],
+      [
+        0.056,
+        0.012
+      ],
+      [
+        0.056,
+        0.008
+      ],
+      [
+        0.056,
+        0.004
+      ],
+      [
+        0.056,
+        0
+      ],
+      [
+        0.056,
+        -0.004
+      ],
+      [
+        0.056,
+        -0.008
+      ],
+      [
+        0.058,
+        -0.012
+      ],
+      [
+        0.058,
+        -0.008
+      ],
+      [
+        0.058,
+        -0.004
+      ],
+      [
+        0.058,
+        0
+      ],
+      [
+        0.058,
+        0.004
+      ],
+      [
+        0.058,
+        0.008
+      ]
+    ],
+    "audioType": "rifle",
+    "killReward": 300,
+    "color": "#34495e"
   },
-  galil: {
-    id: 'galil',
-    name: 'Galil AR',
-    category: 'rifles',
-    slot: 1,
-    team: 'T',
-    cost: 1800,
-    clip: 35,
-    reserve: 90,
-    damage: 30,
-    armorPen: 0.77,
-    fireRate: 0.09,
-    spread: 0.018,
-    recoil: 0.034,
-    audioType: 'rifle',
-    killReward: 300,
-    modelPath: null,
-    color: '#7f8c8d'
+  "galil": {
+    "id": "galil",
+    "name": "Galil AR",
+    "category": "rifles",
+    "slot": 1,
+    "team": "T",
+    "cost": 1800,
+    "clip": 35,
+    "reserve": 90,
+    "damage": 30,
+    "armorPen": 0.77,
+    "fireRate": 0.09,
+    "spread": 0.014,
+    "recoil": 0.03,
+    "reloadTime": 3.03,
+    "isAuto": true,
+    "pellets": 1,
+    "recoilPattern": [
+      [
+        0.01,
+        0
+      ],
+      [
+        0.02,
+        0
+      ],
+      [
+        0.03,
+        0
+      ],
+      [
+        0.04,
+        0
+      ],
+      [
+        0.05,
+        0
+      ],
+      [
+        0.06,
+        0
+      ],
+      [
+        0.062,
+        0.006
+      ],
+      [
+        0.066,
+        0.01
+      ],
+      [
+        0.07,
+        0.014
+      ],
+      [
+        0.074,
+        0.018
+      ],
+      [
+        0.078,
+        0.022
+      ],
+      [
+        0.082,
+        0.026
+      ],
+      [
+        0.088,
+        0.026
+      ],
+      [
+        0.088,
+        0.0205
+      ],
+      [
+        0.088,
+        0.015
+      ],
+      [
+        0.088,
+        0.0095
+      ],
+      [
+        0.088,
+        0.004
+      ],
+      [
+        0.088,
+        -0.0015
+      ],
+      [
+        0.088,
+        -0.007
+      ],
+      [
+        0.088,
+        -0.0125
+      ],
+      [
+        0.088,
+        -0.018
+      ],
+      [
+        0.088,
+        -0.0235
+      ],
+      [
+        0.09,
+        -0.025
+      ],
+      [
+        0.09,
+        -0.017
+      ],
+      [
+        0.09,
+        -0.009
+      ],
+      [
+        0.09,
+        -0.001
+      ],
+      [
+        0.09,
+        0.007
+      ],
+      [
+        0.09,
+        0.015
+      ],
+      [
+        0.09,
+        -0.025
+      ],
+      [
+        0.09,
+        -0.017
+      ],
+      [
+        0.09,
+        -0.009
+      ],
+      [
+        0.09,
+        -0.001
+      ],
+      [
+        0.09,
+        0.007
+      ],
+      [
+        0.09,
+        0.015
+      ],
+      [
+        0.09,
+        -0.025
+      ]
+    ],
+    "audioType": "rifle",
+    "killReward": 300,
+    "color": "#e67e22"
   },
-  famas: {
-    id: 'famas',
-    name: 'FAMAS',
-    category: 'rifles',
-    slot: 1,
-    team: 'CT',
-    cost: 2050,
-    clip: 25,
-    reserve: 90,
-    damage: 30,
-    armorPen: 0.70,
-    fireRate: 0.09,
-    spread: 0.016,
-    recoil: 0.032,
-    audioType: 'rifle',
-    killReward: 300,
-    modelPath: null,
-    color: '#34495e'
+  "famas": {
+    "id": "famas",
+    "name": "FAMAS",
+    "category": "rifles",
+    "slot": 1,
+    "team": "CT",
+    "cost": 2050,
+    "clip": 25,
+    "reserve": 90,
+    "damage": 30,
+    "armorPen": 0.7,
+    "fireRate": 0.09,
+    "spread": 0.012,
+    "recoil": 0.028,
+    "reloadTime": 3.3,
+    "isAuto": true,
+    "pellets": 1,
+    "recoilPattern": [
+      [
+        0.011,
+        0
+      ],
+      [
+        0.022,
+        0
+      ],
+      [
+        0.033,
+        0
+      ],
+      [
+        0.044,
+        0
+      ],
+      [
+        0.055,
+        0
+      ],
+      [
+        0.058,
+        0.006
+      ],
+      [
+        0.062,
+        0.01
+      ],
+      [
+        0.066,
+        0.014
+      ],
+      [
+        0.07,
+        0.018
+      ],
+      [
+        0.074,
+        0.022
+      ],
+      [
+        0.078,
+        0.026
+      ],
+      [
+        0.08,
+        0.024
+      ],
+      [
+        0.08,
+        0.018
+      ],
+      [
+        0.08,
+        0.012
+      ],
+      [
+        0.08,
+        0.006
+      ],
+      [
+        0.08,
+        0
+      ],
+      [
+        0.08,
+        -0.006
+      ],
+      [
+        0.08,
+        -0.012
+      ],
+      [
+        0.082,
+        -0.018
+      ],
+      [
+        0.082,
+        -0.013
+      ],
+      [
+        0.082,
+        -0.008
+      ],
+      [
+        0.082,
+        -0.003
+      ],
+      [
+        0.082,
+        0.002
+      ],
+      [
+        0.082,
+        0.007
+      ],
+      [
+        0.082,
+        0.012
+      ]
+    ],
+    "audioType": "rifle",
+    "killReward": 300,
+    "color": "#3498db"
   },
-  ssg08: {
-    id: 'ssg08',
-    name: 'SSG 08 (Scout)',
-    category: 'rifles',
-    slot: 1,
-    team: 'ANY',
-    cost: 1700,
-    clip: 10,
-    reserve: 90,
-    damage: 88,
-    armorPen: 0.85,
-    fireRate: 1.25,
-    spread: 0.004,
-    recoil: 0.04,
-    audioType: 'sniper',
-    killReward: 300,
-    canScope: true,
-    modelPath: null,
-    color: '#95a5a6'
+  "ssg08": {
+    "id": "ssg08",
+    "name": "SSG 08 (Scout)",
+    "category": "rifles",
+    "slot": 1,
+    "team": "ANY",
+    "cost": 1700,
+    "clip": 10,
+    "reserve": 90,
+    "damage": 88,
+    "armorPen": 0.85,
+    "fireRate": 1.25,
+    "spread": 0.003,
+    "recoil": 0.04,
+    "reloadTime": 3.7,
+    "isAuto": false,
+    "hasScope": true,
+    "pellets": 1,
+    "recoilPattern": null,
+    "audioType": "sniper",
+    "killReward": 300,
+    "color": "#16a085"
   },
-  awp: {
-    id: 'awp',
-    name: 'AWP',
-    category: 'rifles',
-    slot: 1,
-    team: 'ANY',
-    cost: 4750,
-    clip: 5,
-    reserve: 30,
-    damage: 115,
-    armorPen: 0.97,
-    fireRate: 1.45,
-    spread: 0.002,
-    recoil: 0.08,
-    audioType: 'sniper',
-    killReward: 100,
-    canScope: true,
-    modelPath: 'source/AWP.glb',
-    color: '#27ae60'
+  "awp": {
+    "id": "awp",
+    "name": "AWP",
+    "category": "rifles",
+    "slot": 1,
+    "team": "ANY",
+    "cost": 4750,
+    "clip": 5,
+    "reserve": 30,
+    "damage": 115,
+    "armorPen": 0.975,
+    "fireRate": 1.45,
+    "spread": 0.001,
+    "recoil": 0.08,
+    "reloadTime": 3.7,
+    "isAuto": false,
+    "hasScope": true,
+    "pellets": 1,
+    "recoilPattern": null,
+    "audioType": "sniper",
+    "killReward": 100,
+    "color": "#27ae60"
   },
-  aug: {
-    id: 'aug',
-    name: 'AUG',
-    category: 'rifles',
-    slot: 1,
-    team: 'CT',
-    cost: 3300,
-    clip: 30,
-    reserve: 90,
-    damage: 28,
-    armorPen: 0.90,
-    fireRate: 0.09,
-    spread: 0.011,
-    recoil: 0.028,
-    audioType: 'rifle',
-    killReward: 300,
-    canScope: true,
-    modelPath: null,
-    color: '#34495e'
+  "aug": {
+    "id": "aug",
+    "name": "AUG",
+    "category": "rifles",
+    "slot": 1,
+    "team": "CT",
+    "cost": 3300,
+    "clip": 30,
+    "reserve": 90,
+    "damage": 28,
+    "armorPen": 0.9,
+    "fireRate": 0.09,
+    "spread": 0.007,
+    "recoil": 0.024,
+    "reloadTime": 3.75,
+    "isAuto": true,
+    "hasScope": true,
+    "pellets": 1,
+    "recoilPattern": [
+      [
+        0.009,
+        0.0002
+      ],
+      [
+        0.018,
+        0.0002
+      ],
+      [
+        0.027,
+        0.0002
+      ],
+      [
+        0.036,
+        0.0002
+      ],
+      [
+        0.045,
+        0.0002
+      ],
+      [
+        0.048,
+        0.004
+      ],
+      [
+        0.053,
+        0.0075
+      ],
+      [
+        0.058,
+        0.011
+      ],
+      [
+        0.063,
+        0.0145
+      ],
+      [
+        0.068,
+        0.018
+      ],
+      [
+        0.0709,
+        0.018
+      ],
+      [
+        0.07,
+        0.013
+      ],
+      [
+        0.0709,
+        0.008
+      ],
+      [
+        0.0728,
+        0.003
+      ],
+      [
+        0.074,
+        -0.002
+      ],
+      [
+        0.0733,
+        -0.007
+      ],
+      [
+        0.0714,
+        -0.012
+      ],
+      [
+        0.0701,
+        -0.017
+      ],
+      [
+        0.074,
+        -0.018
+      ],
+      [
+        0.074,
+        -0.012
+      ],
+      [
+        0.074,
+        -0.006
+      ],
+      [
+        0.074,
+        0
+      ],
+      [
+        0.074,
+        0.006
+      ],
+      [
+        0.074,
+        0.012
+      ],
+      [
+        0.074,
+        0.018
+      ],
+      [
+        0.075,
+        0.016
+      ],
+      [
+        0.075,
+        0.01
+      ],
+      [
+        0.075,
+        0.004
+      ],
+      [
+        0.075,
+        -0.002
+      ],
+      [
+        0.075,
+        -0.008
+      ]
+    ],
+    "audioType": "rifle",
+    "killReward": 300,
+    "color": "#2c3e50"
   },
-  sg553: {
-    id: 'sg553',
-    name: 'SG 553',
-    category: 'rifles',
-    slot: 1,
-    team: 'T',
-    cost: 3000,
-    clip: 30,
-    reserve: 90,
-    damage: 30,
-    armorPen: 1.00,
-    fireRate: 0.11,
-    spread: 0.012,
-    recoil: 0.035,
-    audioType: 'rifle',
-    killReward: 300,
-    canScope: true,
-    modelPath: null,
-    color: '#d35400'
+  "sg553": {
+    "id": "sg553",
+    "name": "SG 553",
+    "category": "rifles",
+    "slot": 1,
+    "team": "T",
+    "cost": 3000,
+    "clip": 30,
+    "reserve": 90,
+    "damage": 30,
+    "armorPen": 1,
+    "fireRate": 0.11,
+    "spread": 0.008,
+    "recoil": 0.028,
+    "reloadTime": 3.4,
+    "isAuto": true,
+    "hasScope": true,
+    "pellets": 1,
+    "recoilPattern": [
+      [
+        0.012,
+        0.0005
+      ],
+      [
+        0.024,
+        0.0005
+      ],
+      [
+        0.036,
+        0.0005
+      ],
+      [
+        0.048,
+        0.0005
+      ],
+      [
+        0.06,
+        0.0005
+      ],
+      [
+        0.065,
+        0.005
+      ],
+      [
+        0.071,
+        0.01
+      ],
+      [
+        0.077,
+        0.015
+      ],
+      [
+        0.083,
+        0.02
+      ],
+      [
+        0.089,
+        0.025
+      ],
+      [
+        0.0934,
+        0.025
+      ],
+      [
+        0.092,
+        0.018
+      ],
+      [
+        0.0934,
+        0.011
+      ],
+      [
+        0.0963,
+        0.004
+      ],
+      [
+        0.098,
+        -0.003
+      ],
+      [
+        0.097,
+        -0.01
+      ],
+      [
+        0.0941,
+        -0.017
+      ],
+      [
+        0.0921,
+        -0.024
+      ],
+      [
+        0.098,
+        -0.028
+      ],
+      [
+        0.099,
+        -0.02
+      ],
+      [
+        0.0972,
+        -0.012
+      ],
+      [
+        0.0944,
+        -0.004
+      ],
+      [
+        0.093,
+        0.004
+      ],
+      [
+        0.0944,
+        0.012
+      ],
+      [
+        0.0973,
+        0.02
+      ],
+      [
+        0.098,
+        0.022
+      ],
+      [
+        0.098,
+        0.014
+      ],
+      [
+        0.098,
+        0.006
+      ],
+      [
+        0.098,
+        -0.002
+      ],
+      [
+        0.098,
+        -0.01
+      ]
+    ],
+    "audioType": "rifle",
+    "killReward": 300,
+    "color": "#d35400"
   },
-  scar20: {
-    id: 'scar20',
-    name: 'SCAR-20',
-    category: 'rifles',
-    slot: 1,
-    team: 'CT',
-    cost: 5000,
-    clip: 20,
-    reserve: 90,
-    damage: 80,
-    armorPen: 0.82,
-    fireRate: 0.25,
-    spread: 0.005,
-    recoil: 0.045,
-    audioType: 'sniper',
-    killReward: 300,
-    canScope: true,
-    modelPath: null,
-    color: '#2c3e50'
+  "scar20": {
+    "id": "scar20",
+    "name": "SCAR-20",
+    "category": "rifles",
+    "slot": 1,
+    "team": "CT",
+    "cost": 5000,
+    "clip": 20,
+    "reserve": 90,
+    "damage": 80,
+    "armorPen": 0.82,
+    "fireRate": 0.25,
+    "spread": 0.005,
+    "recoil": 0.04,
+    "reloadTime": 3.1,
+    "isAuto": true,
+    "hasScope": true,
+    "pellets": 1,
+    "recoilPattern": null,
+    "audioType": "sniper",
+    "killReward": 300,
+    "color": "#2980b9"
   },
-  g3sg1: {
-    id: 'g3sg1',
-    name: 'G3SG1',
-    category: 'rifles',
-    slot: 1,
-    team: 'T',
-    cost: 5000,
-    clip: 20,
-    reserve: 90,
-    damage: 80,
-    armorPen: 0.82,
-    fireRate: 0.25,
-    spread: 0.005,
-    recoil: 0.045,
-    audioType: 'sniper',
-    killReward: 300,
-    canScope: true,
-    modelPath: null,
-    color: '#c0392b'
+  "g3sg1": {
+    "id": "g3sg1",
+    "name": "G3SG1",
+    "category": "rifles",
+    "slot": 1,
+    "team": "T",
+    "cost": 5000,
+    "clip": 20,
+    "reserve": 90,
+    "damage": 80,
+    "armorPen": 0.82,
+    "fireRate": 0.25,
+    "spread": 0.005,
+    "recoil": 0.04,
+    "reloadTime": 4.65,
+    "isAuto": true,
+    "hasScope": true,
+    "pellets": 1,
+    "recoilPattern": null,
+    "audioType": "sniper",
+    "killReward": 300,
+    "color": "#c0392b"
   },
-
-  // ==================== GEAR & EQUIPMENT ====================
-  kevlar: {
-    id: 'kevlar',
-    name: 'Kevlar Vest',
-    category: 'equipment',
-    team: 'ANY',
-    cost: 650,
-    type: 'armor'
+  "kevlar": {
+    "id": "kevlar",
+    "name": "Kevlar Vest",
+    "category": "equipment",
+    "slot": null,
+    "team": "ANY",
+    "cost": 650,
+    "type": "armor",
+    "armorValue": 100
   },
-  helmet: {
-    id: 'helmet',
-    name: 'Kevlar + Helmet',
-    category: 'equipment',
-    team: 'ANY',
-    cost: 1000,
-    type: 'helmet'
+  "helmet": {
+    "id": "helmet",
+    "name": "Kevlar + Helmet",
+    "category": "equipment",
+    "slot": null,
+    "team": "ANY",
+    "cost": 1000,
+    "type": "helmet",
+    "armorValue": 100,
+    "hasHelmet": true
   },
-  defuser: {
-    id: 'defuser',
-    name: 'Defuse Kit',
-    category: 'equipment',
-    team: 'CT',
-    cost: 400,
-    type: 'kit'
+  "defuser": {
+    "id": "defuser",
+    "name": "Defuse Kit",
+    "category": "equipment",
+    "slot": null,
+    "team": "CT",
+    "cost": 400,
+    "type": "defuser"
   },
-  hegrenade: {
-    id: 'hegrenade',
-    name: 'HE Grenade',
-    category: 'equipment',
-    slot: 4,
-    team: 'ANY',
-    cost: 300,
-    type: 'grenade'
+  "hegrenade": {
+    "id": "hegrenade",
+    "name": "High Explosive Grenade",
+    "category": "equipment",
+    "slot": 4,
+    "team": "ANY",
+    "cost": 300,
+    "type": "grenade",
+    "damage": 98,
+    "radius": 8,
+    "fuseTime": 1.8
   },
-  flashbang: {
-    id: 'flashbang',
-    name: 'Flashbang',
-    category: 'equipment',
-    slot: 4,
-    team: 'ANY',
-    cost: 200,
-    type: 'grenade'
+  "flashbang": {
+    "id": "flashbang",
+    "name": "Flashbang",
+    "category": "equipment",
+    "slot": 4,
+    "team": "ANY",
+    "cost": 200,
+    "type": "grenade",
+    "radius": 15,
+    "fuseTime": 1.5
   },
-  smokegrenade: {
-    id: 'smokegrenade',
-    name: 'Smoke Grenade',
-    category: 'equipment',
-    slot: 4,
-    team: 'ANY',
-    cost: 300,
-    type: 'grenade'
+  "smokegrenade": {
+    "id": "smokegrenade",
+    "name": "Smoke Grenade",
+    "category": "equipment",
+    "slot": 4,
+    "team": "ANY",
+    "cost": 300,
+    "type": "grenade",
+    "duration": 18,
+    "radius": 5.5,
+    "fuseTime": 1.5
   },
-  molotov: {
-    id: 'molotov',
-    name: 'Molotov / Incendiary',
-    category: 'equipment',
-    slot: 4,
-    team: 'ANY',
-    cost: 400,
-    type: 'grenade'
+  "molotov": {
+    "id": "molotov",
+    "name": "Molotov / Incendiary",
+    "category": "equipment",
+    "slot": 4,
+    "team": "ANY",
+    "cost": 400,
+    "type": "grenade",
+    "damage": 40,
+    "duration": 7,
+    "radius": 4.5,
+    "fuseTime": 1.5
   },
-
-  // ==================== DEFAULT GEAR ====================
-  knife: {
-    id: 'knife',
-    name: 'Default Knife',
-    category: 'melee',
-    slot: 3,
-    team: 'ANY',
-    cost: 0,
-    damage: 55,
-    fireRate: 0.4,
-    killReward: 1500,
-    audioType: 'knife',
-    color: '#444444'
+  "knife": {
+    "id": "knife",
+    "name": "Default Knife",
+    "category": "melee",
+    "slot": 3,
+    "team": "ANY",
+    "cost": 0,
+    "damage": 55,
+    "fireRate": 0.4,
+    "killReward": 1500,
+    "audioType": "knife",
+    "color": "#444444"
   },
-  c4: {
-    id: 'c4',
-    name: 'C4 Explosive',
-    category: 'c4',
-    slot: 5,
-    team: 'T',
-    cost: 0,
-    plantTime: 3.2,
-    fuseTime: 40.0,
-    modelPath: 'source/C4.glb'
+  "c4": {
+    "id": "c4",
+    "name": "C4 Explosive",
+    "category": "c4",
+    "slot": 5,
+    "team": "T",
+    "cost": 0,
+    "plantTime": 3.2,
+    "fuseTime": 40
   }
 };

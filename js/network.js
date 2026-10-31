@@ -12,6 +12,34 @@ class CS2NetworkManager {
     this.remotePlayers = {}; // id -> { mesh, data, team, pos, lastPos, lastStepTime }
     this.isConnected = false;
     this.gltfLoader = typeof THREE.GLTFLoader !== 'undefined' ? new THREE.GLTFLoader() : null;
+    this.ctModel = null;
+    this.tModel = null;
+
+    if (this.gltfLoader) {
+      // 1. Counter-Terrorist: Genuine CS2 SAS Operator Model
+      this.gltfLoader.load('ctm_sas__cs2_agent_model.glb', (gltf) => {
+        this.ctModel = gltf.scene;
+        console.log('Authentic CS2 CT (SAS) agent loaded successfully');
+        Object.values(this.remotePlayers).forEach(p => {
+          if (p && p.mesh && p.team === 'CT' && !p.hasAuthenticModel) {
+            this.applyAuthenticModel(p.mesh, 'CT');
+            p.hasAuthenticModel = true;
+          }
+        });
+      }, undefined, (e) => console.warn('CT model load note:', e));
+
+      // 2. Terrorist: Genuine CS:GO/CS2 Phoenix Operator Model
+      this.gltfLoader.load('tm_phoenix_v2-_csgo_terrorist_characters.glb', (gltf) => {
+        this.tModel = gltf.scene;
+        console.log('Authentic CS T (Phoenix) agent loaded successfully');
+        Object.values(this.remotePlayers).forEach(p => {
+          if (p && p.mesh && p.team === 'T' && !p.hasAuthenticModel) {
+            this.applyAuthenticModel(p.mesh, 'T');
+            p.hasAuthenticModel = true;
+          }
+        });
+      }, undefined, (e) => console.warn('T model load note:', e));
+    }
   }
 
   generateRoomCode() {
@@ -406,15 +434,19 @@ class CS2NetworkManager {
 
     const inMatch = this.gm.playerInMatch !== false && this.gm.phase !== 'unselected';
 
+    const callsign = player.name || window.cs2PlayerCallsign || (player.team === 'CT' ? 'SAS OPERATOR' : 'PHOENIX CELL');
+
     const packet = {
       type: 'player_update',
       id: this.peer.id,
+      name: callsign,
       team: player.team,
       pos: { x: player.position.x, y: player.position.y, z: player.position.z },
       yaw: player.yaw,
       pitch: player.pitch,
       health: player.health.get(),
       weapon: player.activeWeapon ? player.activeWeapon.id : 'knife',
+      hasC4: !!player.inventory[5],
       isCrouched: player.isCrouched,
       inMatch: inMatch
     };
@@ -429,240 +461,66 @@ class CS2NetworkManager {
   createTacticalCharacterModel(team) {
     const group = new THREE.Group();
 
-    // 1. Full-Body Hitbox Cylinder (Scaled for +20cm taller authentic player model)
-    const hitboxGeo = new THREE.CylinderGeometry(0.58, 0.58, 2.55, 12);
+    // 1. Full-Body Hitbox Cylinder for authentic hit detection
+    const hitboxGeo = new THREE.CylinderGeometry(0.52, 0.52, 2.0, 12);
     const hitboxMat = new THREE.MeshBasicMaterial({ visible: false });
     const hitbox = new THREE.Mesh(hitboxGeo, hitboxMat);
-    hitbox.position.y = 1.275;
+    hitbox.position.y = 1.0;
     hitbox.name = 'hitbox';
     group.add(hitbox);
 
-    // Scale character visual mesh by 1.12 (+20cm height from 1.80m to 2.02m)
-    group.scale.set(1.45, 1.45, 1.45);
+    // 2. Nametag Billboard above head
+    const nameCanvas = document.createElement('canvas');
+    nameCanvas.width = 256;
+    nameCanvas.height = 64;
+    const ctx = nameCanvas.getContext('2d');
+    ctx.fillStyle = (team === 'CT') ? '#44aaff' : '#ffaa33';
+    ctx.font = 'bold 36px Rajdhani, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('OPERATOR', 128, 44);
+    const nameTex = new THREE.CanvasTexture(nameCanvas);
+    const namePlane = new THREE.Mesh(
+      new THREE.PlaneGeometry(1.4, 0.35),
+      new THREE.MeshBasicMaterial({ map: nameTex, transparent: true, side: THREE.DoubleSide })
+    );
+    namePlane.position.set(0, 2.15, 0);
+    group.add(namePlane);
+    group.nameTagMesh = namePlane;
+    group.nameCanvas = nameCanvas;
 
-    const texLoader = new THREE.TextureLoader();
-
-    // Palette & Textures
-    const isCT = (team === 'CT');
-    const pantsColor = isCT ? 0x182432 : 0x4a4235; // CT Navy vs Phoenix Tan/Brown cargo
-    const shirtColor = isCT ? 0x1d2e42 : 0x6e5239; // CT SAS Jacket vs Phoenix Flight Jacket
-    const vestColor  = isCT ? 0x141a22 : 0x362e24; // Kevlar tactical vest
-    const bootColor  = 0x111317;
-
-    const pantsMat = new THREE.MeshLambertMaterial({ color: pantsColor });
-    const shirtMat = new THREE.MeshLambertMaterial({ color: shirtColor });
-    const vestMat  = new THREE.MeshLambertMaterial({ color: vestColor });
-    const bootMat  = new THREE.MeshLambertMaterial({ color: bootColor });
-    const gloveMat = new THREE.MeshLambertMaterial({ color: 0x16181c });
-
-    if (isCT) {
-      texLoader.load('textures/armor_diffuse_color_psd_25fc1cb_2.png', (tex) => {
-        vestMat.map = tex;
-        vestMat.needsUpdate = true;
-      }, undefined, () => {});
+    // 3. Attach authentic CS character mesh (CT = SAS agent, T = Phoenix agent)
+    this.applyAuthenticModel(group, team);
+    if ((team === 'CT' && this.ctModel) || (team === 'T' && this.tModel)) {
+      group.hasAuthenticModel = true;
     }
-
-    // Left Leg Anchor & Mesh
-    const leftLegGroup = new THREE.Group();
-    leftLegGroup.position.set(-0.16, 0.90, 0);
-    const lLegUpper = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.08, 0.45, 6), pantsMat);
-    lLegUpper.position.y = -0.225;
-    leftLegGroup.add(lLegUpper);
-    const lLegLower = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.07, 0.45, 6), pantsMat);
-    lLegLower.position.y = -0.65;
-    leftLegGroup.add(lLegLower);
-    const lBoot = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, 0.22), bootMat);
-    lBoot.position.set(0, -0.84, 0.04);
-    leftLegGroup.add(lBoot);
-    group.add(leftLegGroup);
-
-    // Right Leg Anchor & Mesh
-    const rightLegGroup = new THREE.Group();
-    rightLegGroup.position.set(0.16, 0.90, 0);
-    const rLegUpper = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.08, 0.45, 6), pantsMat);
-    rLegUpper.position.y = -0.225;
-    rightLegGroup.add(rLegUpper);
-    const rLegLower = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.07, 0.45, 6), pantsMat);
-    rLegLower.position.y = -0.65;
-    rightLegGroup.add(rLegLower);
-    const rBoot = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, 0.22), bootMat);
-    rBoot.position.set(0, -0.84, 0.04);
-    rightLegGroup.add(rBoot);
-    group.add(rightLegGroup);
-
-    // Torso Group (Hips anchor at Y=0.95, pivots for pitch aiming)
-    const torsoGroup = new THREE.Group();
-    torsoGroup.position.set(0, 0.95, 0);
-
-    // Combat Shirt / Jacket Torso
-    const torsoMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.20, 0.62, 6), shirtMat);
-    torsoMesh.position.y = 0.31;
-    torsoGroup.add(torsoMesh);
-
-    // Kevlar Tactical Assault Vest
-    const vestMesh = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.48, 0.32), vestMat);
-    vestMesh.position.y = 0.33;
-    torsoGroup.add(vestMesh);
-
-    // Molle / Ammo pouches on vest
-    const pouchColor = isCT ? 0x1c242c : 0x7c6448;
-    const pouchMat = new THREE.MeshLambertMaterial({ color: pouchColor });
-    for (let pIdx = -1; pIdx <= 1; pIdx++) {
-      const pouch = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.14, 0.08), pouchMat);
-      pouch.position.set(pIdx * 0.12, 0.22, 0.18);
-      torsoGroup.add(pouch);
-    }
-
-    // Head & Helmet / Balaclava
-    const headGroup = new THREE.Group();
-    headGroup.position.set(0, 0.68, 0);
-
-    if (isCT) {
-      // SAS CT: Tactical Balaclava & Ballistic Helmet with Visor
-      const maskMat = new THREE.MeshLambertMaterial({ color: 0x161c24 });
-      const mask = new THREE.Mesh(new THREE.SphereGeometry(0.16, 8, 8), maskMat);
-      headGroup.add(mask);
-
-      const helmetMat = new THREE.MeshLambertMaterial({ color: 0x1f2936 });
-      texLoader.load('textures/helmet_diffuse_color_psd_aaf82f80_5.png', (tex) => {
-        helmetMat.map = tex;
-        helmetMat.needsUpdate = true;
-      }, undefined, () => {});
-      const helmet = new THREE.Mesh(new THREE.SphereGeometry(0.18, 8, 8), helmetMat);
-      helmet.scale.set(1.05, 0.95, 1.1);
-      helmet.position.set(0, 0.05, -0.02);
-      headGroup.add(helmet);
-
-      const visor = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.08, 0.10), new THREE.MeshStandardMaterial({ color: 0x05070a, roughness: 0.1, metalness: 0.8 }));
-      visor.position.set(0, 0.02, 0.13);
-      headGroup.add(visor);
-    } else {
-      // Phoenix Connexion Terrorist: Desert Off-White Balaclava
-      const maskMat = new THREE.MeshLambertMaterial({ color: 0xd6cbb8 });
-      const mask = new THREE.Mesh(new THREE.SphereGeometry(0.17, 8, 8), maskMat);
-      headGroup.add(mask);
-
-      const eyeSlit = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.05, 0.06), new THREE.MeshBasicMaterial({ color: 0x111111 }));
-      eyeSlit.position.set(0, 0.03, 0.145);
-      headGroup.add(eyeSlit);
-
-      const collar = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.18, 0.12, 8), new THREE.MeshLambertMaterial({ color: 0x483a2a }));
-      collar.position.set(0, -0.10, 0);
-      headGroup.add(collar);
-    }
-    torsoGroup.add(headGroup);
-
-    // Left Arm Group
-    const leftArmGroup = new THREE.Group();
-    leftArmGroup.position.set(-0.28, 0.50, 0);
-    const lUpperArm = new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.055, 0.32, 6), shirtMat);
-    lUpperArm.position.set(0.06, -0.12, 0.08);
-    lUpperArm.rotation.set(Math.PI / 4, 0, -0.2);
-    leftArmGroup.add(lUpperArm);
-    const lForearm = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.05, 0.32, 6), shirtMat);
-    lForearm.position.set(0.14, -0.20, 0.26);
-    lForearm.rotation.set(Math.PI / 3, 0, -0.5);
-    leftArmGroup.add(lForearm);
-    const lGlove = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.05, 0.08), gloveMat);
-    lGlove.position.set(0.20, -0.24, 0.38);
-    leftArmGroup.add(lGlove);
-    torsoGroup.add(leftArmGroup);
-
-    // Right Arm Group
-    const rightArmGroup = new THREE.Group();
-    rightArmGroup.position.set(0.28, 0.50, 0);
-    const rUpperArm = new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.055, 0.32, 6), shirtMat);
-    rUpperArm.position.set(-0.06, -0.12, 0.08);
-    rUpperArm.rotation.set(Math.PI / 4, 0, 0.2);
-    rightArmGroup.add(rUpperArm);
-    const rForearm = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.05, 0.32, 6), shirtMat);
-    rForearm.position.set(-0.08, -0.20, 0.26);
-    rForearm.rotation.set(Math.PI / 3.5, 0, 0.35);
-    rightArmGroup.add(rForearm);
-    const rGlove = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.05, 0.08), gloveMat);
-    rGlove.position.set(-0.10, -0.24, 0.38);
-    rightArmGroup.add(rGlove);
-    torsoGroup.add(rightArmGroup);
-
-    // Operator Weapon Model (Real FBX mesh if available, else textured box)
-    const weaponGroup = new THREE.Group();
-    weaponGroup.position.set(0.08, 0.28, 0.38);
-
-    // Try to use real FBX mesh from player's weapon cache
-    let usedRealModel = false;
-    if (window.csGameManager && window.csGameManager.player &&
-        window.csGameManager.player.weaponModelsLoaded &&
-        window.csGameManager.player.weaponMeshCache) {
-      const meshName = isCT ? 'w_rif_m4a1' : 'w_rif_ak47';
-      const cached = window.csGameManager.player.weaponMeshCache[meshName];
-      if (cached) {
-        const clone = cached.clone(true);
-        const texFile = isCT ? 'w_rif_m4a1.png' : 'w_rif_ak47.png';
-        const tex = new THREE.TextureLoader().load('models/' + texFile);
-        clone.traverse((child) => {
-          if (child.isMesh) {
-            child.material = new THREE.MeshLambertMaterial({ map: tex, side: THREE.DoubleSide });
-          }
-        });
-        if (clone.isMesh) {
-          clone.material = new THREE.MeshLambertMaterial({ map: tex, side: THREE.DoubleSide });
-        }
-        clone.scale.set(0.0018, 0.0018, 0.0018);
-        clone.rotation.y = Math.PI;
-        weaponGroup.add(clone);
-        usedRealModel = true;
-      }
-    }
-
-    if (!usedRealModel) {
-      const weaponTex = isCT ? texLoader.load('models/w_rif_m4a1.png') : texLoader.load('models/w_rif_ak47.png');
-      const gunMat = new THREE.MeshLambertMaterial({ map: weaponTex });
-
-      const gunBody = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.09, 0.55), gunMat);
-      weaponGroup.add(gunBody);
-      const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.016, 0.35, 6), gunMat);
-      barrel.rotation.x = Math.PI / 2;
-      barrel.position.set(0, 0.02, 0.38);
-      weaponGroup.add(barrel);
-
-      const stock = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.12, 0.26), gunMat);
-      stock.position.set(0, -0.04, -0.32);
-      weaponGroup.add(stock);
-
-      const mag = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.20, 0.08), gunMat);
-      mag.rotation.x = -0.3;
-      mag.position.set(0, -0.12, 0.08);
-      weaponGroup.add(mag);
-    }
-
-    // Muzzle Flash Mesh & Light
-    const flashGeo = new THREE.SphereGeometry(0.09, 8, 8);
-    const flashMat = new THREE.MeshBasicMaterial({ color: 0xffcc33 });
-    const muzzleFlash = new THREE.Mesh(flashGeo, flashMat);
-    muzzleFlash.position.set(0, 0.02, 0.58);
-    muzzleFlash.visible = false;
-    weaponGroup.add(muzzleFlash);
-
-    const muzzleLight = new THREE.PointLight(0xffaa22, 0, 8);
-    muzzleLight.position.set(0, 0.02, 0.58);
-    weaponGroup.add(muzzleLight);
-
-    torsoGroup.add(weaponGroup);
-    group.add(torsoGroup);
-
-    group.rig = {
-      leftLeg: leftLegGroup,
-      rightLeg: rightLegGroup,
-      torso: torsoGroup,
-      head: headGroup,
-      leftArm: leftArmGroup,
-      rightArm: rightArmGroup,
-      weapon: weaponGroup,
-      muzzleFlash: muzzleFlash,
-      muzzleLight: muzzleLight
-    };
 
     return group;
+  }
+
+  applyAuthenticModel(group, team) {
+    const srcModel = (team === 'T') ? this.tModel : this.ctModel;
+    if (!srcModel) return;
+
+    if (group.characterMesh) {
+      group.remove(group.characterMesh);
+      group.characterMesh = null;
+    }
+
+    const clone = (typeof THREE.SkeletonUtils !== 'undefined' && THREE.SkeletonUtils.clone)
+      ? THREE.SkeletonUtils.clone(srcModel)
+      : srcModel.clone(true);
+
+    if (team === 'T') {
+      // Phoenix model natural height 78 units -> 1.95m
+      clone.scale.set(0.025, 0.025, 0.025);
+    } else {
+      // SAS model natural height 2.0m
+      clone.scale.set(1.0, 1.0, 1.0);
+    }
+    clone.position.set(0, 0, 0);
+
+    group.add(clone);
+    group.characterMesh = clone;
   }
 
   removeRemotePlayer(id) {
@@ -710,6 +568,7 @@ class CS2NetworkManager {
         rig: model.rig,
         data: data,
         team: data.team,
+        name: data.name || `Operator_${id.substring(0, 5)}`,
         pos: data.pos,
         lastPos: null,
         walkCycle: 0,
@@ -718,17 +577,38 @@ class CS2NetworkManager {
     }
 
     const p = this.remotePlayers[id];
+    if (data.name && data.name !== p.name) {
+      p.name = data.name;
+      if (p.mesh && p.mesh.nameCanvas && p.mesh.nameTagMesh) {
+        const ctx = p.mesh.nameCanvas.getContext('2d');
+        ctx.clearRect(0, 0, 256, 64);
+        ctx.fillStyle = (data.team === 'CT') ? '#44aaff' : '#ffaa33';
+        ctx.font = 'bold 36px Rajdhani, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(data.name, 128, 44);
+        if (p.mesh.nameTagMesh.material.map) p.mesh.nameTagMesh.material.map.needsUpdate = true;
+      }
+    }
     p.data = data;
     p.pos = data.pos;
     p.team = data.team;
-    p.mesh.position.set(data.pos.x, data.pos.y - 2.0, data.pos.z);
-    p.mesh.rotation.y = data.yaw + Math.PI; // Correct 180deg alignment so operator faces where they are looking
+    p.mesh.position.set(data.pos.x, data.pos.y - 1.75, data.pos.z);
+    p.mesh.rotation.y = data.yaw; // Operator faces forward towards their look direction
     p.mesh.visible = (data.inMatch !== false && data.health > 0);
     p.lastSeen = performance.now();
 
     const now = performance.now();
     const dt = p.lastTime ? Math.max(0.001, Math.min(0.1, (now - p.lastTime) / 1000)) : 0.016;
     p.lastTime = now;
+
+    // Movement & Footstep Audio Sync for remote operators
+    if (p.lastPos) {
+      const distMoved = Math.hypot(data.pos.x - p.lastPos.x, data.pos.z - p.lastPos.z);
+      if (distMoved > 0.10 && now - p.lastStepTime > 340) {
+        p.lastStepTime = now;
+        window.csAudio.playFootstep();
+      }
+    }
 
     if (p.rig) {
       // Stance: Crouch vs Standing

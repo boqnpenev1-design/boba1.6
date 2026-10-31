@@ -179,16 +179,12 @@ class CS2GameManager {
     wireY.rotation.z = Math.PI / 3.2;
     group.add(wireY);
 
-    // Highly Visible Blinking LED Indicator & Point Light
+    // Highly Visible Blinking LED Indicator (Emissive basic material, zero PointLight overhead)
     const ledGeo = new THREE.SphereGeometry(0.045, 8, 8);
     this.c4LedMat = new THREE.MeshBasicMaterial({ color: 0xff0000 });
     const led = new THREE.Mesh(ledGeo, this.c4LedMat);
     led.position.set(0.10, 0.26, -0.06);
     group.add(led);
-
-    this.c4Light = new THREE.PointLight(0xff0000, 0, 10);
-    this.c4Light.position.set(0.10, 0.35, -0.06);
-    group.add(this.c4Light);
 
     this.c4Mesh = group;
     this.c4Mesh.visible = false;
@@ -306,6 +302,21 @@ class CS2GameManager {
         this.player.inventory[5] = CS2_WEAPONS.c4;
       }
       this.player.switchSlot(2);
+    }
+
+    // Ensure Terrorist team has a C4 bomb allocated every round
+    if (this.player.team === 'T') {
+      let remoteTHasC4 = false;
+      if (this.net && this.net.remotePlayers) {
+        Object.values(this.net.remotePlayers).forEach(rp => {
+          if (rp && rp.team === 'T' && rp.hasC4) remoteTHasC4 = true;
+        });
+      }
+      if (!remoteTHasC4) {
+        this.player.inventory[5] = CS2_WEAPONS.c4;
+      }
+    } else {
+      this.player.inventory[5] = null;
     }
 
     // Spawn player immediately at authentic CS spawn point
@@ -553,10 +564,6 @@ class CS2GameManager {
     ring.position.y = 0.25;
     expGroup.add(ring);
 
-    const expLight = new THREE.PointLight(0xff7711, 28, 70);
-    expLight.position.set(0, 3, 0);
-    expGroup.add(expLight);
-
     this.scene.add(expGroup);
 
     // Camera screen shake based on blast proximity
@@ -632,13 +639,21 @@ class CS2GameManager {
   }
 
   handleObjectives(dt) {
-    if (this.phase !== 'live' || this.player.isSpectating) return;
+    if (this.phase !== 'live' || this.player.isSpectating) {
+      this.player.isPlanting = false;
+      this.player.isDefusing = false;
+      return;
+    }
 
     const actionPrompt = document.getElementById('action-prompt');
     const promptText = document.getElementById('action-prompt-text');
     const progressTrack = document.getElementById('interaction-bar-container');
     const progressFill = document.getElementById('interaction-progress-fill');
     const progressTitle = document.getElementById('interaction-title');
+
+    // Default to not planting/defusing each frame unless holding [E] inside active objective
+    this.player.isPlanting = false;
+    this.player.isDefusing = false;
 
     // T planting C4
     if (this.player.team === 'T' && !this.c4Planted && this.player.inventory[5]) {
@@ -647,9 +662,22 @@ class CS2GameManager {
       const playerFeetY = this.player.position.y - this.player.playerHeight;
       for (let i = 0; i < this.mapBuilder.bombZones.length; i++) {
         const site = this.mapBuilder.bombZones[i];
-        const dist = Math.hypot(this.player.position.x - site.x, this.player.position.z - site.z);
-        const dy = Math.abs(playerFeetY - (site.y || 0));
-        if (dist <= site.radius && dy < 2.0) {
+        let inside = false;
+        if (site.bounds) {
+          const b = site.bounds;
+          if (this.player.position.x >= b.minX && this.player.position.x <= b.maxX &&
+              this.player.position.z >= b.minZ && this.player.position.z <= b.maxZ &&
+              playerFeetY >= b.minY && playerFeetY <= b.maxY) {
+            inside = true;
+          }
+        } else {
+          const dist = Math.hypot(this.player.position.x - site.x, this.player.position.z - site.z);
+          const dy = Math.abs(playerFeetY - (site.y || 0));
+          if (dist <= site.radius && dy < 2.5) {
+            inside = true;
+          }
+        }
+        if (inside) {
           inSite = site.id;
           siteY = site.y || 0.1;
           break;
@@ -665,7 +693,7 @@ class CS2GameManager {
           this.player.plantProgress += dt / 3.2;
           progressTrack.classList.remove('hidden');
           progressTitle.innerText = `ARMING C4 ON SITE ${inSite}...`;
-          progressFill.style.width = `${Math.min(100, this.player.plantProgress * 100)}%`;
+          progressFill.style.width = `${Math.min(100, Math.round(this.player.plantProgress * 100))}%`;
 
           const nowMs = performance.now();
           if (nowMs - (this.lastPlantBeepTime || 0) > 340) {
@@ -693,12 +721,16 @@ class CS2GameManager {
           }
           return;
         } else {
+          this.player.isPlanting = false;
           this.player.plantProgress = 0;
           progressTrack.classList.add('hidden');
         }
       } else {
+        this.player.isPlanting = false;
+        this.player.plantProgress = 0;
         if (promptText && promptText.innerText.includes('PLANT')) {
           actionPrompt.classList.add('hidden');
+          progressTrack.classList.add('hidden');
         }
       }
     } else if (this.c4Planted) {
@@ -721,7 +753,7 @@ class CS2GameManager {
           this.player.defuseProgress += dt / defuseDuration;
           progressTrack.classList.remove('hidden');
           progressTitle.innerText = 'DEFUSING EXPLOSIVE...';
-          progressFill.style.width = `${Math.min(100, this.player.defuseProgress * 100)}%`;
+          progressFill.style.width = `${Math.min(100, Math.round(this.player.defuseProgress * 100))}%`;
 
           const nowMs = performance.now();
           if (nowMs - (this.lastDefuseAudioTime || 0) > 800) {
@@ -746,11 +778,17 @@ class CS2GameManager {
           }
           return;
         } else {
+          this.player.isDefusing = false;
           this.player.defuseProgress = 0;
           progressTrack.classList.add('hidden');
         }
       } else {
-        actionPrompt.classList.add('hidden');
+        this.player.isDefusing = false;
+        this.player.defuseProgress = 0;
+        if (promptText && promptText.innerText.includes('DEFUSE')) {
+          actionPrompt.classList.add('hidden');
+          progressTrack.classList.add('hidden');
+        }
       }
     }
   }
@@ -815,7 +853,7 @@ class CS2GameManager {
 
       ctx.fillStyle = 'rgba(235, 65, 45, 0.45)';
       ctx.beginPath();
-      ctx.arc(pt.x, pt.y, site.radius * cScale * 0.7, 0, Math.PI * 2);
+      ctx.arc(pt.x, pt.y, site.radius * cScale * 0.88, 0, Math.PI * 2);
       ctx.fill();
 
       ctx.strokeStyle = '#eb412d';
@@ -937,10 +975,8 @@ class CS2GameManager {
           window.csAudio.playC4Beep(urgency);
 
           if (this.c4LedMat) this.c4LedMat.color.set(0xffffff);
-          if (this.c4Light) this.c4Light.intensity = 3.5;
           setTimeout(() => {
             if (this.c4LedMat) this.c4LedMat.color.set(0xff0000);
-            if (this.c4Light) this.c4Light.intensity = 0;
           }, 70);
         }
 
@@ -950,7 +986,6 @@ class CS2GameManager {
             : this.c4Mesh.position.clone();
           this.c4Planted = false;
           this.c4Mesh.visible = false;
-          if (this.c4Light) this.c4Light.intensity = 0;
           window.csAudio.playExplosion();
 
           // Spawn authentic fireball animation & shockwave
@@ -1005,6 +1040,11 @@ class CS2GameManager {
 
     // Check for team elimination (All enemies killed)
     this.checkRoundElimination();
+
+    // Void Boundary Safeguard (Terrain edge fall prevention)
+    if (this.player && this.player.position && this.player.position.y < -20.0) {
+      this.player.takeDamage(500, 'Void Boundary', 'world');
+    }
 
     this.player.update(dt, currentTime, this);
     this.handleObjectives(dt);

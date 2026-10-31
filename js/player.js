@@ -151,21 +151,22 @@ class CS2Player {
     this.recoilPitch = 0;
     this.recoilYaw = 0;
 
-    // Viewmodel Rig (weapons lit naturally by scene hemisphere & sun lights)
+    // Viewmodel Rig (weapons brightly lit with dedicated ambient light)
     this.viewmodelGroup = new THREE.Group();
     this.camera.add(this.viewmodelGroup);
     this.weaponRig = new THREE.Group();
     this.viewmodelGroup.add(this.weaponRig);
 
+    // Dedicated viewmodel light (Zero PointLight overhead, uniform 95% brightness)
+    const vmLight = new THREE.AmbientLight(0xffffff, 0.95);
+    this.viewmodelGroup.add(vmLight);
+
     // Muzzle Flash (Subtle realistic muzzle spark, zero screen-blocking circle)
-    this.muzzleLight = new THREE.PointLight(0xffaa33, 0, 8);
-    this.muzzleLight.position.set(0.16, -0.12, -0.65);
     const flashGeo = new THREE.SphereGeometry(0.010, 8, 8);
     const flashMat = new THREE.MeshBasicMaterial({ color: 0xffcc33 });
     this.muzzleFlashMesh = new THREE.Mesh(flashGeo, flashMat);
     this.muzzleFlashMesh.position.set(0.16, -0.12, -0.65);
     this.muzzleFlashMesh.visible = false;
-    this.viewmodelGroup.add(this.muzzleLight);
     this.viewmodelGroup.add(this.muzzleFlashMesh);
 
     this.initControls();
@@ -186,15 +187,16 @@ class CS2Player {
     ];
     const loader = new THREE.TextureLoader();
     for (const f of texFiles) {
-      // Load from models/ (TGA→PNG conversions) first, fallback to textures/
+      // Load from models/ (verified PNG conversions from CSS assets) first, fallback to textures/
       loader.load('models/' + f, (tex) => {
+        tex.flipY = false;
         tex.wrapS = THREE.RepeatWrapping;
         tex.wrapT = THREE.RepeatWrapping;
         tex.encoding = THREE.sRGBEncoding;
         this.weaponTextureCache[f] = tex;
       }, undefined, () => {
-        // Fallback to textures/ directory
         loader.load('textures/' + f, (tex) => {
+          tex.flipY = false;
           tex.wrapS = THREE.RepeatWrapping;
           tex.wrapT = THREE.RepeatWrapping;
           this.weaponTextureCache[f] = tex;
@@ -292,13 +294,15 @@ class CS2Player {
   // Viewmodel positioning per weapon category: authentic forward orientation into crosshair
   static WEAPON_VIEWMODEL = {
     'pistols':    { pos: [0.14, -0.15, -0.28], scale: 0.018, rot: [Math.PI / 2, 0, 0] },
+    'mid-tier':   { pos: [0.15, -0.16, -0.30], scale: 0.017, rot: [Math.PI / 2, 0, 0] },
     'smgs':       { pos: [0.15, -0.16, -0.30], scale: 0.017, rot: [Math.PI / 2, 0, 0] },
     'rifles':     { pos: [0.15, -0.15, -0.28], scale: 0.016, rot: [Math.PI / 2, 0, 0] },
     'shotguns':   { pos: [0.15, -0.16, -0.30], scale: 0.016, rot: [Math.PI / 2, 0, 0] },
     'machineguns':{ pos: [0.14, -0.16, -0.30], scale: 0.016, rot: [Math.PI / 2, 0, 0] },
     'snipers':    { pos: [0.14, -0.15, -0.28], scale: 0.016, rot: [Math.PI / 2, 0, 0] },
-    'equipment':  { pos: [0.14, -0.15, -0.28], scale: 0.018, rot: [Math.PI / 2, 0, 0] },
-    'knife':      { pos: [0.15, -0.15, -0.26], scale: 0.016, rot: [Math.PI / 2, 0, 0] }
+    'equipment':  { pos: [0.15, -0.16, -0.30], scale: 0.020, rot: [0, 0, 0] },
+    'melee':      { pos: [0.18, -0.18, -0.32], scale: 0.016, rot: [-0.10, Math.PI - 0.20, 0.10] },
+    'knife':      { pos: [0.18, -0.18, -0.32], scale: 0.016, rot: [-0.10, Math.PI - 0.20, 0.10] }
   };
 
   // Loads the FBX file containing all CSS weapon meshes
@@ -375,12 +379,29 @@ class CS2Player {
       return this.weaponTextureCache[filename];
     }
     const loader = new THREE.TextureLoader();
-    // Try models/ first (higher quality TGA→PNG), then textures/
-    const tex = loader.load('models/' + filename, undefined, undefined, () => {
-      loader.load('textures/' + filename);
+    // Load authentic texture with flipY=false: models/ first (converted PNGs), fallback to textures/
+    const tex = loader.load('models/' + filename, (loaded) => {
+      loaded.flipY = false;
+      loaded.needsUpdate = true;
+      this.weaponTextureCache[filename] = loaded;
+    }, undefined, () => {
+      loader.load('textures/' + filename, (fallback) => {
+        fallback.flipY = false;
+        fallback.needsUpdate = true;
+        this.weaponTextureCache[filename] = fallback;
+        tex.image = fallback.image;
+        tex.needsUpdate = true;
+      }, undefined, () => {
+        loader.load('allcssweaponsinonemodel/textures_png/' + filename, (pTex) => {
+          pTex.flipY = false;
+          pTex.needsUpdate = true;
+          this.weaponTextureCache[filename] = pTex;
+          tex.image = pTex.image;
+          tex.needsUpdate = true;
+        });
+      });
     });
-    tex.wrapS = THREE.RepeatWrapping;
-    tex.wrapT = THREE.RepeatWrapping;
+    tex.flipY = false;
     this.weaponTextureCache[filename] = tex;
     return tex;
   }
@@ -532,27 +553,23 @@ class CS2Player {
         if (cachedMesh) {
           const weaponClone = cachedMesh.clone(true);
 
-          // Apply authentic weapon texture with full vertex normal computation
+          // Apply authentic weapon texture directly with high-fidelity basic material
           const texFile = CS2Player.WEAPON_TEX_MAP[w.id];
           if (texFile) {
             const tex = this.getWeaponTexture(texFile);
             weaponClone.traverse((child) => {
               if (child.isMesh) {
-                if (child.geometry) child.geometry.computeVertexNormals();
-                child.material = new THREE.MeshLambertMaterial({
+                child.material = new THREE.MeshBasicMaterial({
                   map: tex,
-                  color: 0xffffff,
-                  side: THREE.DoubleSide
+                  side: THREE.FrontSide
                 });
                 child.material.needsUpdate = true;
               }
             });
             if (weaponClone.isMesh) {
-              if (weaponClone.geometry) weaponClone.geometry.computeVertexNormals();
-              weaponClone.material = new THREE.MeshLambertMaterial({
+              weaponClone.material = new THREE.MeshBasicMaterial({
                 map: tex,
-                color: 0xffffff,
-                side: THREE.DoubleSide
+                side: THREE.FrontSide
               });
               weaponClone.material.needsUpdate = true;
             }
@@ -560,11 +577,10 @@ class CS2Player {
 
           // Determine viewmodel positioning based on weapon category
           let cat = w.category || 'rifles';
-          if (w.id === 'knife') cat = 'knife';
+          if (w.id === 'knife' || w.category === 'melee') cat = 'knife';
           else if (w.id === 'hegrenade' || w.id === 'flashbang' || w.id === 'smokegrenade' || w.id === 'molotov') cat = 'equipment';
           else if (w.category === 'snipers' || w.id === 'awp' || w.id === 'ssg08' || w.id === 'g3sg1' || w.id === 'scar20') cat = 'snipers';
-          else if (w.category === 'heavy' && (w.id === 'm249' || w.id === 'negev')) cat = 'machineguns';
-          else if (w.category === 'heavy') cat = 'shotguns';
+          else if (w.category === 'mid-tier') cat = 'mid-tier';
 
           const vm = CS2Player.WEAPON_VIEWMODEL[cat] || CS2Player.WEAPON_VIEWMODEL['rifles'];
 
@@ -577,7 +593,6 @@ class CS2Player {
           const isSniper = (cat === 'snipers');
           const barrelTipZ = isSniper ? -0.92 : (isPistol ? -0.52 : -0.78);
           this.muzzleFlashMesh.position.set(vm.pos[0] + 0.01, vm.pos[1] + 0.03, barrelTipZ);
-          this.muzzleLight.position.copy(this.muzzleFlashMesh.position);
 
           group.add(weaponClone);
           return; // Successfully used real model
@@ -625,16 +640,12 @@ class CS2Player {
     wick.rotation.z = 0.2;
     molyGroup.add(wick);
 
-    // Burning flame at wick tip
+    // Burning flame at wick tip (Emissive basic cone, zero PointLight overhead)
     const flameGeo = new THREE.ConeGeometry(0.028, 0.065, 8);
     const flameMat = new THREE.MeshBasicMaterial({ color: 0xff6600 });
     const flame = new THREE.Mesh(flameGeo, flameMat);
     flame.position.set(0.012, 0.22, 0);
     molyGroup.add(flame);
-
-    const flameLight = new THREE.PointLight(0xff5511, 1.2, 3);
-    flameLight.position.set(0.012, 0.22, 0);
-    molyGroup.add(flameLight);
 
     molyGroup.position.set(0.14, -0.18, -0.32);
     molyGroup.rotation.set(-0.25, 0.2, 0);
@@ -877,7 +888,22 @@ class CS2Player {
     const dropGroup = new THREE.Group();
     let meshCreated = false;
 
-    if (this.weaponModelsLoaded && this.weaponMeshCache) {
+    if (dropSlot === 5 || (droppedWeapon && droppedWeapon.id === 'c4')) {
+      // 3D Physical C4 explosive pack dropped on ground
+      const c4Pack = new THREE.Group();
+      const bodyMat = new THREE.MeshLambertMaterial({ color: 0x5a523a });
+      const body = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.12, 0.18), bodyMat);
+      c4Pack.add(body);
+      const tapeMat = new THREE.MeshLambertMaterial({ color: 0x888888 });
+      const tape = new THREE.Mesh(new THREE.BoxGeometry(0.30, 0.05, 0.08), tapeMat);
+      c4Pack.add(tape);
+      const ledMat = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+      const led = new THREE.Mesh(new THREE.SphereGeometry(0.018, 6, 6), ledMat);
+      led.position.set(0.08, 0.07, 0);
+      c4Pack.add(led);
+      dropGroup.add(c4Pack);
+      meshCreated = true;
+    } else if (this.weaponModelsLoaded && this.weaponMeshCache) {
       const meshName = CS2Player.WEAPON_MESH_MAP[droppedWeapon.id];
       if (meshName) {
         const cached = this.findWeaponMesh(meshName);
@@ -888,11 +914,9 @@ class CS2Player {
             const tex = this.getWeaponTexture(texFile);
             clone.traverse((child) => {
               if (child.isMesh) {
-                if (child.geometry) child.geometry.computeVertexNormals();
-                child.material = new THREE.MeshLambertMaterial({
+                child.material = new THREE.MeshBasicMaterial({
                   map: tex,
-                  color: 0xffffff,
-                  side: THREE.DoubleSide
+                  side: THREE.FrontSide
                 });
               }
             });
@@ -1003,6 +1027,9 @@ class CS2Player {
 
       // Strict proximity check: Must be close to the dropped weapon (< 1.6m)
       if (horizDist < 1.6 && vertDist < 1.4) {
+        // Counter-Terrorists cannot pick up C4 explosive
+        if (item.slot === 5 && this.team !== 'T') continue;
+
         nearbyPrompt = `PRESS [E] TO PICK UP ${item.weapon.name}`;
 
         const timeSinceDrop = performance.now() - (item.droppedAt || 0);
@@ -1142,6 +1169,7 @@ class CS2Player {
 
     this.isReloading = true;
     this.reloadStartTime = performance.now();
+    this.reloadDurationMs = ((this.activeWeapon && this.activeWeapon.reloadTime) || 2.4) * 1000;
     window.csAudio.playWeaponReload(this.activeWeapon.id);
   }
 
@@ -1218,11 +1246,8 @@ class CS2Player {
     if (currentTime - this.lastShotTime < this.activeWeapon.fireRate) return;
     this.lastShotTime = currentTime;
 
-    // Semi-automatic trigger (Pistols require a distinct click per bullet)
-    const isSemiAuto = (this.activeWeapon.category === 'pistols' && this.activeWeapon.id !== 'cz75') ||
-                       (this.activeWeapon.category === 'snipers' && this.activeWeapon.id !== 'scar20' && this.activeWeapon.id !== 'g3sg1') ||
-                       (this.activeWeapon.category === 'heavy' && this.activeWeapon.id !== 'negev' && this.activeWeapon.id !== 'm249');
-    if (isSemiAuto) {
+    // Semi-automatic trigger (Single shot per click unless weapon is full-auto)
+    if (!this.activeWeapon.isAuto) {
       this.isShooting = false;
     }
 
@@ -1235,35 +1260,24 @@ class CS2Player {
       gameManager.net.sendShoot(this.activeWeapon.audioType, this.activeWeapon.id, this.activeWeapon.isSilenced, this.position);
     }
 
-    this.muzzleLight.intensity = 2.5;
     this.muzzleFlashMesh.visible = true;
     setTimeout(() => {
-      this.muzzleLight.intensity = 0;
       this.muzzleFlashMesh.visible = false;
-    }, 45);
+    }, 40);
 
-    // Authentic CS Recoil Spray Pattern
+    // Authentic Deterministic CS Recoil Spray Pattern
     this.sprayCount = (this.sprayCount || 0) + 1;
-    const baseRecoil = this.activeWeapon.recoil || 0.024;
-    let pitchKick = baseRecoil;
+    let pitchKick = this.activeWeapon.recoil || 0.024;
     let yawKick = 0;
 
-    if (this.sprayCount <= 3) {
-      // First 3 bullets: Direct upward climb
-      pitchKick = baseRecoil * 1.35;
-      yawKick = (Math.random() - 0.5) * baseRecoil * 0.15;
-    } else if (this.sprayCount <= 8) {
-      // Bullets 4 to 8: Recoil pulls to the left
-      pitchKick = baseRecoil * 0.85;
-      yawKick = -baseRecoil * 0.65;
-    } else if (this.sprayCount <= 15) {
-      // Bullets 9 to 15: Recoil swings across to the right
-      pitchKick = baseRecoil * 0.35;
-      yawKick = baseRecoil * 0.85;
+    if (this.activeWeapon.recoilPattern && this.activeWeapon.recoilPattern.length > 0) {
+      const pIdx = Math.min(this.sprayCount - 1, this.activeWeapon.recoilPattern.length - 1);
+      const pat = this.activeWeapon.recoilPattern[pIdx];
+      pitchKick = (pat[0] || 0) * 0.0018;
+      yawKick = (pat[1] || 0) * 0.0018;
     } else {
-      // High spray: Horizontal sway
-      pitchKick = baseRecoil * 0.20;
-      yawKick = (Math.sin(this.sprayCount * 1.2) > 0 ? 1 : -1) * baseRecoil * 0.65;
+      pitchKick = (this.activeWeapon.recoil || 0.02) * (1.0 + Math.min(1.0, this.sprayCount * 0.05));
+      yawKick = (Math.random() - 0.5) * pitchKick * 0.3;
     }
 
     this.recoilPitch += pitchKick;
@@ -1271,76 +1285,84 @@ class CS2Player {
 
     this.weaponRig.position.z = -0.42;
 
-    // Raycast hit check & bullet penetration calculation
+    // Shotgun Multi-Pellet Spread vs Single Bullet Hit calculation
     this.camera.getWorldDirection(this.shootCamDir);
-    this.shootRaycaster.set(this.camera.position, this.shootCamDir);
+    const pelletCount = this.activeWeapon.pellets || 1;
+    const pelletDmg = Math.max(1, Math.round(this.activeWeapon.damage / pelletCount));
+    const baseSpread = this.activeWeapon.spread || 0.045;
 
-    // Wall & Obstacle Penetration Check (Hits map geometry and crates)
-    let wallObstacles = [];
-    if (this.map && this.map.groundMeshes && this.map.groundMeshes.length > 0) {
-      wallObstacles = this.shootRaycaster.intersectObjects(this.map.groundMeshes, false);
-      if (wallObstacles.length > 0 && wallObstacles[0].distance < 80) {
-        const hit = wallObstacles[0];
-        if (hit.face && hit.face.normal) {
-          const normalMatrix = new THREE.Matrix3().getNormalMatrix(hit.object.matrixWorld);
-          const worldNormal = hit.face.normal.clone().applyMatrix3(normalMatrix).normalize();
-          this.spawnBulletHole(hit.point, worldNormal);
+    for (let pel = 0; pel < pelletCount; pel++) {
+      const pDir = this.shootCamDir.clone();
+      if (pelletCount > 1) {
+        pDir.x += (Math.random() - 0.5) * baseSpread;
+        pDir.y += (Math.random() - 0.5) * baseSpread;
+        pDir.z += (Math.random() - 0.5) * baseSpread;
+        pDir.normalize();
+      }
+      this.shootRaycaster.set(this.camera.position, pDir);
+
+      // Wall & Obstacle Penetration Check (Hits map geometry and crates)
+      let wallObstacles = [];
+      if (this.map && this.map.groundMeshes && this.map.groundMeshes.length > 0) {
+        wallObstacles = this.shootRaycaster.intersectObjects(this.map.groundMeshes, false);
+        if (wallObstacles.length > 0 && wallObstacles[0].distance < 80) {
+          const hit = wallObstacles[0];
+          if (hit.face && hit.face.normal && (pel === 0 || Math.random() < 0.25)) {
+            const normalMatrix = new THREE.Matrix3().getNormalMatrix(hit.object.matrixWorld);
+            const worldNormal = hit.face.normal.clone().applyMatrix3(normalMatrix).normalize();
+            this.spawnBulletHole(hit.point, worldNormal);
+          }
         }
       }
-    }
 
-    // Hit players with authentic headshot/body multiplier, hit sound, and strict penetration rules
-    if (gameManager && gameManager.net) {
-      Object.entries(gameManager.net.remotePlayers).forEach(([id, p]) => {
-        if (p.team === this.team) return;
-        if (!p.mesh || !p.mesh.visible) return;
-        const playerHits = this.shootRaycaster.intersectObject(p.mesh, true);
-        if (playerHits.length > 0 && playerHits[0].distance < 120) {
-          const playerDist = playerHits[0].distance;
-          let canHit = true;
-          let penetrationPenalty = 1.0;
+      // Hit players with authentic headshot/body multiplier, hit sound, and strict penetration rules
+      if (gameManager && gameManager.net) {
+        Object.entries(gameManager.net.remotePlayers).forEach(([id, p]) => {
+          if (p.team === this.team) return;
+          if (!p.mesh || !p.mesh.visible) return;
+          const playerHits = this.shootRaycaster.intersectObject(p.mesh, true);
+          if (playerHits.length > 0 && playerHits[0].distance < 120) {
+            const playerDist = playerHits[0].distance;
+            let canHit = true;
+            let penetrationPenalty = 1.0;
 
-          // Check for intervening walls between shooter and player
-          if (wallObstacles.length > 0) {
-            const intervening = wallObstacles.filter(w => w.distance < playerDist);
-            if (intervening.length > 0) {
-              const firstDist = intervening[0].distance;
-              const lastDist = intervening[intervening.length - 1].distance;
-              const wallThickness = lastDist - firstDist;
+            // Check for intervening walls between shooter and player
+            if (wallObstacles.length > 0) {
+              const intervening = wallObstacles.filter(w => w.distance < playerDist);
+              if (intervening.length > 0) {
+                const firstDist = intervening[0].distance;
+                const lastDist = intervening[intervening.length - 1].distance;
+                const wallThickness = lastDist - firstDist;
 
-              // CS2 Authentic Wallbang:
-              // Only thin wooden obstacles (crates, doors where thickness <= 1.35m) can be penetrated
-              // Hard concrete/stone walls or thick structures completely absorb bullets
-              const hasPen = (this.activeWeapon.armorPen && this.activeWeapon.armorPen >= 0.65) ||
-                             (this.activeWeapon.category === 'rifles' || this.activeWeapon.id === 'awp' || this.activeWeapon.id === 'deagle');
+                const hasPen = (this.activeWeapon.armorPen && this.activeWeapon.armorPen >= 0.65) ||
+                               (this.activeWeapon.category === 'rifles' || this.activeWeapon.id === 'awp' || this.activeWeapon.id === 'deagle');
 
-              if (hasPen && wallThickness <= 1.35 && intervening.length <= 2) {
-                // Wooden penetration: allowed with 50% damage reduction
-                penetrationPenalty = 0.50;
-              } else {
-                // Hard stone/concrete wall or excessive thickness: bullet is completely blocked
-                canHit = false;
+                if (hasPen && wallThickness <= 1.35 && intervening.length <= 2) {
+                  penetrationPenalty = 0.50;
+                } else {
+                  canHit = false;
+                }
               }
             }
-          }
 
-          if (canHit) {
-            const hitPoint = playerHits[0].point;
-            const relY = hitPoint.y - p.mesh.position.y;
-            const isHeadshot = relY >= 1.60;
-            const dmgMult = (isHeadshot ? 2.5 : 1.0) * penetrationPenalty;
-            const finalDamage = Math.max(1, Math.round(this.activeWeapon.damage * dmgMult));
+            if (canHit) {
+              const hitPoint = playerHits[0].point;
+              const relY = hitPoint.y - p.mesh.position.y;
+              const isHeadshot = relY >= 1.60;
+              const dmgMult = (isHeadshot ? 2.5 : 1.0) * penetrationPenalty;
+              const finalDamage = Math.max(1, Math.round(pelletDmg * dmgMult));
 
-            if (isHeadshot) {
-              window.csAudio.playHeadshotDink();
-            } else {
-              window.csAudio.playSound('damage1');
+              if (isHeadshot) {
+                window.csAudio.playHeadshotDink();
+              } else {
+                window.csAudio.playSound('damage1');
+              }
+
+              gameManager.net.sendDamage(id, finalDamage, this.activeWeapon.name, isHeadshot);
             }
-
-            gameManager.net.sendDamage(id, finalDamage, this.activeWeapon.name, isHeadshot);
           }
-        }
-      });
+        });
+      }
     }
   }
 
@@ -1492,9 +1514,6 @@ class CS2Player {
           const fireball = new THREE.Mesh(fireballGeo, fireballMat);
           heGroup.add(fireball);
 
-          const blastLight = new THREE.PointLight(0xff8822, 10, 16);
-          blastLight.position.set(0, 0.5, 0);
-          heGroup.add(blastLight);
           this.scene.add(heGroup);
 
           const expStart = performance.now();
@@ -1632,6 +1651,7 @@ class CS2Player {
     if (this.inventory[1]) this.dropWeaponBySlot(1);
     if (this.inventory[2]) this.dropWeaponBySlot(2);
     if (this.inventory[4]) this.dropWeaponBySlot(4);
+    if (this.inventory[5]) this.dropWeaponBySlot(5);
 
     this.enterSpectatorMode();
     if (window.csGameManager) {
@@ -1755,21 +1775,32 @@ class CS2Player {
       return;
     }
 
-    // Realistic Reload Animation
+    // Realistic Reload Animation with weapon-specific duration
     if (this.isReloading) {
       const elapsed = currentTime - this.reloadStartTime;
-      const t = Math.min(1.0, elapsed / 2200);
+      const reloadDur = this.reloadDurationMs || 2400;
+      const t = Math.min(1.0, elapsed / reloadDur);
 
       this.weaponRig.position.y = -Math.sin(t * Math.PI) * 0.14;
       this.weaponRig.rotation.z = Math.sin(t * Math.PI) * 0.35;
       this.weaponRig.rotation.x = Math.sin(t * Math.PI) * 0.22;
 
-      if (elapsed > 2200) {
+      if (elapsed > reloadDur) {
         this.weaponRig.position.y = 0;
         this.weaponRig.rotation.z = 0;
         this.weaponRig.rotation.x = 0;
         this.finishReload();
       }
+    }
+
+    // Safety check: isPlanting/isDefusing must only be true if USE key is actively held down
+    if (this.isPlanting && !this.keys[this.keybinds.use]) {
+      this.isPlanting = false;
+      this.plantProgress = 0;
+    }
+    if (this.isDefusing && !this.keys[this.keybinds.use]) {
+      this.isDefusing = false;
+      this.defuseProgress = 0;
     }
 
     // Freezetime Lock (Movement & Shooting prohibited in real CS2)
@@ -1783,7 +1814,7 @@ class CS2Player {
 
     if (this.isShooting && !this.isReloading && !inFreeze) {
       this.shoot(currentTime / 1000, gameManager);
-    } else if (!this.isShooting && (currentTime / 1000 - this.lastShotTime > 0.35)) {
+    } else if (!this.isShooting && (currentTime / 1000 - this.lastShotTime > 0.45)) {
       this.sprayCount = 0;
     }
 

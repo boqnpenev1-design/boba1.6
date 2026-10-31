@@ -24,55 +24,58 @@ class CS2Bot {
     this.mesh = this.createBotMesh();
     this.scene.add(this.mesh);
 
-    // Load SAS 3D Model for CT bots if available
-    this.gltfLoader = typeof THREE.GLTFLoader !== 'undefined' ? new THREE.GLTFLoader() : null;
-    if (this.team === 'CT' && this.gltfLoader) {
-      this.loadSASModel();
+    // Attach genuine 3D character model (CT = SAS agent, T = Phoenix agent)
+    this.attachCharacterModel();
+  }
+
+  attachCharacterModel() {
+    const gltfLoader = typeof THREE.GLTFLoader !== 'undefined' ? new THREE.GLTFLoader() : null;
+    if (!gltfLoader) return;
+
+    if (this.team === 'CT') {
+      if (CS2Bot.ctModel) {
+        this.applyModel(CS2Bot.ctModel, 1.0);
+      } else {
+        gltfLoader.load('ctm_sas__cs2_agent_model.glb', (gltf) => {
+          CS2Bot.ctModel = gltf.scene;
+          this.applyModel(CS2Bot.ctModel, 1.0);
+        });
+      }
+    } else {
+      if (CS2Bot.tModel) {
+        this.applyModel(CS2Bot.tModel, 0.025);
+      } else {
+        gltfLoader.load('tm_phoenix_v2-_csgo_terrorist_characters.glb', (gltf) => {
+          CS2Bot.tModel = gltf.scene;
+          this.applyModel(CS2Bot.tModel, 0.025);
+        });
+      }
     }
   }
 
-  loadSASModel() {
-    this.gltfLoader.load('source/sas blue.glb', (gltf) => {
-      const sas = gltf.scene;
-      sas.scale.set(0.018, 0.018, 0.018);
-      sas.position.set(0, 0, 0);
+  applyModel(srcModel, scale) {
+    if (!srcModel || !this.mesh) return;
+    const clone = (typeof THREE.SkeletonUtils !== 'undefined' && THREE.SkeletonUtils.clone)
+      ? THREE.SkeletonUtils.clone(srcModel)
+      : srcModel.clone(true);
+    clone.scale.set(scale, scale, scale);
+    clone.position.set(0, 0, 0);
 
-      // Hide simple box body and attach detailed SAS model
-      while (this.mesh.children.length > 0) {
-        this.mesh.remove(this.mesh.children[0]);
-      }
-      this.mesh.add(sas);
-    }, undefined, () => {});
+    // Clean any prior children
+    while (this.mesh.children.length > 0) {
+      this.mesh.remove(this.mesh.children[0]);
+    }
+    this.mesh.add(clone);
   }
 
   createBotMesh() {
     const group = new THREE.Group();
-
-    // Body
-    const bodyGeo = new THREE.BoxGeometry(0.7, 1.0, 0.4);
-    const bodyColor = this.team === 'CT' ? 0x2b4c6f : 0x82593b;
-    const bodyMat = new THREE.MeshStandardMaterial({ color: bodyColor, roughness: 0.8 });
-    const body = new THREE.Mesh(bodyGeo, bodyMat);
-    body.position.y = 1.0;
-    body.castShadow = true;
-    group.add(body);
-
-    // Head
-    const headGeo = new THREE.BoxGeometry(0.35, 0.4, 0.35);
-    const headColor = this.team === 'CT' ? 0x1f2937 : 0xd2b48c;
-    const headMat = new THREE.MeshStandardMaterial({ color: headColor, roughness: 0.6 });
-    const head = new THREE.Mesh(headGeo, headMat);
-    head.position.y = 1.7;
-    head.castShadow = true;
-    group.add(head);
-
-    // Gun in hand
-    const weaponGeo = new THREE.BoxGeometry(0.08, 0.1, 0.5);
-    const weaponMat = new THREE.MeshStandardMaterial({ color: 0x111111 });
-    const weapon = new THREE.Mesh(weaponGeo, weaponMat);
-    weapon.position.set(0.3, 1.1, -0.3);
-    group.add(weapon);
-
+    // Hitbox cylinder for raycasting hit detection
+    const hitboxGeo = new THREE.CylinderGeometry(0.5, 0.5, 1.85, 10);
+    const hitboxMat = new THREE.MeshBasicMaterial({ visible: false });
+    const hitbox = new THREE.Mesh(hitboxGeo, hitboxMat);
+    hitbox.position.y = 0.95;
+    group.add(hitbox);
     return group;
   }
 

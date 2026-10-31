@@ -331,6 +331,17 @@
 
       <!-- TAB 1: ONLINE COMPETITIVE SERVER (Dust 2) -->
       <div class="tab-pane active" id="pane-servers">
+        <!-- Player Callsign / Nickname Input -->
+        <div class="player-callsign-box" style="background: rgba(14, 20, 28, 0.85); border: 1px solid #2d3b4d; border-radius: 6px; padding: 16px 20px; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; gap: 16px;">
+          <div style="text-align: left;">
+            <div style="font-family: 'Rajdhani', sans-serif; font-weight: 700; font-size: 15px; color: #ffae35; letter-spacing: 1.5px; text-transform: uppercase;">Operator Callsign / Nickname</div>
+            <div style="font-size: 12px; color: #8899aa;">Required to deploy into competitive servers (2–16 characters)</div>
+          </div>
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <input type="text" id="player-nickname-input" maxlength="16" placeholder="ENTER CALLSIGN..." style="background: #0d1219; border: 2px solid #ffae35; border-radius: 4px; color: #ffffff; font-family: 'Chakra Petch', sans-serif; font-size: 16px; font-weight: 700; padding: 8px 14px; width: 220px; text-transform: uppercase; outline: none; letter-spacing: 1px;" autocomplete="off" spellcheck="false">
+          </div>
+        </div>
+
         <div class="server-browser-grid">
           <!-- Server 1: Dust 2 -->
           <div class="server-card">
@@ -345,8 +356,8 @@
               <div class="s-detail"><span>PING:</span> <strong>8ms</strong></div>
               <div class="s-detail"><span>SLOTS:</span> <strong>HUMAN ONLINE LOBBY</strong></div>
             </div>
-            <button class="btn-connect-server" id="btn-connect-dust2">
-              CONNECT TO DUST II SERVER
+            <button class="btn-connect-server" id="btn-connect-dust2" disabled style="opacity: 0.6; cursor: not-allowed;">
+              ENTER CALLSIGN TO CONNECT
             </button>
           </div>
         </div>
@@ -483,14 +494,15 @@
     </div>
   </div>
 
-  <!-- Game Scripts (v5.9 Authentic Fixes) -->
-  <script src="js/audio.js?v=5.9"></script>
-  <script src="js/antiCheat.js?v=5.9"></script>
-  <script src="js/weapons.js?v=5.9"></script>
-  <script src="js/maps.js?v=5.9"></script>
-  <script src="js/player.js?v=5.9"></script>
-  <script src="js/network.js?v=5.9"></script>
-  <script src="js/game.js?v=5.9"></script>
-  <script src="js/main.js?v=5.9"></script>
+  <!-- Game Scripts (v6.0 Engine Overhaul) -->
+  <script src="js/audio.js?v=6.0"></script>
+  <script src="js/antiCheat.js?v=6.0"></script>
+  <script src="js/weapons.js?v=6.0"></script>
+  <script src="js/maps.js?v=6.0"></script>
+  <script src="js/player.js?v=6.0"></script>
+  <script src="js/bots.js?v=6.0"></script>
+  <script src="js/network.js?v=6.0"></script>
+  <script src="js/game.js?v=6.0"></script>
+  <script src="js/main.js?v=6.0"></script>
 </body>
 </html>
