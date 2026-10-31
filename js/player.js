@@ -188,26 +188,26 @@ class CS2Player {
 
   // Weapon ID → FBX mesh name mapping
   static WEAPON_MESH_MAP = {
-    'glock': 'w_pist_glock18',
+    'glock': 'w_pist_elite_single',   // 9mm semi-auto pistol in the pack
     'usp': 'w_pist_usp',
-    'p250': 'w_pist_p228',
+    'p250': 'w_pist_p228',             // 228_lol
     'deagle': 'w_pist_deagle',
     'dualberettas': 'w_pist_elite',
     'fiveseven': 'w_pist_fiveseven',
-    'tec9': 'w_pist_glock18',      // reuse glock mesh
-    'cz75': 'w_pist_fiveseven',     // reuse fiveseven mesh
+    'tec9': 'w_pist_elite_single',
+    'cz75': 'w_pist_fiveseven',
     'mac10': 'w_smg_mac10',
     'mp9': 'w_smg_tmp',
     'mp7': 'w_smg_mp5',
     'mp5sd': 'w_smg_mp5',
     'ump45': 'w_smg_ump45',
     'p90': 'w_smg_p90',
-    'bizon': 'w_smg_p90',           // reuse p90 mesh
+    'bizon': 'w_smg_p90',
     'nova': 'w_shot_m3super90',
     'xm1014': 'w_shot_xm1014',
-    'mag7': 'w_shot_m3super90',     // reuse m3 mesh
-    'sawedoff': 'w_shot_xm1014',   // reuse xm mesh
-    'negev': 'w_mach_m249',         // reuse m249 mesh
+    'mag7': 'w_shot_m3super90',
+    'sawedoff': 'w_shot_xm1014',
+    'negev': 'w_mach_m249',
     'm249': 'w_mach_m249',
     'ak47': 'w_rif_ak47',
     'm4a4': 'w_rif_m4a1',
@@ -218,13 +218,13 @@ class CS2Player {
     'awp': 'w_snip_awp',
     'aug': 'w_rif_aug',
     'sg553': 'w_rif_sg552',
-    'scar20': 'w_snip_sg550',       // reuse sg550 mesh
+    'scar20': 'w_snip_sg550',
     'g3sg1': 'w_snip_g3sg1',
     'knife': 'w_knife_t',
     'hegrenade': 'w_eq_fraggrenade',
     'flashbang': 'w_eq_flashbang',
     'smokegrenade': 'w_eq_smokegrenade',
-    'molotov': 'w_eq_fraggrenade',  // reuse frag mesh
+    'molotov': 'w_eq_fraggrenade',
     'defuser': 'w_eq_defuser'
   };
 
@@ -270,16 +270,16 @@ class CS2Player {
     'defuser': 'w_eq_defuser.png'
   };
 
-  // Viewmodel positioning per weapon category
+  // Viewmodel positioning per weapon category: authentic CS scale (0.016) & forward orientation
   static WEAPON_VIEWMODEL = {
-    'pistols':    { pos: [0.18, -0.22, -0.32], scale: 0.0032, rotY: Math.PI },
-    'smgs':       { pos: [0.16, -0.24, -0.34], scale: 0.0030, rotY: Math.PI },
-    'rifles':     { pos: [0.15, -0.24, -0.36], scale: 0.0028, rotY: Math.PI },
-    'shotguns':   { pos: [0.16, -0.24, -0.36], scale: 0.0030, rotY: Math.PI },
-    'machineguns':{ pos: [0.14, -0.26, -0.36], scale: 0.0026, rotY: Math.PI },
-    'snipers':    { pos: [0.15, -0.24, -0.38], scale: 0.0028, rotY: Math.PI },
-    'equipment':  { pos: [0.16, -0.22, -0.32], scale: 0.0035, rotY: Math.PI },
-    'knife':      { pos: [0.18, -0.22, -0.30], scale: 0.0035, rotY: Math.PI }
+    'pistols':    { pos: [0.14, -0.15, -0.28], scale: 0.018, rot: [-Math.PI / 2, Math.PI, 0] },
+    'smgs':       { pos: [0.15, -0.16, -0.30], scale: 0.017, rot: [-Math.PI / 2, Math.PI, 0] },
+    'rifles':     { pos: [0.15, -0.15, -0.28], scale: 0.016, rot: [-Math.PI / 2, Math.PI, 0] },
+    'shotguns':   { pos: [0.15, -0.16, -0.30], scale: 0.016, rot: [-Math.PI / 2, Math.PI, 0] },
+    'machineguns':{ pos: [0.14, -0.16, -0.30], scale: 0.016, rot: [-Math.PI / 2, Math.PI, 0] },
+    'snipers':    { pos: [0.14, -0.15, -0.28], scale: 0.016, rot: [-Math.PI / 2, Math.PI, 0] },
+    'equipment':  { pos: [0.14, -0.15, -0.28], scale: 0.018, rot: [-Math.PI / 2, Math.PI, 0] },
+    'knife':      { pos: [0.15, -0.15, -0.26], scale: 0.016, rot: [-Math.PI / 2, Math.PI, 0] }
   };
 
   // Loads the FBX file containing all CSS weapon meshes
@@ -296,35 +296,59 @@ class CS2Player {
     fbxLoader.load('models/css_weapons.fbx', (fbxScene) => {
       console.log('FBX weapon pack loaded, extracting meshes...');
 
+      // Clean name mapping: e.g. "w_rif_ak47mdlw_rif_ak47" -> "w_rif_ak47"
+      const cleanMeshName = (rawName) => {
+        if (!rawName) return '';
+        if (rawName === '228_lol') return 'w_pist_p228';
+        let base = rawName.split('mdl')[0].toLowerCase();
+        if (base === 'w_defuser') return 'w_eq_defuser';
+        if (base === 'w_mach_m249para') return 'w_mach_m249';
+        return base;
+      };
+
       fbxScene.traverse((child) => {
         if (child.isMesh && child.name) {
-          // Store each named mesh in cache
-          this.weaponMeshCache[child.name] = child;
-          // Also store partial matches (mesh names may have suffixes)
-          const baseName = child.name.replace(/_\d+$/, '');
-          if (!this.weaponMeshCache[baseName]) {
-            this.weaponMeshCache[baseName] = child;
+          const raw = child.name;
+          this.weaponMeshCache[raw] = child;
+          const clean = cleanMeshName(raw);
+          if (clean) {
+            this.weaponMeshCache[clean] = child;
           }
         }
       });
 
-      // Also store children by traversing groups
       fbxScene.children.forEach((child) => {
         if (child.name) {
-          if (!this.weaponMeshCache[child.name]) {
-            this.weaponMeshCache[child.name] = child;
+          const raw = child.name;
+          const clean = cleanMeshName(raw);
+          if (clean && !this.weaponMeshCache[clean]) {
+            this.weaponMeshCache[clean] = child;
           }
         }
       });
 
       this.weaponModelsLoaded = true;
-      console.log('Weapon meshes cached:', Object.keys(this.weaponMeshCache).join(', '));
+      console.log('Weapon meshes cached successfully:', Object.keys(this.weaponMeshCache).filter(k => !k.includes('mdl')).join(', '));
 
-      // Rebuild current weapon to use the real model
+      // Rebuild current weapon immediately with authentic 3D mesh
       this.buildCurrentWeaponModel();
     }, undefined, (err) => {
       console.warn('Failed to load FBX weapons:', err);
     });
+  }
+
+  // Finds a weapon mesh in cache by exact clean name or fallback substring
+  findWeaponMesh(meshName) {
+    if (!this.weaponMeshCache) return null;
+    if (this.weaponMeshCache[meshName]) return this.weaponMeshCache[meshName];
+    const target = meshName.toLowerCase();
+    const keys = Object.keys(this.weaponMeshCache);
+    for (let i = 0; i < keys.length; i++) {
+      if (keys[i].toLowerCase() === target || keys[i].toLowerCase().startsWith(target)) {
+        return this.weaponMeshCache[keys[i]];
+      }
+    }
+    return null;
   }
 
   getWeaponTexture(filename) {
@@ -473,7 +497,7 @@ class CS2Player {
     if (this.weaponModelsLoaded && this.weaponMeshCache) {
       const meshName = CS2Player.WEAPON_MESH_MAP[w.id];
       if (meshName) {
-        const cachedMesh = this.weaponMeshCache[meshName];
+        const cachedMesh = this.findWeaponMesh(meshName);
         if (cachedMesh) {
           const weaponClone = cachedMesh.clone(true);
 
@@ -509,7 +533,7 @@ class CS2Player {
 
           weaponClone.position.set(vm.pos[0], vm.pos[1], vm.pos[2]);
           weaponClone.scale.set(vm.scale, vm.scale, vm.scale);
-          weaponClone.rotation.y = vm.rotY;
+          weaponClone.rotation.set(vm.rot[0], vm.rot[1], vm.rot[2]);
 
           group.add(weaponClone);
           return; // Successfully used real model
@@ -636,6 +660,12 @@ class CS2Player {
 
   initControls() {
     window.addEventListener('keydown', (e) => {
+      // Block browser shortcuts (Ctrl+W, Ctrl+N, Ctrl+T, etc.) during gameplay
+      if (e.ctrlKey && (e.code === 'KeyW' || e.code === 'KeyN' || e.code === 'KeyT' || e.code === 'KeyR')) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+
       this.keys[e.code] = true;
 
       // Discrete Space bar jump trigger: prevents continuous bunny-hop when holding space
@@ -1600,15 +1630,15 @@ class CS2Player {
     // Discrete Jump (Single press required, no auto bunny-hop)
     if (this.jumpRequested && this.isGrounded && !inFreeze) {
       this.jumpRequested = false;
-      // Crouch-jump (duck-jump) boost to easily clear and land on Dust 2 crates
-      const jumpImpulse = this.isCrouched ? 8.6 : 8.0;
+      // Crouch-jump (duck-jump) boost (11.2) to easily clear and land on 2.8m Dust 2 crates
+      const jumpImpulse = this.isCrouched ? 11.2 : 10.0;
       this.velocity.y = jumpImpulse;
       this.isGrounded = false;
     }
 
     this.velocity.y -= 18.0 * dt;
 
-    this.isCrouched = !!this.keys[this.keybinds.crouch];
+    this.isCrouched = !!(this.keys[this.keybinds.crouch] || this.keys['KeyC']);
     const targetHeight = this.isCrouched ? 1.35 : 2.2;
     this.playerHeight += (targetHeight - this.playerHeight) * 0.2;
 
@@ -1624,20 +1654,24 @@ class CS2Player {
       this.wallDir.set(dirX, 0, dirZ).normalize();
       const perpX = -dirZ;
       const perpZ = dirX;
-      const lateralOffsets = [0, 0.40, -0.40];
+      const lateralOffsets = [0, 0.35, -0.35];
+      const currentFeetY = this.position.y - this.playerHeight;
+      // When jumping or in air, any obstacle below feet + 0.6 is a climbable surface/step, NOT a wall!
+      const stepAllowance = this.isGrounded ? 1.4 : 0.6;
+      const wallCheckMinY = currentFeetY + stepAllowance;
       const yOffsets = [
-        this.position.y - this.playerHeight * 0.35,
-        this.position.y - this.playerHeight * 0.70
+        currentFeetY + this.playerHeight * 0.45,
+        currentFeetY + this.playerHeight * 0.80
       ];
-      const maxStepHeight = (this.isCrouched && !this.isGrounded) ? 2.4 : 1.2;
       for (const yOff of yOffsets) {
+        if (yOff <= wallCheckMinY) continue;
         for (const lOff of lateralOffsets) {
           this.wallOrigin.set(oldX + perpX * lOff, yOff, oldZ + perpZ * lOff);
           this.wallRaycaster.set(this.wallOrigin, this.wallDir);
           this.wallRaycaster.far = dist;
           const hits = this.wallRaycaster.intersectObjects(this.map.groundMeshes, false);
           for (let i = 0; i < hits.length; i++) {
-            if (hits[i].point.y > (this.lastGroundY + maxStepHeight)) {
+            if (hits[i].point.y > wallCheckMinY) {
               return true;
             }
           }

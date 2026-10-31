@@ -156,6 +156,11 @@ document.addEventListener('DOMContentLoaded', () => {
     } else {
       document.getElementById('pause-menu').classList.add('hidden');
       document.getElementById('buy-menu').classList.add('hidden');
+      try {
+        if (navigator.keyboard && navigator.keyboard.lock) {
+          navigator.keyboard.lock(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ControlLeft', 'ControlRight', 'ShiftLeft', 'Space']).catch(() => {});
+        }
+      } catch (e) {}
     }
   });
 

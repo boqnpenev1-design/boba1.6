@@ -214,11 +214,16 @@ class CS2GameManager {
     this.player.setTeam(team);
 
     document.getElementById('team-select-screen').classList.add('hidden');
-    // Auto-fullscreen to prevent Ctrl+W/Ctrl+N browser shortcuts during gameplay
+    // Auto-fullscreen & Keyboard Lock to prevent Ctrl+W/Ctrl+N browser shortcuts during gameplay
     try {
       const el = document.documentElement;
       if (el.requestFullscreen) el.requestFullscreen().catch(() => {});
       else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+    } catch (e) {}
+    try {
+      if (navigator.keyboard && navigator.keyboard.lock) {
+        navigator.keyboard.lock(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ControlLeft', 'ControlRight', 'ShiftLeft', 'Space']).catch(() => {});
+      }
     } catch (e) {}
     document.getElementById('hud').classList.remove('hidden');
     try {
