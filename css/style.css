@@ -1223,10 +1223,11 @@ body, html {
   justify-content: center;
   margin-bottom: 6px;
 }
-.buy-svg {
-  max-width: 80px;
+.buy-svg, .buy-menu-img {
+  max-width: 95px;
   max-height: 44px;
-  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.6));
+  object-fit: contain;
+  filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.7)) brightness(1.1);
 }
 .btn-card-revert {
   margin-top: 8px;

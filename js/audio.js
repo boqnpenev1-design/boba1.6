@@ -80,9 +80,17 @@ class CS2AudioSystem {
       c4_explode: 'weapons/c4/c4_explode1.wav',
       c4_key: 'weapons/c4/key_press1.wav',
 
-      // Player Damage & Foley
+      // Player Damage & Foley (Real CS2 WAV files)
+      jump: 'player/effort_m_01.wav',
+      land: 'player/land.wav',
+      land2: 'player/land2.wav',
+      round_start: 'player/pl_respawn.wav',
+      round_end_ct: 'weapons/party_horn_01.wav',
+      round_end_t: 'weapons/c4/c4_disarmfinish.wav',
+      bullet_impact: 'weapons/debris1.wav',
       damage1: 'player/damage1.wav',
       damage2: 'player/damage2.wav',
+      damage3: 'player/damage3.wav',
       death: 'player/death1.wav',
       headshot_armor: 'player/headshot_armor_01.wav',
       footstep_sand: 'player/footsteps/sand_01.wav',
@@ -350,81 +358,31 @@ class CS2AudioSystem {
   }
 
   playJump() {
-    this.ensureContext();
-    if (!this.ctx) return;
-    const t = this.ctx.currentTime;
-    const osc = this.ctx.createOscillator();
-    const gain = this.ctx.createGain();
-    osc.type = 'triangle';
-    osc.frequency.setValueAtTime(120, t);
-    osc.frequency.exponentialRampToValueAtTime(60, t + 0.12);
-    gain.gain.setValueAtTime(0.25, t);
-    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
-    osc.connect(gain);
-    gain.connect(this.sfxGain);
-    osc.start(t);
-    osc.stop(t + 0.12);
+    this.playSound('jump', 'sfx', 0.65);
+    this.playSound('footstep_sand', 'sfx', 0.35);
   }
 
   playLand() {
-    this.ensureContext();
-    if (!this.ctx) return;
-    const t = this.ctx.currentTime;
-    const osc = this.ctx.createOscillator();
-    const gain = this.ctx.createGain();
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(90, t);
-    osc.frequency.exponentialRampToValueAtTime(35, t + 0.18);
-    gain.gain.setValueAtTime(0.45, t);
-    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
-    osc.connect(gain);
-    gain.connect(this.sfxGain);
-    osc.start(t);
-    osc.stop(t + 0.18);
-    this.playSound('footstep_sand', 'sfx', 0.55);
+    this.playSound('land', 'sfx', 0.85);
   }
 
   playRoundStart() {
-    this.ensureContext();
-    if (!this.ctx) return;
-    const t = this.ctx.currentTime;
-    // Authentic CS2 double-tone round start horn (F4 -> C5)
-    [ { f: 349.2, start: 0, dur: 0.18 }, { f: 523.2, start: 0.16, dur: 0.35 } ].forEach(tone => {
-      const osc = this.ctx.createOscillator();
-      const gain = this.ctx.createGain();
-      osc.type = 'sawtooth';
-      osc.frequency.setValueAtTime(tone.f, t + tone.start);
-      gain.gain.setValueAtTime(0.28, t + tone.start);
-      gain.gain.exponentialRampToValueAtTime(0.001, t + tone.start + tone.dur);
-      osc.connect(gain);
-      gain.connect(this.sfxGain);
-      osc.start(t + tone.start);
-      osc.stop(t + tone.start + tone.dur);
-    });
+    this.playSound('round_start', 'sfx', 0.95);
   }
 
   playRoundEnd(winner = 'CT') {
-    this.ensureContext();
-    if (!this.ctx) return;
-    const t = this.ctx.currentTime;
-    // Triumphant orchestral brass chords for round victory
-    const chord = (winner === 'CT') ? [523.2, 659.2, 783.9, 1046.5] : [440.0, 554.3, 659.2, 880.0];
-    chord.forEach((freq, idx) => {
-      const osc = this.ctx.createOscillator();
-      const gain = this.ctx.createGain();
-      osc.type = 'sawtooth';
-      osc.frequency.setValueAtTime(freq, t + idx * 0.04);
-      gain.gain.setValueAtTime(0.18, t + idx * 0.04);
-      gain.gain.exponentialRampToValueAtTime(0.001, t + 1.2);
-      osc.connect(gain);
-      gain.connect(this.sfxGain);
-      osc.start(t + idx * 0.04);
-      osc.stop(t + 1.2);
-    });
+    if (winner === 'CT') {
+      this.playSound('round_end_ct', 'sfx', 0.85);
+    } else {
+      this.playSound('round_end_t', 'sfx', 0.85);
+    }
   }
 
   playDamage() {
-    this.playSound('damage1', 'sfx', 0.7);
+    const r = Math.random();
+    if (r < 0.33) this.playSound('damage1', 'sfx', 0.85);
+    else if (r < 0.66) this.playSound('damage2', 'sfx', 0.85);
+    else this.playSound('damage3', 'sfx', 0.85);
   }
 
   playRadioTone(kind = 'beep') {

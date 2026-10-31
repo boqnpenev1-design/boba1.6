@@ -64,6 +64,7 @@ class CS2NetworkManager {
 
         conn.on('close', () => {
           this.isConnected = false;
+          this.clearAllRemotePlayers();
         });
 
         if (onReady) onReady('client');
@@ -192,6 +193,7 @@ class CS2NetworkManager {
 
       conn.on('close', () => {
         this.isConnected = false;
+        this.clearAllRemotePlayers();
       });
     });
 
@@ -230,6 +232,10 @@ class CS2NetworkManager {
     conn.on('close', () => {
       const idx = this.connections.indexOf(conn);
       if (idx !== -1) this.connections.splice(idx, 1);
+      if (conn.peer) {
+        this.removeRemotePlayer(conn.peer);
+        this.broadcast({ type: 'player_leave', peerId: conn.peer });
+      }
     });
   }
 
@@ -277,7 +283,9 @@ class CS2NetworkManager {
   }
 
   handleClientReceivedPacket(data) {
-    if (data.type === 'player_update') {
+    if (data.type === 'player_leave') {
+      this.removeRemotePlayer(data.peerId);
+    } else if (data.type === 'player_update') {
       this.updateRemotePlayer(data.id, data);
     } else if (data.type === 'shoot') {
       window.csAudio.playGunshot(data.weaponType || 'rifle', data.weaponId || 'ak47', data.isSilenced || false);
@@ -655,6 +663,31 @@ class CS2NetworkManager {
     };
 
     return group;
+  }
+
+  removeRemotePlayer(id) {
+    if (!id) return;
+    const p = this.remotePlayers[id];
+    if (p) {
+      if (p.mesh && this.gm && this.gm.scene) {
+        this.gm.scene.remove(p.mesh);
+        p.mesh.traverse(child => {
+          if (child.geometry) child.geometry.dispose();
+          if (child.material) {
+            if (Array.isArray(child.material)) child.material.forEach(m => m.dispose());
+            else child.material.dispose();
+          }
+        });
+      }
+      delete this.remotePlayers[id];
+    }
+  }
+
+  clearAllRemotePlayers() {
+    Object.keys(this.remotePlayers).forEach(id => {
+      this.removeRemotePlayer(id);
+    });
+    this.remotePlayers = {};
   }
 
   updateRemotePlayer(id, data) {

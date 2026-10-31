@@ -232,69 +232,57 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // Authentic CS2 vector weapon silhouettes (crisp at any resolution, zero 404s, never broken)
+  // Official CS2 Panorama Weapon Icon SVGs from icons/weapons/
+  const WEAPON_SVG_MAP = {
+    'ak47': 'ak47.svg',
+    'm4a4': 'm4a1.svg',
+    'm4a1s': 'm4a1_silencer.svg',
+    'galil': 'galilar.svg',
+    'famas': 'famas.svg',
+    'aug': 'aug.svg',
+    'sg553': 'sg556.svg',
+    'awp': 'awp.svg',
+    'ssg08': 'ssg08.svg',
+    'g3sg1': 'g3sg1.svg',
+    'scar20': 'scar20.svg',
+    'glock': 'glock.svg',
+    'usp': 'usp_silencer.svg',
+    'p250': 'p250.svg',
+    'deagle': 'deagle.svg',
+    'dualberettas': 'elite.svg',
+    'fiveseven': 'fiveseven.svg',
+    'tec9': 'tec9.svg',
+    'cz75': 'cz75a.svg',
+    'mac10': 'mac10.svg',
+    'mp9': 'mp9.svg',
+    'mp7': 'mp7.svg',
+    'mp5sd': 'mp5sd.svg',
+    'ump45': 'ump45.svg',
+    'p90': 'p90.svg',
+    'bizon': 'bizon.svg',
+    'nova': 'nova.svg',
+    'xm1014': 'xm1014.svg',
+    'mag7': 'mag7.svg',
+    'sawedoff': 'sawedoff.svg',
+    'm249': 'm249.svg',
+    'negev': 'negev.svg',
+    'knife': 'knife.svg',
+    'hegrenade': 'hegrenade.svg',
+    'flashbang': 'flashbang.svg',
+    'smokegrenade': 'smokegrenade.svg',
+    'molotov': 'molotov.svg',
+    'incgrenade': 'incgrenade.svg',
+    'decoy': 'decoy.svg',
+    'taser': 'taser.svg',
+    'c4': 'c4.svg',
+    'defuser': 'defuser.svg',
+    'armor': 'kevlar.svg',
+    'helmet': 'assaultsuit.svg'
+  };
+
   function getWeaponSVG(id) {
-    switch (id) {
-      case 'ak47':
-        return `<svg viewBox="0 0 100 36" class="buy-svg"><path d="M4 22 L22 22 L26 27 L36 27 L38 23 L62 23 L64 26 L70 26 L72 20 L96 20 L96 17 L72 17 L70 14 L62 14 L55 17 L44 17 L36 12 L16 12 L8 16 Z M50 23 L46 34 L54 34 L56 23 Z" fill="#e2e8f0"/></svg>`;
-      case 'm4a4':
-      case 'm4a1s':
-        return `<svg viewBox="0 0 100 36" class="buy-svg"><path d="M4 20 L24 20 L28 26 L36 26 L38 22 L66 22 L68 25 L72 25 L74 19 L96 19 L96 17 L74 17 L72 14 L60 14 L48 16 L32 14 L12 14 Z M48 22 L45 33 L52 33 L54 22 Z" fill="#e2e8f0"/></svg>`;
-      case 'awp':
-        return `<svg viewBox="0 0 110 34" class="buy-svg"><path d="M2 20 L22 20 L25 26 L35 26 L38 21 L98 21 L98 18 L48 18 L45 13 L65 13 L65 11 L42 11 L40 18 L18 16 L8 16 Z M48 21 L44 32 L51 32 L53 21 Z" fill="#e2e8f0"/></svg>`;
-      case 'ssg08':
-        return `<svg viewBox="0 0 100 34" class="buy-svg"><path d="M4 20 L22 20 L25 25 L34 25 L36 21 L96 21 L96 18 L50 18 L47 13 L64 13 L64 11 L44 11 L42 18 L16 16 Z" fill="#e2e8f0"/></svg>`;
-      case 'deagle':
-        return `<svg viewBox="0 0 64 36" class="buy-svg"><path d="M8 12 L56 12 L56 20 L44 20 L38 22 L32 34 L18 34 L22 20 L8 20 Z" fill="#e2e8f0"/></svg>`;
-      case 'glock':
-      case 'usp':
-      case 'p250':
-      case 'fiveseven':
-      case 'dualberettas':
-      case 'cz75':
-      case 'tec9':
-        return `<svg viewBox="0 0 60 36" class="buy-svg"><path d="M8 14 L52 14 L52 20 L42 20 L36 22 L30 33 L18 33 L22 20 L8 20 Z" fill="#e2e8f0"/></svg>`;
-      case 'mp5sd':
-      case 'mp7':
-      case 'mp9':
-      case 'ump45':
-      case 'mac10':
-      case 'bizon':
-        return `<svg viewBox="0 0 80 36" class="buy-svg"><path d="M8 18 L24 18 L28 24 L34 24 L36 20 L68 20 L68 15 L44 15 L32 14 L12 14 Z M42 20 L38 33 L45 33 L48 20 Z" fill="#e2e8f0"/></svg>`;
-      case 'p90':
-        return `<svg viewBox="0 0 76 36" class="buy-svg"><path d="M8 24 L22 26 L36 26 L42 32 L56 32 L62 26 L70 26 L70 14 L20 14 L10 18 Z M26 22 A4 4 0 1 0 26 14 A4 4 0 1 0 26 22 Z" fill="#e2e8f0"/></svg>`;
-      case 'nova':
-      case 'xm1014':
-      case 'mag7':
-      case 'sawedoff':
-        return `<svg viewBox="0 0 96 32" class="buy-svg"><path d="M4 20 L24 20 L28 24 L48 24 L52 20 L92 20 L92 16 L48 16 L32 14 L10 14 Z M52 23 L68 23 L68 21 L52 21 Z" fill="#e2e8f0"/></svg>`;
-      case 'm249':
-      case 'negev':
-        return `<svg viewBox="0 0 96 38" class="buy-svg"><path d="M4 22 L24 22 L28 27 L40 27 L42 22 L92 22 L92 18 L50 18 L34 14 L12 14 Z M44 22 L40 34 L56 34 L56 22 Z" fill="#e2e8f0"/></svg>`;
-      case 'famas':
-      case 'galil':
-      case 'aug':
-      case 'sg553':
-      case 'g3sg1':
-      case 'scar20':
-        return `<svg viewBox="0 0 96 36" class="buy-svg"><path d="M4 22 L22 22 L26 27 L36 27 L38 23 L68 23 L70 20 L94 20 L94 17 L56 17 L44 14 L20 14 Z M46 23 L42 34 L50 34 L52 23 Z" fill="#e2e8f0"/></svg>`;
-      case 'hegrenade':
-        return `<svg viewBox="0 0 40 40" class="buy-svg"><circle cx="20" cy="24" r="13" fill="#68bb59"/><rect x="17" y="5" width="6" height="7" fill="#888888"/><ellipse cx="20" cy="5" rx="5" ry="2" fill="#555555"/></svg>`;
-      case 'flashbang':
-        return `<svg viewBox="0 0 36 44" class="buy-svg"><rect x="11" y="14" width="14" height="24" rx="3" fill="#cbd5e1"/><rect x="14" y="6" width="8" height="8" fill="#64748b"/><circle cx="24" cy="9" r="4" fill="none" stroke="#94a3b8" stroke-width="2"/></svg>`;
-      case 'smokegrenade':
-        return `<svg viewBox="0 0 36 44" class="buy-svg"><rect x="10" y="14" width="16" height="26" rx="3" fill="#94a3b8"/><rect x="14" y="6" width="8" height="8" fill="#475569"/><line x1="10" y1="20" x2="26" y2="20" stroke="#f1f5f9" stroke-width="2"/></svg>`;
-      case 'molotov':
-        return `<svg viewBox="0 0 36 48" class="buy-svg"><path d="M12 20 L12 42 Q12 45 18 45 Q24 45 24 42 L24 20 L21 14 L21 8 L15 8 L15 14 Z" fill="#d97706"/><rect x="16" y="2" width="4" height="7" fill="#f8fafc"/><path d="M18 0 Q22 4 18 8 Q14 4 18 0 Z" fill="#ef4444"/></svg>`;
-      case 'armor':
-        return `<svg viewBox="0 0 44 44" class="buy-svg"><path d="M8 8 L16 8 L22 14 L28 8 L36 8 L38 22 L32 38 L12 38 L6 22 Z" fill="#3b82f6"/></svg>`;
-      case 'helmet':
-        return `<svg viewBox="0 0 44 44" class="buy-svg"><path d="M8 8 L16 8 L22 14 L28 8 L36 8 L38 22 L32 38 L12 38 L6 22 Z" fill="#3b82f6"/><path d="M12 8 Q22 0 32 8 L34 16 L10 16 Z" fill="#eab308"/></svg>`;
-      case 'defuser':
-        return `<svg viewBox="0 0 44 44" class="buy-svg"><rect x="10" y="14" width="24" height="22" rx="4" fill="#0284c7"/><path d="M16 14 L16 8 Q22 4 28 8 L28 14" stroke="#e0f2fe" stroke-width="3" fill="none"/><line x1="17" y1="22" x2="27" y2="22" stroke="#ffffff" stroke-width="2"/></svg>`;
-      default:
-        return `<svg viewBox="0 0 40 40" class="buy-svg"><rect x="8" y="14" width="24" height="12" rx="2" fill="#94a3b8"/></svg>`;
-    }
+    const file = WEAPON_SVG_MAP[id] || 'ak47.svg';
+    return `<img src="icons/weapons/${file}" class="buy-menu-img" alt="${id}">`;
   }
 
   function renderBuyItems(category) {

@@ -81,17 +81,36 @@ class CS2Player {
     this.downOrigin = new THREE.Vector3();
     this.downDir = new THREE.Vector3(0, -1, 0);
 
-    // Pre-allocated Decal Pool for Bullet Holes (Zero per-shot GC pressure)
-    this.bulletHoleGeo = new THREE.CircleGeometry(0.055, 5);
-    this.bulletHoleMat = new THREE.MeshBasicMaterial({ color: 0x181818, side: THREE.DoubleSide, depthWrite: false });
+    // Pre-allocated Decal Pool for Bullet Holes (PolygonOffset prevents Z-fighting & clipping)
+    this.bulletHoleGeo = new THREE.CircleGeometry(0.095, 8);
+    this.bulletHoleMat = new THREE.MeshBasicMaterial({
+      color: 0x141619,
+      side: THREE.DoubleSide,
+      depthTest: true,
+      depthWrite: false,
+      polygonOffset: true,
+      polygonOffsetFactor: -4,
+      polygonOffsetUnits: -4
+    });
     this.bulletHolePool = [];
     this.bulletHolePoolIndex = 0;
-    for (let i = 0; i < 28; i++) {
+    for (let i = 0; i < 48; i++) {
       const mesh = new THREE.Mesh(this.bulletHoleGeo, this.bulletHoleMat);
+      mesh.renderOrder = 99;
       mesh.visible = false;
       this.scene.add(mesh);
       this.bulletHolePool.push(mesh);
     }
+
+    // Pre-allocated Shared Smoke Resources (eliminates shader hitch on grenade pop)
+    this.sharedSmokeGeo = new THREE.SphereGeometry(5.4, 12, 12);
+    this.sharedSmokeMat = new THREE.MeshLambertMaterial({
+      color: 0xc8ccd2,
+      transparent: true,
+      opacity: 0.98,
+      side: THREE.DoubleSide,
+      depthWrite: false
+    });
 
     // Input States
     this.keys = {};
@@ -132,18 +151,11 @@ class CS2Player {
     this.recoilPitch = 0;
     this.recoilYaw = 0;
 
-    // Viewmodel Rig with Dedicated Studio Lighting (Ensures vibrant, never-black weapon skins)
+    // Viewmodel Rig (weapons lit naturally by scene hemisphere & sun lights)
     this.viewmodelGroup = new THREE.Group();
     this.camera.add(this.viewmodelGroup);
     this.weaponRig = new THREE.Group();
     this.viewmodelGroup.add(this.weaponRig);
-
-    // Dedicated viewmodel lights (eliminates black silhouettes in shadows)
-    const vmAmbient = new THREE.AmbientLight(0xffffff, 1.4);
-    this.viewmodelGroup.add(vmAmbient);
-    const vmDir = new THREE.DirectionalLight(0xfff5e6, 0.8);
-    vmDir.position.set(0.5, 1.5, 1.0);
-    this.viewmodelGroup.add(vmDir);
 
     // Muzzle Flash
     this.muzzleLight = new THREE.PointLight(0xffaa33, 0, 8);
@@ -277,16 +289,16 @@ class CS2Player {
     'defuser': 'w_eq_defuser.png'
   };
 
-  // Viewmodel positioning per weapon category: authentic CS scale (0.016) & barrel pointing forward into crosshair
+  // Viewmodel positioning per weapon category: authentic CS scale & barrel pointing forward into crosshair
   static WEAPON_VIEWMODEL = {
-    'pistols':    { pos: [0.14, -0.15, -0.28], scale: 0.018, rot: [-Math.PI / 2, 0, 0] },
-    'smgs':       { pos: [0.15, -0.16, -0.30], scale: 0.017, rot: [-Math.PI / 2, 0, 0] },
-    'rifles':     { pos: [0.15, -0.15, -0.28], scale: 0.016, rot: [-Math.PI / 2, 0, 0] },
-    'shotguns':   { pos: [0.15, -0.16, -0.30], scale: 0.016, rot: [-Math.PI / 2, 0, 0] },
-    'machineguns':{ pos: [0.14, -0.16, -0.30], scale: 0.016, rot: [-Math.PI / 2, 0, 0] },
-    'snipers':    { pos: [0.14, -0.15, -0.28], scale: 0.016, rot: [-Math.PI / 2, 0, 0] },
-    'equipment':  { pos: [0.14, -0.15, -0.28], scale: 0.018, rot: [-Math.PI / 2, 0, 0] },
-    'knife':      { pos: [0.15, -0.15, -0.26], scale: 0.016, rot: [-Math.PI / 2, 0, 0] }
+    'pistols':    { pos: [0.14, -0.15, -0.28], scale: 0.018, rot: [Math.PI / 2, 0, Math.PI] },
+    'smgs':       { pos: [0.15, -0.16, -0.30], scale: 0.017, rot: [Math.PI / 2, 0, Math.PI] },
+    'rifles':     { pos: [0.15, -0.15, -0.28], scale: 0.016, rot: [Math.PI / 2, 0, Math.PI] },
+    'shotguns':   { pos: [0.15, -0.16, -0.30], scale: 0.016, rot: [Math.PI / 2, 0, Math.PI] },
+    'machineguns':{ pos: [0.14, -0.16, -0.30], scale: 0.016, rot: [Math.PI / 2, 0, Math.PI] },
+    'snipers':    { pos: [0.14, -0.15, -0.28], scale: 0.016, rot: [Math.PI / 2, 0, Math.PI] },
+    'equipment':  { pos: [0.14, -0.15, -0.28], scale: 0.018, rot: [Math.PI / 2, 0, Math.PI] },
+    'knife':      { pos: [0.15, -0.15, -0.26], scale: 0.016, rot: [0, Math.PI, 0] }
   };
 
   // Loads the FBX file containing all CSS weapon meshes
@@ -886,7 +898,7 @@ class CS2Player {
             });
           }
           clone.scale.set(0.016, 0.016, 0.016);
-          clone.rotation.set(-Math.PI / 2, 0, 0);
+          clone.rotation.set(Math.PI / 2, 0, Math.PI);
           dropGroup.add(clone);
           meshCreated = true;
         }
@@ -896,7 +908,7 @@ class CS2Player {
     if (!meshCreated) {
       const texFile = CS2Player.WEAPON_TEX_MAP[droppedWeapon.id] || 'w_rif_ak47.png';
       const tex = this.getWeaponTexture(texFile);
-      const boxMat = new THREE.MeshLambertMaterial({ map: tex, color: 0xffffff, side: THREE.DoubleSide });
+      const boxMat = new THREE.MeshBasicMaterial({ map: tex, color: 0xffffff, side: THREE.DoubleSide });
       const box = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.08, 0.45), boxMat);
       dropGroup.add(box);
     }
@@ -909,13 +921,14 @@ class CS2Player {
     dropGroup.rotation.y = this.yaw + 1.2;
     this.scene.add(dropGroup);
 
-    // Register in world dropped items pool
+    // Register in world dropped items pool with timestamp
     if (!window._droppedItems) window._droppedItems = [];
     window._droppedItems.push({
       mesh: dropGroup,
       weapon: droppedWeapon,
       slot: dropSlot,
-      pos: dropPos
+      pos: dropPos,
+      droppedAt: performance.now()
     });
 
     // Remove from player inventory
@@ -961,12 +974,12 @@ class CS2Player {
       const horizDist = Math.hypot(dx, dz);
       const vertDist = Math.abs(feetY - item.pos.y);
 
-      if (horizDist < 2.4 && vertDist < 2.0) {
-        nearbyPrompt = `PICK UP ${item.weapon.name}`;
+      if (horizDist < 2.4 && vertDist < 2.2) {
+        nearbyPrompt = `PRESS [E] TO PICK UP ${item.weapon.name}`;
 
-        // Auto pickup on close walkover if slot is completely empty
+        const timeSinceDrop = performance.now() - (item.droppedAt || 0);
         const slotEmpty = !this.inventory[item.slot];
-        const wantPickup = (this.keys[this.keybinds.use]) || (horizDist < 1.3 && slotEmpty);
+        const wantPickup = (this.keys[this.keybinds.use] && timeSinceDrop > 250) || (horizDist < 1.4 && slotEmpty && timeSinceDrop > 1200);
 
         if (wantPickup) {
           const targetSlot = item.slot;
@@ -1232,15 +1245,17 @@ class CS2Player {
     this.camera.getWorldDirection(this.shootCamDir);
     this.shootRaycaster.set(this.camera.position, this.shootCamDir);
 
-    // Wall & Obstacle Penetration Check (Hard walls block completely; only wooden objects/doors allow penetration)
+    // Wall & Obstacle Penetration Check (Hits map geometry and crates)
     let wallObstacles = [];
     if (this.map && this.map.groundMeshes && this.map.groundMeshes.length > 0) {
       wallObstacles = this.shootRaycaster.intersectObjects(this.map.groundMeshes, false);
       if (wallObstacles.length > 0 && wallObstacles[0].distance < 80) {
         const hit = wallObstacles[0];
-        const normalMatrix = new THREE.Matrix3().getNormalMatrix(hit.object.matrixWorld);
-        const worldNormal = hit.face.normal.clone().applyMatrix3(normalMatrix).normalize();
-        this.spawnBulletHole(hit.point, worldNormal);
+        if (hit.face && hit.face.normal) {
+          const normalMatrix = new THREE.Matrix3().getNormalMatrix(hit.object.matrixWorld);
+          const worldNormal = hit.face.normal.clone().applyMatrix3(normalMatrix).normalize();
+          this.spawnBulletHole(hit.point, worldNormal);
+        }
       }
     }
 
@@ -1316,9 +1331,10 @@ class CS2Player {
     const decal = this.bulletHolePool[this.bulletHolePoolIndex];
     this.bulletHolePoolIndex = (this.bulletHolePoolIndex + 1) % this.bulletHolePool.length;
 
-    decal.position.copy(point).addScaledVector(normal, 0.015);
+    decal.position.copy(point).addScaledVector(normal, 0.022);
     decal.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), normal);
     decal.visible = true;
+    window.csAudio.playSound('bullet_impact', 'sfx', 0.5);
   }
 
   // Authentic CS2 tracer line from forward barrel tip to impact point
@@ -1496,16 +1512,8 @@ class CS2Player {
         } else if (g.type === 'smokegrenade') {
           window.csAudio.playSmokeEmit();
 
-          // Fully impenetrable CS2 Volumetric Smoke (DoubleSide, 0.98 Opacity, Zero See-Through)
-          const smokeGeo = new THREE.SphereGeometry(5.4, 14, 14);
-          const smokeMat = new THREE.MeshLambertMaterial({
-            color: 0xc8ccd2,
-            transparent: true,
-            opacity: 0.98,
-            side: THREE.DoubleSide,
-            depthWrite: false
-          });
-          const smokeMesh = new THREE.Mesh(smokeGeo, smokeMat);
+          // Fully impenetrable CS2 Volumetric Smoke (Pre-allocated, Zero Shader Hitch)
+          const smokeMesh = new THREE.Mesh(this.sharedSmokeGeo, this.sharedSmokeMat);
           smokeMesh.position.set(pos.x, pos.y + 1.8, pos.z);
           smokeMesh.scale.set(0.1, 0.1, 0.1);
           this.scene.add(smokeMesh);
@@ -1532,8 +1540,6 @@ class CS2Player {
             const idx = window._activeSmokes ? window._activeSmokes.indexOf(smokeRecord) : -1;
             if (idx !== -1) window._activeSmokes.splice(idx, 1);
             this.scene.remove(smokeMesh);
-            smokeGeo.dispose();
-            smokeMat.dispose();
           }, 18000);
         } else if (g.type === 'molotov') {
           window.csAudio.playMolotovDetonate();
@@ -1635,7 +1641,7 @@ class CS2Player {
   respawn(spawnPos) {
     this.exitSpectatorMode();
     const defaultX = this.team === 'CT' ? -5.0 : -65.0;
-    const defaultY = 25.0; // High Y — raycast finds true ground below
+    const defaultY = this.team === 'CT' ? -3.56 : 7.96; // Exact floor height (-5.76 / 5.76) + playerHeight
     const defaultZ = this.team === 'CT' ? -98.0 : 35.0;
     const defaultYaw = this.team === 'CT' ? Math.PI : 0;
 
@@ -1643,18 +1649,17 @@ class CS2Player {
     let posY = (spawnPos && spawnPos.y !== undefined) ? spawnPos.y : defaultY;
     const posZ = (spawnPos && spawnPos.z !== undefined) ? spawnPos.z : defaultZ;
 
-    // Raycast straight down from spawn to find real ground surface
+    // Raycast straight down from spawn to find real ground surface if map is loaded
     if (this.map && this.map.groundMeshes && this.map.groundMeshes.length > 0) {
-      const rayOrigin = new THREE.Vector3(posX, posY + 5, posZ);
+      const rayOrigin = new THREE.Vector3(posX, posY + 4, posZ);
       const rayDir = new THREE.Vector3(0, -1, 0);
-      const raycaster = new THREE.Raycaster(rayOrigin, rayDir, 0, 80);
+      const raycaster = new THREE.Raycaster(rayOrigin, rayDir, 0, 40);
       const hits = raycaster.intersectObjects(this.map.groundMeshes, false);
       if (hits.length > 0) {
-        // Find the highest ground surface that isn't a ceiling above us
         let bestY = -999;
         for (let i = 0; i < hits.length; i++) {
           const hitY = hits[i].point.y;
-          if (hitY > bestY) bestY = hitY;
+          if (hitY > bestY && hitY <= (posY + 1.0)) bestY = hitY;
         }
         if (bestY > -900) {
           posY = bestY + this.playerHeight;
@@ -1665,13 +1670,7 @@ class CS2Player {
     this.position.set(posX, posY, posZ);
     this.yaw = (spawnPos && spawnPos.yaw !== undefined) ? spawnPos.yaw : defaultYaw;
     this.velocity.set(0, 0, 0);
-    // If raycast found ground, snap grounded. Otherwise let gravity pull down.
-    if (this.map && this.map.groundMeshes && this.map.groundMeshes.length > 0) {
-      this.isGrounded = true;
-    } else {
-      this.isGrounded = false;
-      this.velocity.y = -2; // gentle initial drop
-    }
+    this.isGrounded = true;
     this.lastGroundY = posY - this.playerHeight;
     this.health.set(100);
     this.armor.set(100);
@@ -1831,31 +1830,16 @@ class CS2Player {
     const playerRadius = 0.52;
     const colliders = this.map.colliders;
 
-    // Multi-Axis Impenetrable Collision Resolution:
-    // Feeler ray test: 0.45m max step height. Obstacles above that block horizontal movement (player must jump!)
+    // High-performance single-feeler obstacle check at waist height (solid crates block walkover)
     const checkMeshWall = (dirX, dirZ, dist) => {
       if (!this.map || !this.map.groundMeshes || this.map.groundMeshes.length === 0) return false;
       this.wallDir.set(dirX, 0, dirZ).normalize();
       const currentFeetY = this.position.y - this.playerHeight;
-      const stepAllowance = 0.45; // Authentic CS step height (crates cannot be walked through!)
-      const wallCheckMinY = currentFeetY + stepAllowance;
-      const yOffsets = [
-        currentFeetY + this.playerHeight * 0.45,
-        currentFeetY + this.playerHeight * 0.75
-      ];
-      for (const yOff of yOffsets) {
-        if (yOff <= wallCheckMinY) continue;
-        this.wallOrigin.set(oldX, yOff, oldZ);
-        this.wallRaycaster.set(this.wallOrigin, this.wallDir);
-        this.wallRaycaster.far = dist;
-        const hits = this.wallRaycaster.intersectObjects(this.map.groundMeshes, false);
-        for (let i = 0; i < hits.length; i++) {
-          if (hits[i].point.y > wallCheckMinY) {
-            return true;
-          }
-        }
-      }
-      return false;
+      this.wallOrigin.set(oldX, currentFeetY + 0.85, oldZ);
+      this.wallRaycaster.set(this.wallOrigin, this.wallDir);
+      this.wallRaycaster.far = dist;
+      const hits = this.wallRaycaster.intersectObjects(this.map.groundMeshes, false);
+      return hits.length > 0 && hits[0].distance < dist;
     };
 
     // 1. Resolve X movement (enables sliding smoothly along walls)
@@ -1876,7 +1860,7 @@ class CS2Player {
         break;
       }
     }
-    if (Math.abs(this.velocity.x) > 0.001) {
+    if (Math.abs(this.velocity.x) > 0.05) {
       const dist = playerRadius + Math.abs(this.velocity.x * dt) + 0.05;
       if (checkMeshWall(Math.sign(this.velocity.x), 0, dist)) {
         this.position.x = oldX;
@@ -1902,13 +1886,17 @@ class CS2Player {
         break;
       }
     }
-    if (Math.abs(this.velocity.z) > 0.001) {
+    if (Math.abs(this.velocity.z) > 0.05) {
       const dist = playerRadius + Math.abs(this.velocity.z * dt) + 0.05;
       if (checkMeshWall(0, Math.sign(this.velocity.z), dist)) {
         this.position.z = oldZ;
         this.velocity.z = 0;
       }
     }
+
+    // Perimeter boundary clamp strictly preventing walking out onto exterior cliffs
+    this.position.x = Math.max(-94.0, Math.min(65.0, this.position.x));
+    this.position.z = Math.max(-134.0, Math.min(45.0, this.position.z));
 
     // 3. Resolve Y movement & Downward 3D Terrain Raycasting
     this.position.y += this.velocity.y * dt;
@@ -1917,13 +1905,12 @@ class CS2Player {
     if (this.map && this.map.groundMeshes && this.map.groundMeshes.length > 0) {
       this.downOrigin.set(this.position.x, this.position.y + 0.5, this.position.z);
       this.downRaycaster.set(this.downOrigin, this.downDir);
-      this.downRaycaster.far = 12.0; // High-performance capped far distance
+      this.downRaycaster.far = 12.0;
       const hits = this.downRaycaster.intersectObjects(this.map.groundMeshes, false);
       let foundGround = false;
       let highestGroundY = -999;
       for (let i = 0; i < hits.length; i++) {
         const ptY = hits[i].point.y;
-        // Strictly block climbing canyon mountain cliffs (cliffs are Y >= 6.8)
         if (ptY <= (this.position.y - this.playerHeight + 0.8) && ptY > highestGroundY && ptY <= 6.8) {
           highestGroundY = ptY;
           foundGround = true;
@@ -1935,14 +1922,19 @@ class CS2Player {
       }
     }
 
-    if (this.position.y <= targetGroundY + this.playerHeight) {
-      this.position.y = targetGroundY + this.playerHeight;
+    const groundSurfaceY = targetGroundY + this.playerHeight;
+    const heightDiff = groundSurfaceY - this.position.y;
+
+    if (this.position.y <= groundSurfaceY) {
+      this.position.y = groundSurfaceY;
       this.velocity.y = 0;
       this.isGrounded = true;
-    } else if (this.isGrounded && (targetGroundY + this.playerHeight - this.position.y) <= 0.45) {
-      this.position.y = targetGroundY + this.playerHeight;
+    } else if (this.isGrounded && heightDiff >= -0.05 && heightDiff <= 0.45) {
+      // Step up gentle elevation
+      this.position.y = groundSurfaceY;
       this.velocity.y = 0;
     } else {
+      // Natural free-fall off crates and ledges (zero teleportation)
       this.isGrounded = false;
     }
 

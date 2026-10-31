@@ -85,6 +85,11 @@ class CS2GameManager {
 
     this.radarCanvas = document.getElementById('radar-canvas');
     this.radarCtx = this.radarCanvas ? this.radarCanvas.getContext('2d') : null;
+    this.radarImg = new Image();
+    this.radarImg.src = 'textures/radar_dust2.png';
+    this.radarImgLoaded = false;
+    this.radarImg.onload = () => { this.radarImgLoaded = true; };
+
     this.net = new CS2NetworkManager(this);
 
     window.csGameManager = this;
@@ -614,10 +619,12 @@ class CS2GameManager {
     if (this.player.team === 'T' && !this.c4Planted && this.player.inventory[5]) {
       let inSite = null;
       let siteY = 0.1;
+      const playerFeetY = this.player.position.y - this.player.playerHeight;
       for (let i = 0; i < this.mapBuilder.bombZones.length; i++) {
         const site = this.mapBuilder.bombZones[i];
         const dist = Math.hypot(this.player.position.x - site.x, this.player.position.z - site.z);
-        if (dist <= site.radius) {
+        const dy = Math.abs(playerFeetY - (site.y || 0));
+        if (dist <= site.radius && dy < 3.2) {
           inSite = site.id;
           siteY = site.y || 0.1;
           break;
@@ -723,72 +730,50 @@ class CS2GameManager {
     const h = this.radarCanvas.height;
     const cx = w / 2;
     const cy = h / 2;
-    const scale = 0.68;
+    const zoomScale = 0.52; // Authentic CS2 radar zoom level
 
     ctx.clearRect(0, 0, w, h);
 
-    // Radar Background & Outer Ring
+    // Radar Background & Outer Circular Clipping
     ctx.save();
     ctx.beginPath();
     ctx.arc(cx, cy, cx - 2, 0, Math.PI * 2);
     ctx.clip();
 
-    ctx.fillStyle = '#0f141c';
+    ctx.fillStyle = '#0a0e14';
     ctx.fillRect(0, 0, w, h);
 
+    // Official CS2 Dust 2 Radar Map Projection
+    if (this.radarImgLoaded && this.radarImg) {
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(this.player.yaw);
+
+      // CS:GO / CS2 overview transform: pos_x = -2476, pos_y = 3239, scale = 4.4
+      const pu = (this.player.position.x / 0.045 + 2476) / 4.4;
+      const pv = (3239 + this.player.position.z / 0.045) / 4.4;
+
+      ctx.drawImage(
+        this.radarImg,
+        -pu * zoomScale,
+        -pv * zoomScale,
+        1024 * zoomScale,
+        1024 * zoomScale
+      );
+      ctx.restore();
+    }
+
     // World to Radar Transform: Straight ahead in direction of view is always UP (-Y)
+    const cScale = (1 / (0.045 * 4.4)) * zoomScale; // Canvas pixels per world meter
     const toRadar = (wx, wz) => {
       const dx = wx - this.player.position.x;
       const dz = wz - this.player.position.z;
-      const lx = (dx * Math.cos(this.player.yaw) - dz * Math.sin(this.player.yaw)) * scale;
-      const ly = (dx * Math.sin(this.player.yaw) + dz * Math.cos(this.player.yaw)) * scale;
-      return { x: cx + lx, y: cy + ly };
+      const cos = Math.cos(this.player.yaw);
+      const sin = Math.sin(this.player.yaw);
+      const rx = (dx * cos - dz * sin) * cScale;
+      const ry = (dx * sin + dz * cos) * cScale;
+      return { x: cx + rx, y: cy + ry };
     };
-
-    // Authentic CS2 Dust 2 Radar Minimap Corridors & Layout
-    const mapPaths = [
-      // Long A Corridor
-      [{ x: -65, z: 35 }, { x: -20, z: 25 }, { x: 30, z: 20 }, { x: 65, z: 10 }, { x: 65, z: -80 }, { x: 28, z: -118 }],
-      // Catwalk / Short A
-      [{ x: -30, z: 10 }, { x: 0, z: -10 }, { x: 18, z: -40 }, { x: 28, z: -118 }],
-      // Mid & Doors to CT Spawn
-      [{ x: -65, z: 35 }, { x: -30, z: 10 }, { x: -18, z: -45 }, { x: -5, z: -98 }],
-      // B Tunnels (Upper & Lower) to B Site
-      [{ x: -65, z: 35 }, { x: -85, z: 10 }, { x: -85, z: -70 }, { x: -72, z: -98 }],
-      // CT Spawn to B Site & Doors
-      [{ x: -5, z: -98 }, { x: -45, z: -98 }, { x: -72, z: -98 }],
-      // CT Spawn to A Site
-      [{ x: -5, z: -98 }, { x: 15, z: -98 }, { x: 28, z: -118 }]
-    ];
-
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-
-    // Draw thick minimap roadway base
-    ctx.lineWidth = 10;
-    ctx.strokeStyle = '#222d3d';
-    for (const path of mapPaths) {
-      ctx.beginPath();
-      for (let i = 0; i < path.length; i++) {
-        const pt = toRadar(path[i].x, path[i].z);
-        if (i === 0) ctx.moveTo(pt.x, pt.y);
-        else ctx.lineTo(pt.x, pt.y);
-      }
-      ctx.stroke();
-    }
-
-    // Draw inner minimap corridor highlight
-    ctx.lineWidth = 5;
-    ctx.strokeStyle = '#324258';
-    for (const path of mapPaths) {
-      ctx.beginPath();
-      for (let i = 0; i < path.length; i++) {
-        const pt = toRadar(path[i].x, path[i].z);
-        if (i === 0) ctx.moveTo(pt.x, pt.y);
-        else ctx.lineTo(pt.x, pt.y);
-      }
-      ctx.stroke();
-    }
 
     // Bombsites A & B
     const bZones = this.mapBuilder.bombZones;
@@ -798,7 +783,7 @@ class CS2GameManager {
 
       ctx.fillStyle = 'rgba(235, 65, 45, 0.45)';
       ctx.beginPath();
-      ctx.arc(pt.x, pt.y, site.radius * scale, 0, Math.PI * 2);
+      ctx.arc(pt.x, pt.y, site.radius * cScale * 0.7, 0, Math.PI * 2);
       ctx.fill();
 
       ctx.strokeStyle = '#eb412d';
@@ -806,7 +791,7 @@ class CS2GameManager {
       ctx.stroke();
 
       ctx.fillStyle = '#ffcc00';
-      ctx.font = 'bold 13px Chakra Petch, sans-serif';
+      ctx.font = 'bold 12px Chakra Petch, sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(site.id, pt.x, pt.y);
@@ -826,7 +811,7 @@ class CS2GameManager {
     const remPlayers = Object.values(this.net.remotePlayers);
     for (let i = 0; i < remPlayers.length; i++) {
       const p = remPlayers[i];
-      if (p.team !== this.player.team) continue; // Only friendly teammates appear on radar
+      if (p.team !== this.player.team) continue;
 
       const pt = toRadar(p.pos.x, p.pos.z);
       ctx.fillStyle = p.team === 'CT' ? '#5b97d5' : '#e5a035';
@@ -928,9 +913,12 @@ class CS2GameManager {
         }
 
         if (this.c4Timer <= 0) {
-          const boomPos = this.c4Pos ? this.c4Pos.clone() : this.c4Mesh.position.clone();
+          const boomPos = this.c4Pos
+            ? new THREE.Vector3(this.c4Pos.x, (this.c4Pos.y !== undefined ? this.c4Pos.y : 0.1), this.c4Pos.z)
+            : this.c4Mesh.position.clone();
           this.c4Planted = false;
           this.c4Mesh.visible = false;
+          if (this.c4Light) this.c4Light.intensity = 0;
           window.csAudio.playExplosion();
 
           // Spawn authentic fireball animation & shockwave

@@ -153,52 +153,49 @@ class CS2MapBuilder {
     // MAP BOUNDARIES & OBSTACLES (Outer Perimeter Limits & Anti-Escape Clips)
     // ==========================================================
     // Outer skybox boundaries preventing walking off into void
-    this.addCollider(0, -15, -165, 260, 45, 12); // North limit
-    this.addCollider(0, -15, 68, 260, 45, 12);   // South limit
-    this.addCollider(-115, -15, -50, 12, 45, 260); // West limit
-    this.addCollider(88, -15, -50, 12, 45, 260);  // East limit
+    this.addCollider(0, -15, -145, 260, 45, 12); // North limit
+    this.addCollider(0, -15, 52, 260, 45, 12);   // South limit
+    this.addCollider(-102, -15, -50, 12, 45, 260); // West limit
+    this.addCollider(74, -15, -50, 12, 45, 260);  // East limit
 
-    // Canyon Cliff Top Invisible Barrier Clips (Blocks escaping onto the mountain ridges shown in Pic 2 & 3)
-    this.addCollider(-50, 4.0, -10, 80, 20, 10);  // Canyon wall ridge above mid
-    this.addCollider(-75, 4.0, -35, 30, 20, 40);  // Canyon cliff above B doors / tunnels
-    this.addCollider(-20, 4.0, -60, 40, 20, 25);  // Canyon ridge above double doors
-    this.addCollider(55, 5.0, -120, 30, 20, 60);  // Canyon ridge east of A site
-    this.addCollider(-85, 3.5, -90, 25, 20, 50);  // Wall above B site back plateau
+    // Canyon Cliff Top Invisible Barrier Clips (Blocks escaping onto mountain ridges, TUNNEL FREED)
+    this.addCollider(-50, 12.0, -10, 80, 20, 10);  // Canyon wall ridge above mid
+    this.addCollider(-20, 12.0, -60, 40, 20, 25);  // Canyon ridge above double doors
+    this.addCollider(55, 12.0, -120, 30, 20, 60);  // Canyon ridge east of A site
+    this.addCollider(-85, 10.0, -90, 25, 20, 50);  // Wall above B site back plateau
 
     // ==========================================================
     // BOMBSITES & BUY ZONES (100% Authentic Dust 2 Geometry)
     // ==========================================================
 
-    // Bombsite A: Positioned directly at the platform triple boxes (Pic 4)
-    this.addBombsiteZone('A', 34.0, 4.3, -128.0, 9.5);
+    // Bombsite A: Positioned directly at the platform crates (Pic 6)
+    this.addBombsiteZone('A', 51.5, 4.81, -115.0, 9.0);
 
-    // Bombsite B: Positioned directly in the courtyard spray between crates (Pic 5)
-    this.addBombsiteZone('B', -66.0, 0.05, -91.0, 9.5);
+    // Bombsite B: Positioned directly in the courtyard center between crates
+    this.addBombsiteZone('B', -67.5, 0.89, -108.0, 9.0);
 
     // Authentic Buy Zones matching CT & T Spawns
     this.buyZones.CT = { minX: -25, maxX: 15, minZ: -115, maxZ: -85 };
     this.buyZones.T = { minX: -90, maxX: -40, minZ: 20, maxZ: 50 };
 
     // ==========================================================
-    // AUTHENTIC DUST 2 SPAWN POINTS
+    // AUTHENTIC DUST 2 SPAWN POINTS (Exact Ground Heights: CT -3.56, T 7.96)
     // ==========================================================
 
-    // CT Spawns: Y set high — respawn() raycasts down to find true ground
     this.spawnPoints.CT = [
-      { x: -5.0, y: 25.0, z: -98.0, yaw: Math.PI },
-      { x: -2.0, y: 25.0, z: -96.0, yaw: Math.PI },
-      { x: -8.0, y: 25.0, z: -96.0, yaw: Math.PI },
-      { x: -5.0, y: 25.0, z: -101.0, yaw: Math.PI },
-      { x: -1.0, y: 25.0, z: -100.0, yaw: Math.PI }
+      { x: -5.0, y: -3.56, z: -98.0, yaw: Math.PI },
+      { x: -2.0, y: -3.56, z: -96.0, yaw: Math.PI },
+      { x: -8.0, y: -3.56, z: -96.0, yaw: Math.PI },
+      { x: -5.0, y: -3.56, z: -101.0, yaw: Math.PI },
+      { x: -1.0, y: -3.56, z: -100.0, yaw: Math.PI }
     ];
 
-    // T Spawns: Y set high — respawn() raycasts down to find true ground
     this.spawnPoints.T = [
-      { x: -65.0, y: 25.0, z: 35.0, yaw: 0 },
-      { x: -61.0, y: 25.0, z: 33.0, yaw: 0 },
-      { x: -69.0, y: 25.0, z: 33.0, yaw: 0 },
-      { x: -65.0, y: 25.0, z: 38.0, yaw: 0 },
-      { x: -58.0, y: 25.0, z: 36.0, yaw: 0 }
+      { x: -65.0, y: 7.96, z: 35.0, yaw: 0 },
+      { x: -61.0, y: 7.96, z: 33.0, yaw: 0 },
+      { x: -69.0, y: 7.96, z: 33.0, yaw: 0 },
+      { x: -65.0, y: 7.96, z: 38.0, yaw: 0 },
+      { x: -58.0, y: 7.96, z: 36.0, yaw: 0 }
     ];
   }
 }
