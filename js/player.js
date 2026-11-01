@@ -317,16 +317,16 @@ class CS2Player {
 
   // Viewmodel positioning per weapon category: authentic forward orientation into crosshair
   static WEAPON_VIEWMODEL = {
-    'pistols':    { pos: [0.14, -0.15, -0.28], scale: 0.018, rot: [0, Math.PI, 0] },
+    'pistols':    { pos: [0.16, -0.16, -0.32], scale: 0.018, rot: [0, Math.PI, 0] },
     'mid-tier':   { pos: [0.15, -0.16, -0.30], scale: 0.017, rot: [0, Math.PI, 0] },
     'smgs':       { pos: [0.15, -0.16, -0.30], scale: 0.017, rot: [0, Math.PI, 0] },
-    'rifles':     { pos: [0.15, -0.15, -0.28], scale: 0.016, rot: [0, Math.PI, 0] },
-    'shotguns':   { pos: [0.15, -0.16, -0.30], scale: 0.016, rot: [0, -Math.PI / 2, 0] },
+    'rifles':     { pos: [0.15, -0.16, -0.30], scale: 0.016, rot: [0, Math.PI, 0] },
+    'shotguns':   { pos: [0.15, -0.16, -0.30], scale: 0.016, rot: [0, Math.PI, 0] },
     'machineguns':{ pos: [0.14, -0.16, -0.30], scale: 0.016, rot: [0, Math.PI, 0] },
     'snipers':    { pos: [0.14, -0.15, -0.28], scale: 0.016, rot: [0, Math.PI, 0] },
     'equipment':  { pos: [0.15, -0.16, -0.30], scale: 0.020, rot: [0, 0, 0] },
-    'melee':      { pos: [0.16, -0.16, -0.28], scale: 0.016, rot: [Math.PI / 2 - 0.2, 0.3, -0.2] },
-    'knife':      { pos: [0.16, -0.16, -0.28], scale: 0.016, rot: [Math.PI / 2 - 0.2, 0.3, -0.2] }
+    'melee':      { pos: [0.18, -0.16, -0.32], scale: 0.016, rot: [Math.PI / 2, -0.35, 0.25] },
+    'knife':      { pos: [0.18, -0.16, -0.32], scale: 0.016, rot: [Math.PI / 2, -0.35, 0.25] }
   };
 
   // Loads the FBX file containing all CSS weapon meshes
@@ -356,11 +356,11 @@ class CS2Player {
       fbxScene.traverse((child) => {
         if (child.isMesh && child.name) {
           const raw = child.name;
-          this.weaponMeshCache[raw] = child;
           const clean = cleanMeshName(raw);
-          if (clean) {
-            this.weaponMeshCache[clean] = child;
-          }
+          child.cleanName = clean;
+          child.name = clean;
+          this.weaponMeshCache[clean] = child;
+          this.weaponMeshCache[raw] = child;
         }
       });
 
@@ -368,6 +368,8 @@ class CS2Player {
         if (child.name) {
           const raw = child.name;
           const clean = cleanMeshName(raw);
+          child.cleanName = clean;
+          child.name = clean;
           if (clean && !this.weaponMeshCache[clean]) {
             this.weaponMeshCache[clean] = child;
           }
@@ -509,7 +511,7 @@ class CS2Player {
 
     window.__heldWeaponDiagnostics = {
       weaponId: weaponId,
-      meshName: cachedMesh.name || 'unknown',
+      meshName: cachedMesh.cleanName || (cachedMesh.name ? cachedMesh.name.split('mdl')[0] : 'unknown'),
       matType: matType,
       mapLoaded: mapLoaded,
       mapDimensions: mapDimensions,
@@ -736,10 +738,12 @@ class CS2Player {
       this.keys[e.code] = true;
 
       // Orientation calibration tool under ?debug=1 (I/K/J/L/U/O + Arrows + [])
-      if (window.__CS2_DEBUG && this.activeWeapon) {
+      const isDebug = !!(window.__CS2_DEBUG || (typeof window !== 'undefined' && window.location && window.location.search.includes('debug=1')));
+      if (isDebug && this.activeWeapon) {
         let cat = this.activeWeapon.category || 'rifles';
         if (this.activeWeapon.id === 'knife' || this.activeWeapon.category === 'melee') cat = 'knife';
-        const vm = CS2Player.WEAPON_VIEWMODEL[cat];
+        else if (this.activeWeapon.category === 'snipers' || this.activeWeapon.id === 'awp') cat = 'snipers';
+        const vm = CS2Player.WEAPON_VIEWMODEL[cat] || CS2Player.WEAPON_VIEWMODEL['rifles'];
         if (vm) {
           const stepRad = e.shiftKey ? (5 * Math.PI / 180) : (Math.PI / 2);
           const posStep = e.shiftKey ? 0.05 : 0.01;
@@ -764,8 +768,8 @@ class CS2Player {
               this.activeWeaponMeshGroup.rotation.set(vm.rot[0], vm.rot[1], vm.rot[2]);
             }
             const deg = vm.rot.map(r => ((r * 180 / Math.PI) % 360).toFixed(1));
-            const logStr = `[CALIBRATION] cat=${cat} rot=[${deg.join(', ')}°] pos=[${vm.pos.map(p=>p.toFixed(3)).join(', ')}] scale=${(vm.scale || 0.016).toFixed(3)}`;
-            console.log(logStr);
+            const logStr = `cat=${cat} rot=[${deg.join(', ')}°] pos=[${vm.pos.map(p=>p.toFixed(3)).join(', ')}] scale=${(vm.scale || 0.016).toFixed(3)}`;
+            console.log(`[CALIBRATION] ${logStr}`);
             window.__lastWeaponCalibration = logStr;
           }
         }

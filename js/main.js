@@ -138,6 +138,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Initialize Game Engine
   const gameManager = new CS2GameManager(scene, camera);
+  window.game = gameManager;
+  window.csGameManager = gameManager;
   setupDebugOverlay(gameManager, renderer, scene, camera);
 
   // Pre-compile all scene shaders on startup (eliminates mid-combat shader compile freezes)
@@ -788,6 +790,82 @@ document.addEventListener('DOMContentLoaded', () => {
       'white-space: pre'
     ].join(';');
     document.body.appendChild(overlay);
+
+    // Interactive On-Screen Calibration Panel (?debug=1)
+    const calibPanel = document.createElement('div');
+    calibPanel.id = 'cs2-calib-panel';
+    calibPanel.style.cssText = [
+      'position: fixed',
+      'bottom: 16px',
+      'left: 12px',
+      'z-index: 999999',
+      'background: rgba(10, 16, 24, 0.95)',
+      'border: 1px solid #00e5ff',
+      'border-radius: 4px',
+      'padding: 8px 12px',
+      'font-family: Consolas, "Courier New", monospace',
+      'font-size: 11px',
+      'color: #00e5ff',
+      'pointer-events: auto',
+      'box-shadow: 0 4px 16px rgba(0,0,0,0.85)'
+    ].join(';');
+
+    let calibStepRad = Math.PI / 2;
+    let calibPosStep = 0.02;
+
+    window.__adjustCalib = (type, axis, sign) => {
+      const p = gameManager.player;
+      if (!p || !p.activeWeapon) return;
+      let cat = p.activeWeapon.category || 'rifles';
+      if (p.activeWeapon.id === 'knife' || p.activeWeapon.category === 'melee') cat = 'knife';
+      const vm = CS2Player.WEAPON_VIEWMODEL[cat] || CS2Player.WEAPON_VIEWMODEL['rifles'];
+      if (type === 'rot') {
+        vm.rot[axis] += sign * calibStepRad;
+      } else if (type === 'pos') {
+        vm.pos[axis] += sign * calibPosStep;
+      } else if (type === 'scale') {
+        vm.scale = Math.max(0.001, (vm.scale || 0.016) + sign * 0.001);
+      }
+      if (p.activeWeaponMeshGroup) {
+        p.activeWeaponMeshGroup.position.set(vm.pos[0], vm.pos[1], vm.pos[2]);
+        p.activeWeaponMeshGroup.rotation.set(vm.rot[0], vm.rot[1], vm.rot[2]);
+      }
+      const deg = vm.rot.map(r => ((r * 180 / Math.PI) % 360).toFixed(1));
+      const logStr = `cat=${cat} rot=[${deg.join(', ')}°] pos=[${vm.pos.map(v=>v.toFixed(3)).join(', ')}] scale=${(vm.scale || 0.016).toFixed(3)}`;
+      window.__lastWeaponCalibration = logStr;
+      console.log(`[CALIBRATION] ${logStr}`);
+    };
+
+    window.__toggleCalibStep = () => {
+      if (calibStepRad > 0.5) {
+        calibStepRad = 5 * Math.PI / 180;
+        calibPosStep = 0.005;
+        return '5°';
+      } else {
+        calibStepRad = Math.PI / 2;
+        calibPosStep = 0.02;
+        return '90°';
+      }
+    };
+
+    calibPanel.innerHTML = `
+      <div style="font-weight:bold;margin-bottom:6px;color:#fff;">WEAPON CALIBRATION CONTROLS</div>
+      <div style="margin-bottom:4px;">
+        Rot X: <button style="cursor:pointer;padding:1px 6px;margin:0 2px;" onclick="window.__adjustCalib('rot',0,-1)">-</button><button style="cursor:pointer;padding:1px 6px;margin:0 2px;" onclick="window.__adjustCalib('rot',0,1)">+</button>
+        Rot Y: <button style="cursor:pointer;padding:1px 6px;margin:0 2px;" onclick="window.__adjustCalib('rot',1,-1)">-</button><button style="cursor:pointer;padding:1px 6px;margin:0 2px;" onclick="window.__adjustCalib('rot',1,1)">+</button>
+        Rot Z: <button style="cursor:pointer;padding:1px 6px;margin:0 2px;" onclick="window.__adjustCalib('rot',2,-1)">-</button><button style="cursor:pointer;padding:1px 6px;margin:0 2px;" onclick="window.__adjustCalib('rot',2,1)">+</button>
+      </div>
+      <div style="margin-bottom:4px;">
+        Pos X: <button style="cursor:pointer;padding:1px 6px;margin:0 2px;" onclick="window.__adjustCalib('pos',0,-1)">-</button><button style="cursor:pointer;padding:1px 6px;margin:0 2px;" onclick="window.__adjustCalib('pos',0,1)">+</button>
+        Pos Y: <button style="cursor:pointer;padding:1px 6px;margin:0 2px;" onclick="window.__adjustCalib('pos',1,-1)">-</button><button style="cursor:pointer;padding:1px 6px;margin:0 2px;" onclick="window.__adjustCalib('pos',1,1)">+</button>
+        Pos Z: <button style="cursor:pointer;padding:1px 6px;margin:0 2px;" onclick="window.__adjustCalib('pos',2,-1)">-</button><button style="cursor:pointer;padding:1px 6px;margin:0 2px;" onclick="window.__adjustCalib('pos',2,1)">+</button>
+      </div>
+      <div>
+        Scale: <button style="cursor:pointer;padding:1px 6px;margin:0 2px;" onclick="window.__adjustCalib('scale',0,-1)">-</button><button style="cursor:pointer;padding:1px 6px;margin:0 2px;" onclick="window.__adjustCalib('scale',0,1)">+</button>
+        &nbsp;Step: <button id="calib-step-btn" style="cursor:pointer;padding:1px 8px;" onclick="this.innerText = window.__toggleCalibStep();">90°</button>
+      </div>
+    `;
+    document.body.appendChild(calibPanel);
 
     const update = () => {
       try {
