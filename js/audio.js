@@ -158,10 +158,9 @@ class CS2AudioSystem {
 
       this.initialized = true;
 
-      // Preload primary audio buffers
-      const primaryKeys = ['ak47', 'm4a1', 'm4a4', 'awp', 'deagle', 'usp', 'glock', 'mp5sd', 'p90', 'knife_slash', 'knife_hit', 'c4_beep', 'c4_explode', 'c4_plant', 'c4_defuse', 'jump', 'land', 'footstep_1', 'footstep_2'];
-      primaryKeys.forEach(k => {
-        if (this.soundPaths[k]) this.preloadSample(k, this.soundPaths[k]);
+      // Preload all audio samples (eliminates in-game decode hitching on first shot)
+      Object.keys(this.soundPaths).forEach(k => {
+        this.preloadSample(k, this.soundPaths[k]);
       });
     } catch (e) {
       console.warn("AudioContext init postponed", e);

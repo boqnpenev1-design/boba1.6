@@ -102,6 +102,22 @@ class CS2Player {
       this.bulletHolePool.push(mesh);
     }
 
+    // Pre-allocated Tracer Pool (eliminates garbage collection and shader compile on firing)
+    this.tracerMat = new THREE.LineBasicMaterial({
+      color: 0xffe680,
+      transparent: true,
+      opacity: 0.95
+    });
+    this.tracerPool = [];
+    this.tracerPoolIndex = 0;
+    for (let i = 0; i < 16; i++) {
+      const tGeo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]);
+      const line = new THREE.Line(tGeo, this.tracerMat);
+      line.visible = false;
+      this.scene.add(line);
+      this.tracerPool.push(line);
+    }
+
     // Pre-allocated Shared Smoke Resources (eliminates shader hitch on grenade pop)
     this.sharedSmokeGeo = new THREE.SphereGeometry(5.4, 12, 12);
     this.sharedSmokeMat = new THREE.MeshLambertMaterial({
@@ -1374,20 +1390,18 @@ class CS2Player {
     window.csAudio.playSound('bullet_impact', 'sfx', 0.5);
   }
 
-  // Authentic CS2 tracer line from forward barrel tip to impact point
+  // Authentic CS2 tracer line from forward barrel tip to impact point (zero allocation pooled)
   spawnTracer(start, end) {
-    const geo = new THREE.BufferGeometry().setFromPoints([start, end]);
-    const mat = new THREE.LineBasicMaterial({
-      color: 0xffe680,
-      transparent: true,
-      opacity: 0.95
-    });
-    const line = new THREE.Line(geo, mat);
-    this.scene.add(line);
+    if (!this.tracerPool || this.tracerPool.length === 0) return;
+    const line = this.tracerPool[this.tracerPoolIndex];
+    this.tracerPoolIndex = (this.tracerPoolIndex + 1) % this.tracerPool.length;
+    const pos = line.geometry.attributes.position;
+    pos.setXYZ(0, start.x, start.y, start.z);
+    pos.setXYZ(1, end.x, end.y, end.z);
+    pos.needsUpdate = true;
+    line.visible = true;
     setTimeout(() => {
-      this.scene.remove(line);
-      geo.dispose();
-      mat.dispose();
+      line.visible = false;
     }, 45);
   }
 

@@ -140,6 +140,20 @@ document.addEventListener('DOMContentLoaded', () => {
   const gameManager = new CS2GameManager(scene, camera);
   setupDebugOverlay(gameManager, renderer, scene, camera);
 
+  // Pre-compile all scene shaders on startup (eliminates mid-combat shader compile freezes)
+  try {
+    if (gameManager.player && gameManager.player.muzzleFlashMesh) {
+      gameManager.player.muzzleFlashMesh.visible = true;
+    }
+    renderer.compile(scene, camera);
+    if (gameManager.player && gameManager.player.muzzleFlashMesh) {
+      gameManager.player.muzzleFlashMesh.visible = false;
+    }
+    console.log('[PERF] Pre-compiled shaders successfully, programs:', renderer.info.programs ? renderer.info.programs.length : 0);
+  } catch (e) {
+    console.warn('[PERF] Shader pre-compile warning:', e);
+  }
+
   // 3. Main Menu Navigation
   const navTabs = document.querySelectorAll('.nav-tab');
   navTabs.forEach(tab => {
