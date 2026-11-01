@@ -1374,6 +1374,12 @@ document.addEventListener('DOMContentLoaded', () => {
           catEl.innerText = `${gameManager.player.activeWeapon.category || 'rifles'}:${gameManager.player.activeWeapon.id}`;
         }
 
+        let collDecisionStr = 'stepTested: 0.00 | normal.y: 1.00 | result: CLEAR';
+        if (gameManager.player && gameManager.player.collisionDecision) {
+          const cd = gameManager.player.collisionDecision;
+          collDecisionStr = `stepTested: ${cd.stepTested} | normal.y: ${cd.normalY} | result: ${cd.result}`;
+        }
+
         overlay.textContent =
 `[CS2 ENGINE DEBUG] ?debug=1
 BUILD_ID:      ${buildId}
@@ -1393,6 +1399,7 @@ DROPS:         ${dropsStr}
 CAMERA:        ${camStr} | fog: ${fogStr}
 PLAYER:        pos: ${pPosStr} | feetY: ${feetYStr}
 LAST CORRECTION: ${corrStr}
+COLLISION:     ${collDecisionStr}
 WEAPON:        ${wpnStr}${calibStr}
 HELD TEXTURE:  ${heldTexStr}
 TEC-9 NOTE:    shared w_pist_elite_single (Provide tec9.fbx or tec9.glb in models/)

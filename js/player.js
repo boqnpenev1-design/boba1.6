@@ -2166,36 +2166,58 @@ class CS2Player {
       return (this.map && this.map.groundMeshes) ? this.map.groundMeshes : [];
     };
 
-    // Feeler obstacle check at waist height (solid crates block walkover)
+    const maxStepUp = 0.75; // Authentic CS2 step-up limit (up to 0.75m ledges cleared without freezing)
+    let decisionStep = 0;
+    let decisionNormalY = 1.0;
+    let decisionResult = 'CLEAR';
+
+    // Feeler obstacle check at chest height (solid crates/walls block walkover)
     const checkMeshWall = (dirX, dirZ, dist) => {
       const candidates = getNearbyMeshes(oldX, oldZ);
       if (candidates.length === 0) return false;
       this.wallDir.set(dirX, 0, dirZ).normalize();
       const currentFeetY = this.position.y - this.playerHeight;
-      this.wallOrigin.set(oldX, currentFeetY + 0.85, oldZ);
+      this.wallOrigin.set(oldX, currentFeetY + maxStepUp + 0.15, oldZ);
       this.wallRaycaster.set(this.wallOrigin, this.wallDir);
       this.wallRaycaster.far = dist;
       const hits = this.wallRaycaster.intersectObjects(candidates, false);
-      return hits.length > 0 && hits[0].distance < dist;
+      if (hits.length > 0 && hits[0].distance < dist) {
+        if (hits[0].face && hits[0].face.normal) decisionNormalY = hits[0].face.normal.y;
+        return true;
+      }
+      return false;
     };
 
-    // 1. Resolve X movement (enables sliding smoothly along walls)
+    // 1. Resolve X movement (enables sliding smoothly along walls & stepping up ledges)
     this.position.x += this.velocity.x * dt;
+    const currentFeetY_X = this.position.y - this.playerHeight;
     for (let i = 0; i < colliders.length; i++) {
       const c = colliders[i];
       if (c.isClimbable) continue;
       const box = c.box;
       if (
-        this.position.y > box.min.y && (this.position.y - this.playerHeight) < box.max.y &&
+        this.position.y > box.min.y && currentFeetY_X < box.max.y &&
         this.position.x + playerRadius > box.min.x &&
         this.position.x - playerRadius < box.max.x &&
         oldZ + playerRadius > box.min.z &&
         oldZ - playerRadius < box.max.z
       ) {
-        this.position.x = oldX;
-        this.velocity.x = 0;
-        this.lastCorrection = { reason: 'collider_x', delta: (this.position.x - oldX).toFixed(3), t: Date.now() };
-        break;
+        const stepDiff = box.max.y - currentFeetY_X;
+        decisionStep = stepDiff;
+        if (stepDiff > 0 && stepDiff <= maxStepUp) {
+          // Smooth step-up onto ledge without freezing velocity
+          this.position.y = box.max.y + this.playerHeight;
+          this.velocity.y = 0;
+          this.isGrounded = true;
+          decisionResult = 'STEP_UP_X';
+        } else {
+          // Wall slide: cancel X velocity, keep Z velocity sliding along wall
+          this.position.x = oldX;
+          this.velocity.x = 0;
+          decisionResult = 'SLIDE_WALL_X';
+          this.lastCorrection = { reason: 'collider_x_slide', delta: (this.position.x - oldX).toFixed(3), t: Date.now() };
+          break;
+        }
       }
     }
     if (Math.abs(this.velocity.x) > 0.05) {
@@ -2203,27 +2225,41 @@ class CS2Player {
       if (checkMeshWall(Math.sign(this.velocity.x), 0, dist)) {
         this.position.x = oldX;
         this.velocity.x = 0;
-        this.lastCorrection = { reason: 'mesh_wall_x', delta: (this.position.x - oldX).toFixed(3), t: Date.now() };
+        decisionResult = 'SLIDE_MESH_X';
+        this.lastCorrection = { reason: 'mesh_wall_x_slide', delta: (this.position.x - oldX).toFixed(3), t: Date.now() };
       }
     }
 
-    // 2. Resolve Z movement
+    // 2. Resolve Z movement (enables sliding smoothly along walls & stepping up ledges)
     this.position.z += this.velocity.z * dt;
+    const currentFeetY_Z = this.position.y - this.playerHeight;
     for (let i = 0; i < colliders.length; i++) {
       const c = colliders[i];
       if (c.isClimbable) continue;
       const box = c.box;
       if (
-        this.position.y > box.min.y && (this.position.y - this.playerHeight) < box.max.y &&
+        this.position.y > box.min.y && currentFeetY_Z < box.max.y &&
         this.position.x + playerRadius > box.min.x &&
         this.position.x - playerRadius < box.max.x &&
         this.position.z + playerRadius > box.min.z &&
         this.position.z - playerRadius < box.max.z
       ) {
-        this.position.z = oldZ;
-        this.velocity.z = 0;
-        this.lastCorrection = { reason: 'collider_z', delta: (this.position.z - oldZ).toFixed(3), t: Date.now() };
-        break;
+        const stepDiff = box.max.y - currentFeetY_Z;
+        decisionStep = stepDiff;
+        if (stepDiff > 0 && stepDiff <= maxStepUp) {
+          // Smooth step-up onto ledge without freezing velocity
+          this.position.y = box.max.y + this.playerHeight;
+          this.velocity.y = 0;
+          this.isGrounded = true;
+          decisionResult = 'STEP_UP_Z';
+        } else {
+          // Wall slide: cancel Z velocity, keep X velocity sliding along wall
+          this.position.z = oldZ;
+          this.velocity.z = 0;
+          decisionResult = 'SLIDE_WALL_Z';
+          this.lastCorrection = { reason: 'collider_z_slide', delta: (this.position.z - oldZ).toFixed(3), t: Date.now() };
+          break;
+        }
       }
     }
     if (Math.abs(this.velocity.z) > 0.05) {
@@ -2231,9 +2267,16 @@ class CS2Player {
       if (checkMeshWall(0, Math.sign(this.velocity.z), dist)) {
         this.position.z = oldZ;
         this.velocity.z = 0;
-        this.lastCorrection = { reason: 'mesh_wall_z', delta: (this.position.z - oldZ).toFixed(3), t: Date.now() };
+        decisionResult = 'SLIDE_MESH_Z';
+        this.lastCorrection = { reason: 'mesh_wall_z_slide', delta: (this.position.z - oldZ).toFixed(3), t: Date.now() };
       }
     }
+
+    this.collisionDecision = {
+      stepTested: decisionStep.toFixed(2),
+      normalY: decisionNormalY.toFixed(2),
+      result: decisionResult
+    };
 
     // Perimeter boundary clamp strictly preventing walking out onto exterior cliffs
     const preClampX = this.position.x;
