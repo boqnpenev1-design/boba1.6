@@ -774,9 +774,11 @@ class CS2NetworkManager {
         rp.mesh.rotation.y = latest.yaw;
       }
 
-      // Procedural bone articulation (Idle ready carry, walk/run leg swing, death collapse)
+      // Procedural bone articulation (Idle ready carry, walk, run, crouch, crouch walk, jump/air, death collapse)
       const moveSpeed = Math.hypot(rp.mesh.position.x - prevX, rp.mesh.position.z - prevZ);
       const isAlive = (rp.isAlive !== false);
+      const isCrouched = !!(rp.isCrouched || (latest && latest.crouch));
+      const inAir = Math.abs(rp.mesh.position.y - prevY) > 0.04;
 
       if (!isAlive) {
         rp.mesh.rotation.z = -Math.PI / 2;
@@ -792,23 +794,45 @@ class CS2NetworkManager {
           if (b.armLowerL) b.armLowerL.rotation.y = -0.75;
           if (b.armLowerR) b.armLowerR.rotation.y = 0.75;
 
-          const walkCycle = Math.sin(now * 0.011);
           const isMoving = moveSpeed > 0.015;
-          rp.activeState = isMoving ? (moveSpeed > 0.08 ? 'RUN' : 'WALK') : 'IDLE';
 
-          if (isMoving) {
-            const walkAmp = Math.min(0.65, moveSpeed * 6.5);
+          if (inAir) {
+            rp.activeState = 'JUMP';
+            if (b.legUpperL) b.legUpperL.rotation.set(-0.45, 0.1, 0);
+            if (b.legUpperR) b.legUpperR.rotation.set(-0.35, -0.1, 0);
+            if (b.legLowerL) b.legLowerL.rotation.x = 0.60;
+            if (b.legLowerR) b.legLowerR.rotation.x = 0.50;
+            if (b.spine) b.spine.rotation.x = 0.05;
+          } else if (isCrouched) {
+            rp.activeState = isMoving ? 'CROUCH_WALK' : 'CROUCH';
+            const crouchStride = isMoving ? Math.sin(now * 0.009) * 0.35 : 0;
+            if (b.legUpperL) b.legUpperL.rotation.x = -0.70 + crouchStride;
+            if (b.legUpperR) b.legUpperR.rotation.x = -0.70 - crouchStride;
+            if (b.legLowerL) b.legLowerL.rotation.x = 1.10 - Math.max(0, crouchStride * 0.5);
+            if (b.legLowerR) b.legLowerR.rotation.x = 1.10 + Math.max(0, crouchStride * 0.5);
+            if (b.spine) b.spine.rotation.x = -0.12;
+          } else if (isMoving) {
+            const isRun = moveSpeed > 0.07;
+            rp.activeState = isRun ? 'RUN' : 'WALK';
+            const freq = isRun ? 0.013 : 0.010;
+            const walkCycle = Math.sin(now * freq);
+            const walkAmp = isRun ? Math.min(0.75, moveSpeed * 7.5) : Math.min(0.50, moveSpeed * 5.0);
+
             if (b.legUpperL) b.legUpperL.rotation.x = walkCycle * walkAmp;
             if (b.legUpperR) b.legUpperR.rotation.x = -walkCycle * walkAmp;
             if (b.legLowerL) b.legLowerL.rotation.x = Math.max(0, -walkCycle * walkAmp * 0.7);
             if (b.legLowerR) b.legLowerR.rotation.x = Math.max(0, walkCycle * walkAmp * 0.7);
             if (b.armUpperL) b.armUpperL.rotation.x = -0.65 - walkCycle * walkAmp * 0.25;
             if (b.armUpperR) b.armUpperR.rotation.x = -0.65 + walkCycle * walkAmp * 0.25;
+            if (b.spine) b.spine.rotation.x = isRun ? -0.14 : -0.05;
           } else {
-            if (b.legUpperL) b.legUpperL.rotation.x = 0;
-            if (b.legUpperR) b.legUpperR.rotation.x = 0;
+            rp.activeState = 'IDLE';
+            const idleBreathe = Math.sin(now * 0.002) * 0.02;
+            if (b.legUpperL) b.legUpperL.rotation.set(0, 0, 0);
+            if (b.legUpperR) b.legUpperR.rotation.set(0, 0, 0);
             if (b.legLowerL) b.legLowerL.rotation.x = 0;
             if (b.legLowerR) b.legLowerR.rotation.x = 0;
+            if (b.spine) b.spine.rotation.x = idleBreathe;
           }
         }
       }
