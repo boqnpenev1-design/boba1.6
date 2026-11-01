@@ -292,6 +292,7 @@ class CS2GameManager {
     this.c4Timer = 40.0;
     this.c4PlantPos = null;
     this.c4Site = null;
+    this._hasExploded = false;
 
     const timerEl = document.getElementById('round-timer');
     const phaseEl = document.getElementById('round-phase-label');
@@ -631,6 +632,9 @@ class CS2GameManager {
   // 3D Visual C4 Explosion Effect with screen shake & radial shockwave
   spawnC4ExplosionEffect(pos) {
     if (!pos) return;
+    if (this._hasExploded) return;
+    this._hasExploded = true;
+
     const expGroup = new THREE.Group();
     expGroup.position.copy(pos);
 
@@ -650,11 +654,30 @@ class CS2GameManager {
 
     this.scene.add(expGroup);
 
-    // Camera screen shake based on blast proximity
+    // Audio with distance falloff (Item 3)
     const dist = this.player.position.distanceTo(pos);
-    const shakeIntensity = Math.max(0, 0.40 * (1 - dist / 55));
+    const maxAudioDist = 80.0;
+    const vol = Math.max(0.25, Math.min(2.5, 2.2 * (1.0 - (dist / maxAudioDist) * 0.75)));
+    window.csAudio.playSound('c4_explode', 'c4', vol);
+
+    // Full-screen white flash & blast shake
+    const flashEl = document.getElementById('flash-overlay');
+    if (flashEl) {
+      const flashAlpha = Math.max(0.15, Math.min(1.0, 1.2 - (dist / 45.0)));
+      flashEl.style.backgroundColor = `rgba(255, 230, 200, ${flashAlpha})`;
+      setTimeout(() => { flashEl.style.backgroundColor = 'rgba(255, 255, 255, 0)'; }, 380);
+    }
+
+    const shakeIntensity = Math.max(0, 0.65 * (1 - dist / 55));
     this.player.pitch += (Math.random() - 0.5) * shakeIntensity;
     this.player.yaw += (Math.random() - 0.5) * shakeIntensity;
+
+    // Damage by distance to everyone in radius (lethal inside 25m, max radius 50m)
+    if (dist < 50) {
+      const factor = Math.pow(Math.max(0, 1 - dist / 50), 1.5);
+      const blastDamage = Math.round(500 * factor);
+      this.player.takeDamage(blastDamage, 'C4 Explosive', 'c4');
+    }
 
     const t0 = performance.now();
     const anim = setInterval(() => {
@@ -790,6 +813,17 @@ class CS2GameManager {
             this.player.isPlanting = false;
             this.player.plantProgress = 0;
             this.player.inventory[5] = null;
+            delete this.player.inventory[5];
+            this.player.hasC4 = false;
+            this.player.updateSlotHUD();
+
+            // Auto-switch to previous weapon or primary -> secondary -> knife (Item 3)
+            const prevSlot = this.player.previousSlot;
+            const targetSlot = (prevSlot && this.player.inventory[prevSlot])
+              ? prevSlot
+              : (this.player.inventory[1] ? 1 : (this.player.inventory[2] ? 2 : 3));
+            this.player.switchSlot(targetSlot);
+
             progressTrack.classList.add('hidden');
             actionPrompt.classList.add('hidden');
             // Determine exact contact ground/box surface Y via downward raycast
