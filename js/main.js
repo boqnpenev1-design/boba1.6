@@ -821,7 +821,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Camera & Fog
         const cPos = camera.position;
-        const camStr = `pos(${cPos.x.toFixed(1)}, ${cPos.y.toFixed(1)}, ${cPos.z.toFixed(1)}) | far: ${camera.far}`;
+        const rollDeg = (camera.rotation.z * 180 / Math.PI).toFixed(1);
+        const camStr = `pos(${cPos.x.toFixed(1)}, ${cPos.y.toFixed(1)}, ${cPos.z.toFixed(1)}) | roll: ${rollDeg}° | far: ${camera.far}`;
         const fogStr = scene.fog ? `ON (#${scene.fog.color.getHexString()})` : 'OFF';
 
         // Player pos & feetY

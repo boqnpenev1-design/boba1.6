@@ -1105,6 +1105,9 @@ class CS2Player {
     document.getElementById('spectator-hud').classList.add('hidden');
     document.getElementById('hud').classList.remove('hidden');
     this.viewmodelGroup.visible = true;
+    this.camera.up.set(0, 1, 0);
+    this.camera.rotation.order = 'YXZ';
+    this.camera.rotation.z = 0;
   }
 
   cycleSpectator(dir) {
@@ -1752,6 +1755,12 @@ class CS2Player {
 
     this.position.set(posX, posY, posZ);
     this.yaw = spawnYaw;
+    this.pitch = 0;
+    this.recoilPitch = 0;
+    this.recoilYaw = 0;
+    this.camera.up.set(0, 1, 0);
+    this.camera.rotation.order = 'YXZ';
+    this.camera.rotation.set(0, this.yaw, 0);
     this.velocity.set(0, 0, 0);
     this.isGrounded = true;
     this.lastGroundY = posY - this.playerHeight;
@@ -2131,9 +2140,11 @@ class CS2Player {
     this.currentRecoilPitchDeg = Math.abs(this.recoilPitch * 180 / Math.PI);
 
     this.camera.position.copy(this.position);
+    this.camera.up.set(0, 1, 0);
     this.camera.rotation.order = 'YXZ';
     this.camera.rotation.y = this.yaw + this.recoilYaw;
     this.camera.rotation.x = this.pitch + this.recoilPitch;
+    this.camera.rotation.z = 0; // CAMERA ROLL STRICTLY 0 AT ALL TIMES
 
     // Viewmodel Recoil Recovery & Weapon Bobbing
     this.weaponRig.position.z += (-0.45 - this.weaponRig.position.z) * (1 - Math.exp(-18.0 * dt));
