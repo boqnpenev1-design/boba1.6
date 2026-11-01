@@ -333,6 +333,7 @@ class CS2MapBuilder {
     this.addCollider(-20, 12.0, -60, 40, 25, 25);  // Canyon ridge above double doors
     this.addCollider(55, 12.0, -120, 30, 25, 60);  // Canyon ridge east of A site
     this.addCollider(-85, 10.0, -90, 25, 25, 50);  // Wall above B site back plateau
+    this.addCollider(-58, 2.0, -98, 14, 25, 12);   // B-window rock cliff face barrier (keeps rocks strictly blocked)
 
     // ==========================================================
     // BOMBSITES & BUY ZONES (100% Authentic Dust 2 Geometry)

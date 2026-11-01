@@ -1138,6 +1138,13 @@ document.addEventListener('DOMContentLoaded', () => {
           } catch (e) {}
         }
 
+        let corrStr = 'none';
+        if (gameManager.player && gameManager.player.lastCorrection) {
+          const lc = gameManager.player.lastCorrection;
+          const timeStr = lc.t ? new Date(lc.t).toTimeString().substring(0, 8) : '';
+          corrStr = `${lc.reason} | delta: ${lc.delta} | ${timeStr}`;
+        }
+
         let dropsStr = '0 (none)';
         if (window._droppedItems && window._droppedItems.length > 0) {
           const dParts = window._droppedItems.map(d => {
@@ -1171,6 +1178,7 @@ REMOTE MODEL:  ${remoteModelStr}
 DROPS:         ${dropsStr}
 CAMERA:        ${camStr} | fog: ${fogStr}
 PLAYER:        pos: ${pPosStr} | feetY: ${feetYStr}
+LAST CORRECTION: ${corrStr}
 WEAPON:        ${wpnStr}${calibStr}
 VM SCREEN BOX: ${vmBoxStr}
 RECOIL:        climb: ${recoilClimbDeg.toFixed(1)}°

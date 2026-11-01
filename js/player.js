@@ -2054,6 +2054,7 @@ class CS2Player {
       ) {
         this.position.x = oldX;
         this.velocity.x = 0;
+        this.lastCorrection = { reason: 'collider_x', delta: (this.position.x - oldX).toFixed(3), t: Date.now() };
         break;
       }
     }
@@ -2062,6 +2063,7 @@ class CS2Player {
       if (checkMeshWall(Math.sign(this.velocity.x), 0, dist)) {
         this.position.x = oldX;
         this.velocity.x = 0;
+        this.lastCorrection = { reason: 'mesh_wall_x', delta: (this.position.x - oldX).toFixed(3), t: Date.now() };
       }
     }
 
@@ -2080,6 +2082,7 @@ class CS2Player {
       ) {
         this.position.z = oldZ;
         this.velocity.z = 0;
+        this.lastCorrection = { reason: 'collider_z', delta: (this.position.z - oldZ).toFixed(3), t: Date.now() };
         break;
       }
     }
@@ -2088,12 +2091,18 @@ class CS2Player {
       if (checkMeshWall(0, Math.sign(this.velocity.z), dist)) {
         this.position.z = oldZ;
         this.velocity.z = 0;
+        this.lastCorrection = { reason: 'mesh_wall_z', delta: (this.position.z - oldZ).toFixed(3), t: Date.now() };
       }
     }
 
     // Perimeter boundary clamp strictly preventing walking out onto exterior cliffs
+    const preClampX = this.position.x;
+    const preClampZ = this.position.z;
     this.position.x = Math.max(-94.0, Math.min(65.0, this.position.x));
     this.position.z = Math.max(-134.0, Math.min(45.0, this.position.z));
+    if (this.position.x !== preClampX || this.position.z !== preClampZ) {
+      this.lastCorrection = { reason: 'perimeter_clamp', delta: `dx:${(this.position.x - preClampX).toFixed(2)},dz:${(this.position.z - preClampZ).toFixed(2)}`, t: Date.now() };
+    }
 
     // 3. Resolve Y movement & Downward 3D Terrain Raycasting
     this.position.y += this.velocity.y * dt;
@@ -2132,14 +2141,6 @@ class CS2Player {
       if (foundGround) {
         targetGroundY = highestGroundY;
         this.lastGroundY = highestGroundY;
-        if (this.isGrounded && this.lastValidPosition) {
-          this.lastValidPosition.set(this.position.x, this.position.y, this.position.z);
-        }
-      } else if (this.isGrounded && this.lastValidPosition) {
-        // Player tried to walk onto steep cliff/unwalkable rock face: restore last valid walkable position
-        this.position.copy(this.lastValidPosition);
-        this.velocity.x = 0;
-        this.velocity.z = 0;
       }
     }
 
