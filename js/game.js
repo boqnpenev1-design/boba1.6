@@ -1043,22 +1043,24 @@ class CS2GameManager {
     ctx.restore();
   }
 
-  updateFPSCounter(currentTime) {
+  updateFPSCounter(currentTime, frameDurationMs = 0) {
     this.frameCount++;
+    this.frameMsSum = (this.frameMsSum || 0) + frameDurationMs;
     if (currentTime - this.fpsLastTime >= 500) {
       this.currentFPS = Math.round((this.frameCount * 1000) / (currentTime - this.fpsLastTime));
+      this.avgFrameMs = this.frameMsSum / Math.max(1, this.frameCount);
       this.frameCount = 0;
+      this.frameMsSum = 0;
       this.fpsLastTime = currentTime;
 
       if (this.hudEls.netGraphFPS) {
-        this.hudEls.netGraphFPS.innerText = `${this.currentFPS} FPS | 8ms | TICK 64`;
+        this.hudEls.netGraphFPS.innerText = `${this.currentFPS} FPS | ${(this.avgFrameMs || 0).toFixed(1)}ms | TICK 64`;
       }
     }
   }
 
   update(dt, currentTime) {
-    this.updateFPSCounter(currentTime);
-
+    const tFrameStart = performance.now();
     const now = Date.now();
 
     // Round Timer & Phase Logic: In online mode, strictly owned by server snapshot
@@ -1218,6 +1220,9 @@ class CS2GameManager {
       this.lastNetTime = currentTime;
       this.net.sendPlayerState(this.player);
     }
+
+    const tFrameDuration = performance.now() - tFrameStart;
+    this.updateFPSCounter(currentTime, tFrameDuration);
   }
 
   updateHUD() {

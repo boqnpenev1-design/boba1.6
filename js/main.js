@@ -52,8 +52,19 @@ document.addEventListener('DOMContentLoaded', () => {
     depth: true
   });
   renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.25));
-  renderer.shadowMap.enabled = false;
+
+  const urlParams = new URLSearchParams(window.location.search);
+  const forcePR1 = urlParams.get('pr') === '1';
+  const noShadow = urlParams.get('noshadow') === '1';
+  const noPost = urlParams.get('nopost') === '1';
+  const noOverlay = urlParams.get('nooverlay') === '1';
+  const noRemote = urlParams.get('noremote') === '1';
+  window.__noRemote = noRemote;
+  window.__noOverlay = noOverlay;
+
+  const defaultPR = forcePR1 ? 1.0 : Math.min(window.devicePixelRatio || 1, 1.0);
+  renderer.setPixelRatio(defaultPR);
+  renderer.shadowMap.enabled = !noShadow && false; // Off by default for competitive 60+ FPS
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.0;
   renderer.outputEncoding = THREE.sRGBEncoding;
@@ -863,6 +874,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function setupDebugOverlay(gameManager, renderer, scene, camera) {
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.get('debug') !== '1') return;
+    if (urlParams.get('nooverlay') === '1') return;
 
     const overlay = document.createElement('div');
     overlay.id = 'cs2-debug-overlay';
@@ -969,7 +981,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const tris = rInfo.render ? rInfo.render.triangles : 0;
         const progCount = rInfo.programs ? rInfo.programs.length : 0;
 
-        // Map meshes & BBox (Calculated strictly from real loaded map meshes)
+        // Map meshes & BBox (Cached once after loading to eliminate 100ms CPU freeze)
         let mapLoaded = false;
         let meshCount = 0;
         let mapTriangles = 0;
@@ -978,16 +990,23 @@ document.addEventListener('DOMContentLoaded', () => {
           mapLoaded = !!gameManager.mapBuilder.mapLoaded;
           const gMeshes = gameManager.mapBuilder.groundMeshes || [];
           meshCount = gMeshes.length;
-          const realBox = new THREE.Box3();
-          for (let i = 0; i < gMeshes.length; i++) {
-            const gm = gMeshes[i];
-            if (gm.geometry && gm.geometry.attributes && gm.geometry.attributes.position) {
-              mapTriangles += (gm.geometry.attributes.position.count / 3);
+          if (gameManager.mapBuilder.cachedBBoxStr) {
+            bboxStr = gameManager.mapBuilder.cachedBBoxStr;
+            mapTriangles = gameManager.mapBuilder.cachedTriangles || 0;
+          } else if (mapLoaded && gMeshes.length > 0) {
+            const realBox = new THREE.Box3();
+            for (let i = 0; i < gMeshes.length; i++) {
+              const gm = gMeshes[i];
+              if (gm.geometry && gm.geometry.attributes && gm.geometry.attributes.position) {
+                mapTriangles += (gm.geometry.attributes.position.count / 3);
+              }
+              realBox.expandByObject(gm);
             }
-            realBox.expandByObject(gm);
-          }
-          if (!realBox.isEmpty() && isFinite(realBox.min.x)) {
-            bboxStr = `min(${realBox.min.x.toFixed(1)}, ${realBox.min.y.toFixed(1)}, ${realBox.min.z.toFixed(1)}) max(${realBox.max.x.toFixed(1)}, ${realBox.max.y.toFixed(1)}, ${realBox.max.z.toFixed(1)})`;
+            if (!realBox.isEmpty() && isFinite(realBox.min.x)) {
+              bboxStr = `min(${realBox.min.x.toFixed(1)}, ${realBox.min.y.toFixed(1)}, ${realBox.min.z.toFixed(1)}) max(${realBox.max.x.toFixed(1)}, ${realBox.max.y.toFixed(1)}, ${realBox.max.z.toFixed(1)})`;
+              gameManager.mapBuilder.cachedBBoxStr = bboxStr;
+              gameManager.mapBuilder.cachedTriangles = mapTriangles;
+            }
           }
         }
 
@@ -1169,6 +1188,7 @@ document.addEventListener('DOMContentLoaded', () => {
 `[CS2 ENGINE DEBUG] ?debug=1
 BUILD_ID:      ${buildId}
 RENDER:        calls: ${calls} | triangles: ${tris} | programs: ${progCount}
+FRAME TIME:    ${(gameManager.avgFrameMs || 0).toFixed(1)}ms (JS frame duration)
 MAP:           loaded: ${mapLoaded ? 'YES' : 'NO'} | meshes: ${meshCount} | tris: ${mapTriangles}
 MAP BBOX:      ${bboxStr}
 SPAWN:         ${spawnStr}
