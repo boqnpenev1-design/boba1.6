@@ -112,21 +112,18 @@ class CS2MapBuilder {
               }
               const m = child.material;
               if (m) {
-                if (Array.isArray(m)) {
-                  m.forEach(mat => {
-                    mat.side = THREE.FrontSide;
-                    if (mat.specular) mat.specular.setHex(0x000000);
-                    if (typeof mat.shininess !== 'undefined') mat.shininess = 0;
-                    if (typeof mat.roughness !== 'undefined') mat.roughness = 1.0;
-                    if (typeof mat.metalness !== 'undefined') mat.metalness = 0.0;
-                  });
-                } else {
-                  m.side = THREE.FrontSide;
-                  if (m.specular) m.specular.setHex(0x000000);
-                  if (typeof m.shininess !== 'undefined') m.shininess = 0;
-                  if (typeof m.roughness !== 'undefined') m.roughness = 1.0;
-                  if (typeof m.metalness !== 'undefined') m.metalness = 0.0;
-                }
+                const mats = Array.isArray(m) ? m : [m];
+                mats.forEach(mat => {
+                  if (mat.map) {
+                    mat.map.encoding = THREE.sRGBEncoding;
+                    mat.map.needsUpdate = true;
+                  }
+                  if (mat.emissive) mat.emissive.setHex(0x000000);
+                  if (mat.specular) mat.specular.setHex(0x000000);
+                  if (typeof mat.shininess !== 'undefined') mat.shininess = 0;
+                  if (typeof mat.roughness !== 'undefined') mat.roughness = 0.95;
+                  if (typeof mat.metalness !== 'undefined') mat.metalness = 0.0;
+                });
               }
               child.castShadow = false;
               child.receiveShadow = false;
@@ -283,6 +280,14 @@ class CS2MapBuilder {
         console.log('[MAP] Requesting de_dust2.mtl from source/de_dust2/...');
         mtlLoader.load('de_dust2.mtl', (materials) => {
           console.log('[MAP] MTL materials loaded and preloading textures...');
+          if (materials && materials.materials) {
+            Object.values(materials.materials).forEach(mat => {
+              if (mat.map) {
+                mat.map.encoding = THREE.sRGBEncoding;
+              }
+              if (mat.emissive) mat.emissive.setHex(0x000000);
+            });
+          }
           materials.preload();
           objLoader.setMaterials(materials);
           objLoader.setPath('source/de_dust2/');

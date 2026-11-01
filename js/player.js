@@ -169,18 +169,11 @@ class CS2Player {
     this.recoilPitch = 0;
     this.recoilYaw = 0;
 
-    // Viewmodel Rig (weapons brightly lit with dedicated ambient light)
+    // Viewmodel Rig (weapons lit cleanly by scene sun and hemisphere, zero world blowout)
     this.viewmodelGroup = new THREE.Group();
     this.camera.add(this.viewmodelGroup);
     this.weaponRig = new THREE.Group();
     this.viewmodelGroup.add(this.weaponRig);
-
-    // Dedicated viewmodel light (Zero PointLight overhead, uniform 95% brightness + directional)
-    const vmLight = new THREE.AmbientLight(0xffffff, 0.95);
-    this.viewmodelGroup.add(vmLight);
-    const vmDirLight = new THREE.DirectionalLight(0xffffff, 0.85);
-    vmDirLight.position.set(0.5, 1.0, 0.5);
-    this.viewmodelGroup.add(vmDirLight);
 
     // Muzzle Flash (Subtle realistic muzzle spark, zero screen-blocking circle)
     const flashGeo = new THREE.SphereGeometry(0.010, 8, 8);

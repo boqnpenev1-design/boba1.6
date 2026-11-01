@@ -54,16 +54,16 @@ document.addEventListener('DOMContentLoaded', () => {
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.25));
   renderer.shadowMap.enabled = false;
-  renderer.toneMapping = THREE.LinearToneMapping;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.0;
   renderer.outputEncoding = THREE.sRGBEncoding;
   container.appendChild(renderer.domElement);
 
-  // Fast Competitive Lighting (Soft Desert Sun - clean textures, zero blowout)
-  const hemiLight = new THREE.HemisphereLight(0xffeedd, 0x5a4836, 0.60);
+  // Fast Competitive Lighting (Authentic CS2 Desert Sun - warm contrast, zero blowout)
+  const hemiLight = new THREE.HemisphereLight(0xffeedd, 0x6e5a44, 0.45);
   scene.add(hemiLight);
 
-  const sunLight = new THREE.DirectionalLight(0xfffaed, 0.70);
+  const sunLight = new THREE.DirectionalLight(0xfffaed, 0.65);
   sunLight.position.set(50, 90, 40);
   scene.add(sunLight);
 
