@@ -380,6 +380,18 @@ class CS2NetworkManager {
         }
         break;
 
+      case 'item_dropped':
+        if (packet.item && packet.item.droppedBy !== this.playerId && this.gm) {
+          this.gm.spawnRemoteDroppedWeapon(packet.item);
+        }
+        break;
+
+      case 'item_picked_up':
+        if (packet.weaponId && this.gm) {
+          this.gm.removeRemoteDroppedWeapon(packet.itemId, packet.weaponId);
+        }
+        break;
+
       case 'c4_dropped':
         if (packet.pos && this.gm.player) {
           // Visual dropped C4 is handled by gameManager

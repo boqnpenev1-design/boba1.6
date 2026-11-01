@@ -1008,10 +1008,19 @@ class CS2Player {
       if (!switched) this.switchSlot(3);
     }
 
+    if (window.csGameManager && window.csGameManager.net) {
+      window.csGameManager.net.send({
+        type: 'drop_weapon',
+        weaponId: droppedWeapon.id,
+        slot: dropSlot,
+        pos: { x: dropPos.x, y: dropPos.y, z: dropPos.z }
+      });
+    }
+
     window.csAudio.playWeaponEquip('knife');
   }
 
-  // Pick up dropped weapon (strict proximity < 1.6m or pressing [E])
+  // Pick up dropped weapon (proximity < 2.5m or pressing [E])
   checkPickupItems() {
     if (!this.actionPrompt) {
       this.actionPrompt = document.getElementById('action-prompt');
@@ -1037,8 +1046,8 @@ class CS2Player {
       const horizDist = Math.hypot(dx, dz);
       const vertDist = Math.abs(feetY - item.pos.y);
 
-      // Strict proximity check: Must be close to the dropped weapon (< 1.6m)
-      if (horizDist < 1.6 && vertDist < 1.4) {
+      // Proximity check: Must be close to the dropped weapon (< 2.5m)
+      if (horizDist < 2.5 && vertDist < 2.0) {
         // Counter-Terrorists cannot pick up C4 explosive
         if (item.slot === 5 && this.team !== 'T') continue;
 
@@ -1046,7 +1055,7 @@ class CS2Player {
 
         const timeSinceDrop = performance.now() - (item.droppedAt || 0);
         const slotEmpty = !this.inventory[item.slot];
-        const wantPickup = (this.keys[this.keybinds.use] && timeSinceDrop > 250) || (horizDist < 1.1 && slotEmpty && timeSinceDrop > 1000);
+        const wantPickup = (this.keys[this.keybinds.use] && timeSinceDrop > 250) || (horizDist < 1.3 && slotEmpty && timeSinceDrop > 1000);
 
         if (wantPickup) {
           const targetSlot = item.slot;
@@ -1067,6 +1076,14 @@ class CS2Player {
           this.scene.remove(item.mesh);
           window._droppedItems.splice(i, 1);
           window.csAudio.playWeaponEquip(item.weapon.id);
+
+          if (window.csGameManager && window.csGameManager.net) {
+            window.csGameManager.net.send({
+              type: 'pickup_weapon',
+              weaponId: item.weapon.id,
+              slot: targetSlot
+            });
+          }
 
           if (actionPrompt) actionPrompt.classList.add('hidden');
           break;

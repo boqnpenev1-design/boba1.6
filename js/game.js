@@ -108,6 +108,39 @@ class CS2GameManager {
     }
   }
 
+  spawnRemoteDroppedWeapon(item) {
+    if (!item || !item.weaponId || !this.player) return;
+    const w = CS2_WEAPONS[item.weaponId];
+    if (!w) return;
+    const meshName = CS2Player.WEAPON_MESH_MAP[w.id];
+    const cachedMesh = this.player.findWeaponMesh(meshName);
+    const mesh = this.player.prepareWeaponModel(cachedMesh, w.id);
+    if (!mesh) return;
+    mesh.position.set(item.pos.x, item.pos.y, item.pos.z);
+    mesh.rotation.x = Math.PI / 2;
+    this.scene.add(mesh);
+    if (!window._droppedItems) window._droppedItems = [];
+    window._droppedItems.push({
+      id: item.id,
+      mesh: mesh,
+      weapon: w,
+      slot: item.slot || 1,
+      pos: mesh.position,
+      groundY: item.pos.y,
+      isResting: true,
+      droppedAt: performance.now()
+    });
+  }
+
+  removeRemoteDroppedWeapon(itemId, weaponId) {
+    if (!window._droppedItems) return;
+    const idx = window._droppedItems.findIndex(d => (itemId && d.id === itemId) || (d.weapon && d.weapon.id === weaponId));
+    if (idx !== -1) {
+      const it = window._droppedItems.splice(idx, 1)[0];
+      if (it && it.mesh && this.scene) this.scene.remove(it.mesh);
+    }
+  }
+
   // Highly visible 3D C4 Prop with authentic CS digital display & flashing beacon light
   createC4Prop() {
     const group = new THREE.Group();
