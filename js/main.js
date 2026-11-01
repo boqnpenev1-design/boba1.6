@@ -448,14 +448,76 @@ document.addEventListener('DOMContentLoaded', () => {
           refundWeapon(weapon);
           return;
         }
-        if (canAfford) {
-          buyWeapon(weapon);
-        }
+        buyWeapon(weapon);
       });
 
       grid.appendChild(card);
     });
   }
+
+  // Toast Notification System (Bans silent failures - Rule 2)
+  function showToast(msg, type = 'error') {
+    let container = document.getElementById('cs2-toast-container');
+    if (!container) {
+      container = document.createElement('div');
+      container.id = 'cs2-toast-container';
+      container.style.cssText = [
+        'position: fixed',
+        'top: 20px',
+        'right: 20px',
+        'z-index: 1000000',
+        'display: flex',
+        'flex-direction: column',
+        'gap: 8px',
+        'pointer-events: none'
+      ].join(';');
+      document.body.appendChild(container);
+    }
+
+    const toast = document.createElement('div');
+    const colors = {
+      error: { bg: 'rgba(220, 38, 38, 0.94)', border: '#ef4444', icon: '⚠' },
+      warning: { bg: 'rgba(217, 119, 6, 0.94)', border: '#f59e0b', icon: '⚡' },
+      success: { bg: 'rgba(16, 185, 129, 0.94)', border: '#10b981', icon: '✔' },
+      info: { bg: 'rgba(37, 99, 235, 0.94)', border: '#3b82f6', icon: 'ℹ' }
+    };
+    const c = colors[type] || colors.info;
+
+    toast.style.cssText = [
+      `background: ${c.bg}`,
+      `border-left: 4px solid ${c.border}`,
+      'color: #ffffff',
+      'padding: 10px 16px',
+      'border-radius: 4px',
+      'font-family: Rajdhani, Consolas, sans-serif',
+      'font-size: 14px',
+      'font-weight: 600',
+      'letter-spacing: 0.5px',
+      'box-shadow: 0 4px 14px rgba(0,0,0,0.6)',
+      'transition: opacity 0.25s ease-out, transform 0.25s ease-out',
+      'transform: translateX(20px)',
+      'opacity: 0',
+      'pointer-events: auto'
+    ].join(';');
+    toast.innerHTML = `<span style="margin-right:8px;font-size:16px;">${c.icon}</span> ${msg}`;
+    container.appendChild(toast);
+
+    requestAnimationFrame(() => {
+      toast.style.transform = 'translateX(0)';
+      toast.style.opacity = '1';
+    });
+
+    setTimeout(() => {
+      toast.style.opacity = '0';
+      toast.style.transform = 'translateX(30px)';
+      setTimeout(() => {
+        if (toast.parentNode) toast.parentNode.removeChild(toast);
+      }, 300);
+    }, 3500);
+  }
+  window.showCS2Toast = showToast;
+  window.__buyTrace = 'none';
+  window.__lastReject = null;
 
   // Server-authoritative buy and refund responses
   window.__onBuySuccess = (packet) => {
@@ -476,13 +538,27 @@ document.addEventListener('DOMContentLoaded', () => {
         gameManager.player.switchSlot(4);
       }
     } else if (weapon.slot) {
+      if (weapon.slot === 1 && gameManager.player.inventory[1] && gameManager.player.inventory[1].id !== weapon.id) {
+        gameManager.player.dropWeaponBySlot(1);
+      }
       gameManager.player.inventory[weapon.slot] = weapon;
       gameManager.player.switchSlot(weapon.slot);
     }
     gameManager.purchaseHistory.push(weapon);
+    window.__buyTrace = `click -> packet_sent -> buy_success(${packet.weaponId}) -> inventory_updated -> UI_synced`;
+    showToast(`Purchased ${weapon.name} (-$${packet.cost || weapon.cost})`, 'success');
+    console.log('[BUY_SUCCESS] Verified by server:', packet);
     window.csAudio.playRadioTone('buy');
     renderBuyItems(currentBuyCategory);
     gameManager.updateHUD();
+  };
+
+  window.__onBuyError = (packet) => {
+    const reason = packet.reason || 'Purchase rejected';
+    window.__buyTrace = `click -> packet_sent -> buy_error(${reason})`;
+    window.__lastReject = { type: 'buy_error', reason: reason, time: new Date().toLocaleTimeString() };
+    showToast(`Server rejected purchase: ${reason}`, 'error');
+    console.warn('[BUY_ERROR] Server rejection:', reason, packet);
   };
 
   window.__onRefundSuccess = (packet) => {
@@ -507,9 +583,18 @@ document.addEventListener('DOMContentLoaded', () => {
         else gameManager.player.switchSlot(3);
       }
     }
+    showToast(`Refunded ${weapon ? weapon.name : packet.weaponId} (+$${packet.refundAmount})`, 'success');
+    console.log('[REFUND_SUCCESS]', packet);
     window.csAudio.playRadioTone('buy');
     renderBuyItems(currentBuyCategory);
     gameManager.updateHUD();
+  };
+
+  window.__onRefundError = (packet) => {
+    const reason = packet.reason || 'Refund rejected';
+    window.__lastReject = { type: 'refund_error', reason: reason, time: new Date().toLocaleTimeString() };
+    showToast(`Server rejected refund: ${reason}`, 'error');
+    console.warn('[REFUND_ERROR] Server rejection:', reason, packet);
   };
 
   function refundWeapon(weapon) {
@@ -548,16 +633,72 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function buyWeapon(weapon) {
-    if (!gameManager.canBuy()) return;
-    const cash = gameManager.player.money.get();
-    if (cash < weapon.cost) return;
+    // 1. Guard against buying a second primary without dropping first
+    if (weapon.slot === 1 && gameManager.player.inventory[1]) {
+      const reason = 'Drop your primary first (press G)';
+      showToast(reason, 'warning');
+      console.warn(`[BUY_REJECT] ${reason}`);
+      window.__lastReject = { type: 'buy_item', reason: reason, time: new Date().toLocaleTimeString() };
+      window.__buyTrace = `click(${weapon.id}) -> rejected(drop primary first)`;
+      return;
+    }
 
+    // 2. Guard against purchasing already owned non-stackable items
+    if (weapon.id === 'helmet' && gameManager.player.hasHelmet) {
+      const reason = 'Already own helmet';
+      showToast(reason, 'warning');
+      console.warn(`[BUY_REJECT] ${reason}`);
+      window.__lastReject = { type: 'buy_item', reason: reason, time: new Date().toLocaleTimeString() };
+      window.__buyTrace = `click(helmet) -> rejected(already owned)`;
+      return;
+    }
+    if (weapon.id === 'defuser' && gameManager.player.hasDefuseKit) {
+      const reason = 'Already own defuse kit';
+      showToast(reason, 'warning');
+      console.warn(`[BUY_REJECT] ${reason}`);
+      window.__lastReject = { type: 'buy_item', reason: reason, time: new Date().toLocaleTimeString() };
+      window.__buyTrace = `click(defuser) -> rejected(already owned)`;
+      return;
+    }
+    if (weapon.slot === 2 && gameManager.player.inventory[2] && gameManager.player.inventory[2].id === weapon.id) {
+      const reason = `Already own ${weapon.name}`;
+      showToast(reason, 'warning');
+      console.warn(`[BUY_REJECT] ${reason}`);
+      window.__lastReject = { type: 'buy_item', reason: `Already own ${weapon.id}`, time: new Date().toLocaleTimeString() };
+      window.__buyTrace = `click(${weapon.id}) -> rejected(already owned)`;
+      return;
+    }
+
+    // 3. Buy zone & phase validation
+    if (!gameManager.canBuy()) {
+      let reason = 'Cannot purchase at this time';
+      const inZone = gameManager.mapBuilder && gameManager.mapBuilder.isInBuyZone(gameManager.player.team, gameManager.player.position);
+      if (!inZone) reason = 'Not in a buy zone';
+      else if (gameManager.phase !== 'freeze' && gameManager.phase !== 'live') reason = 'Round is over';
+      else reason = 'Buy period expired (first 20s only)';
+
+      showToast(`Cannot buy: ${reason}`, 'error');
+      console.warn(`[BUY_REJECT] ${reason}`);
+      window.__lastReject = { type: 'buy_item', reason: reason, time: new Date().toLocaleTimeString() };
+      window.__buyTrace = `click(${weapon.id}) -> rejected(${reason})`;
+      return;
+    }
+
+    // 4. Sufficient funds check
+    const cash = gameManager.player.money.get();
+    if (cash < weapon.cost) {
+      const reason = `Insufficient funds ($${cash} / $${weapon.cost})`;
+      showToast(`Cannot buy: ${reason}`, 'error');
+      console.warn(`[BUY_REJECT] ${reason}`);
+      window.__lastReject = { type: 'buy_item', reason: reason, time: new Date().toLocaleTimeString() };
+      window.__buyTrace = `click(${weapon.id}) -> rejected(insufficient funds)`;
+      return;
+    }
+
+    // 5. Transmit authoritative buy request (DO NOT drop weapon until server responds!)
+    window.__buyTrace = `click(${weapon.id}) -> packet_sent(cost:${weapon.cost})`;
     if (gameManager.net && gameManager.net.isConnected) {
-      if (weapon.slot === 1 && gameManager.player.inventory[1]) {
-        gameManager.player.dropWeaponBySlot(1);
-      } else if (weapon.slot === 2 && gameManager.player.inventory[2]) {
-        gameManager.player.dropWeaponBySlot(2);
-      }
+      console.log(`[BUY_REQUEST] Transmitting buy_item: ${weapon.id} ($${weapon.cost})`);
       gameManager.net.sendBuyItem(weapon.cost, weapon.id, weapon.slot);
       return;
     }
@@ -578,6 +719,24 @@ document.addEventListener('DOMContentLoaded', () => {
         gameManager.player.armor.set(100);
         gameManager.player.hasHelmet = true;
       } else if (weapon.type === 'kit') {
+        gameManager.player.hasDefuseKit = true;
+      } else if (weapon.slot === 4 || weapon.type === 'grenade' || weapon.id === 'flashbang' || weapon.id === 'hegrenade' || weapon.id === 'smokegrenade' || weapon.id === 'molotov') {
+        gameManager.player.grenades = gameManager.player.grenades || [];
+        gameManager.player.grenades.push(weapon);
+        gameManager.player.inventory[4] = weapon;
+        gameManager.player.switchSlot(4);
+      }
+    } else if (weapon.slot) {
+      gameManager.player.inventory[weapon.slot] = weapon;
+      gameManager.player.switchSlot(weapon.slot);
+    }
+
+    gameManager.purchaseHistory.push(weapon);
+
+    window.csAudio.playRadioTone('buy');
+    renderBuyItems(currentBuyCategory);
+    gameManager.updateHUD();
+  }
         gameManager.player.hasDefuseKit = true;
       } else if (weapon.slot === 4 || weapon.type === 'grenade' || weapon.id === 'flashbang' || weapon.id === 'hegrenade' || weapon.id === 'smokegrenade' || weapon.id === 'molotov') {
         gameManager.player.grenades = gameManager.player.grenades || [];
@@ -1201,6 +1360,8 @@ MAP BBOX:      ${bboxStr}
 SPAWN:         ${spawnStr}
 TEAM SOURCES:  ${teamSourcesStr}
 TEAM:          client: ${clientTeam} | server: ${serverTeam}
+BUY TRACE:     ${window.__buyTrace || 'none'}
+LAST REJECT:   ${window.__lastReject ? `${window.__lastReject.type}, ${window.__lastReject.reason}, ${window.__lastReject.time}` : 'none'}
 REMOTES:       ${remotesStr}
 REMOTE MODEL:  ${remoteModelStr}
 DROPS:         ${dropsStr}
