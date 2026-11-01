@@ -730,18 +730,52 @@ class CS2NetworkManager {
         rp.mesh.rotation.y = latest.yaw;
       }
 
-      // Procedural walking articulation or mixer animation
+      // Procedural bone articulation (Idle ready carry, walk/run leg swing, death collapse)
       const moveSpeed = Math.hypot(rp.mesh.position.x - prevX, rp.mesh.position.z - prevZ);
-      if (rp.mixer) {
-        rp.mixer.update(0.016);
-      } else if (rp.mesh.characterBones) {
+      const isAlive = (rp.isAlive !== false);
+
+      if (!isAlive) {
+        rp.mesh.rotation.z = -Math.PI / 2;
+        rp.mesh.position.y = Math.max(0, rp.mesh.position.y - 0.7);
+        rp.activeState = 'DEAD';
+      } else {
+        rp.mesh.rotation.z = 0;
         const b = rp.mesh.characterBones;
-        const walkCycle = Math.sin(now * 0.012);
-        const walkAmp = Math.min(0.45, moveSpeed * 3.5);
-        if (b.legL) b.legL.rotation.x = walkCycle * walkAmp;
-        if (b.legR) b.legR.rotation.x = -walkCycle * walkAmp;
-        if (b.armL) b.armL.rotation.x = -walkCycle * walkAmp * 0.7;
-        if (b.armR) b.armR.rotation.x = walkCycle * walkAmp * 0.7;
+        if (b) {
+          // Tactical weapon-carry arm stance (living player never in T-pose)
+          if (b.armUpperL) b.armUpperL.rotation.set(-0.65, 0.45, -1.15);
+          if (b.armUpperR) b.armUpperR.rotation.set(-0.65, -0.45, 1.15);
+          if (b.armLowerL) b.armLowerL.rotation.y = -0.75;
+          if (b.armLowerR) b.armLowerR.rotation.y = 0.75;
+
+          const walkCycle = Math.sin(now * 0.011);
+          const isMoving = moveSpeed > 0.015;
+          rp.activeState = isMoving ? (moveSpeed > 0.08 ? 'RUN' : 'WALK') : 'IDLE';
+
+          if (isMoving) {
+            const walkAmp = Math.min(0.65, moveSpeed * 6.5);
+            if (b.legUpperL) b.legUpperL.rotation.x = walkCycle * walkAmp;
+            if (b.legUpperR) b.legUpperR.rotation.x = -walkCycle * walkAmp;
+            if (b.legLowerL) b.legLowerL.rotation.x = Math.max(0, -walkCycle * walkAmp * 0.7);
+            if (b.legLowerR) b.legLowerR.rotation.x = Math.max(0, walkCycle * walkAmp * 0.7);
+            if (b.armUpperL) b.armUpperL.rotation.x = -0.65 - walkCycle * walkAmp * 0.25;
+            if (b.armUpperR) b.armUpperR.rotation.x = -0.65 + walkCycle * walkAmp * 0.25;
+          } else {
+            if (b.legUpperL) b.legUpperL.rotation.x = 0;
+            if (b.legUpperR) b.legUpperR.rotation.x = 0;
+            if (b.legLowerL) b.legLowerL.rotation.x = 0;
+            if (b.legLowerR) b.legLowerR.rotation.x = 0;
+          }
+        }
+      }
+
+      // Sync hitbox wireframe visibility with global toggle
+      const showWire = !!window.__showHitboxWireframes;
+      if (rp.mesh.bodyHitbox && rp.mesh.bodyHitbox.material) {
+        rp.mesh.bodyHitbox.material.visible = showWire;
+      }
+      if (rp.mesh.headHitbox && rp.mesh.headHitbox.material) {
+        rp.mesh.headHitbox.material.visible = showWire;
       }
     });
   }
@@ -749,15 +783,28 @@ class CS2NetworkManager {
   createTacticalCharacterModel(team, callsign = 'OPERATOR') {
     const group = new THREE.Group();
 
-    // 1. Full-Body Hitbox Cylinder for hit detection (authoritative box raycasted only)
-    const hitboxGeo = new THREE.CylinderGeometry(0.48, 0.48, 1.85, 10);
-    const hitboxMat = new THREE.MeshBasicMaterial({ visible: false });
-    const hitbox = new THREE.Mesh(hitboxGeo, hitboxMat);
-    hitbox.position.y = 0.925;
-    hitbox.name = 'hitbox';
-    group.add(hitbox);
+    // 1. Authentic Capsule Body Hitbox (Radius 0.38m, Cylinder height 1.30m, at Y=0.95)
+    const showWire = !!window.__showHitboxWireframes;
+    const bodyHitboxGeo = new THREE.CylinderGeometry(0.38, 0.38, 1.30, 12);
+    const bodyHitboxMat = new THREE.MeshBasicMaterial({ color: 0x00ff88, wireframe: true, visible: showWire });
+    const bodyHitbox = new THREE.Mesh(bodyHitboxGeo, bodyHitboxMat);
+    bodyHitbox.position.y = 0.95;
+    bodyHitbox.name = 'bodyHitbox';
+    bodyHitbox.userData = { isHead: false, isHitbox: true };
+    group.add(bodyHitbox);
+    group.bodyHitbox = bodyHitbox;
 
-    // 2. Nametag Billboard above head
+    // 2. Authentic Sphere Head Hitbox (Radius 0.18m, at Y=2.15 matching eye level)
+    const headHitboxGeo = new THREE.SphereGeometry(0.18, 12, 10);
+    const headHitboxMat = new THREE.MeshBasicMaterial({ color: 0xff3344, wireframe: true, visible: showWire });
+    const headHitbox = new THREE.Mesh(headHitboxGeo, headHitboxMat);
+    headHitbox.position.y = 2.15;
+    headHitbox.name = 'headHitbox';
+    headHitbox.userData = { isHead: true, isHitbox: true };
+    group.add(headHitbox);
+    group.headHitbox = headHitbox;
+
+    // 3. Nametag Billboard above head
     const nameCanvas = document.createElement('canvas');
     nameCanvas.width = 256;
     nameCanvas.height = 64;
@@ -771,12 +818,12 @@ class CS2NetworkManager {
       new THREE.PlaneGeometry(1.4, 0.35),
       new THREE.MeshBasicMaterial({ map: nameTex, transparent: true, side: THREE.DoubleSide })
     );
-    namePlane.position.set(0, 2.05, 0);
+    namePlane.position.set(0, 2.45, 0);
     group.add(namePlane);
     group.nameTagMesh = namePlane;
     group.nameCanvas = nameCanvas;
 
-    // 3. Attach authentic CS character model (CT = SAS GLB, T = Phoenix GLB)
+    // 4. Attach authentic CS character model (CT = SAS GLB, T = Phoenix GLB)
     this.applyAuthenticModel(group, team);
     if ((team === 'CT' && this.ctModel) || (team === 'T' && this.tModel)) {
       group.hasAuthenticModel = true;
@@ -798,18 +845,21 @@ class CS2NetworkManager {
       ? THREE.SkeletonUtils.clone(srcModel)
       : srcModel.clone(true);
 
-    // Dynamic normalization to authentic 1.85m player height with pivot at feet
+    // Height calibration: ~2.4m tall (scale ~1.09 * playerHeight, feet at Y=0, head at Y ~2.2m)
     const bbox = new THREE.Box3().setFromObject(srcModel);
     const size = new THREE.Vector3();
     bbox.getSize(size);
-    const targetHeight = 1.85;
-    const normScale = size.y > 0 ? (targetHeight / size.y) : 1.0;
+    const rawHeight = Math.max(size.y, size.z) || 2.0;
+    const targetHeight = 2.40;
+    const normScale = rawHeight > 0 ? (targetHeight / rawHeight) : 1.20;
 
     clone.scale.set(normScale, normScale, normScale);
     // Align bottom of model with feet (Y=0)
     clone.position.set(0, -bbox.min.y * normScale, 0);
+    // Orient model so it faces the exact player view/movement direction (fix 180 deg offset)
+    clone.rotation.y = Math.PI;
 
-    // Ensure all materials are visible, DoubleSide and sRGB
+    // FrontSide only (halves character rasterization work and avoids inside-mesh rendering)
     clone.traverse(child => {
       if (child.isMesh) {
         child.visible = true;
@@ -818,7 +868,7 @@ class CS2NetworkManager {
         if (child.material) {
           const mats = Array.isArray(child.material) ? child.material : [child.material];
           mats.forEach(m => {
-            m.side = THREE.DoubleSide;
+            m.side = THREE.FrontSide;
             if (m.map) {
               m.map.encoding = THREE.sRGBEncoding;
               m.map.needsUpdate = true;
@@ -830,19 +880,34 @@ class CS2NetworkManager {
 
     // Extract named bones for procedural articulation
     const bones = {};
+    let totalBones = 0;
     clone.traverse(c => {
       if (c.isBone) {
+        totalBones++;
         const n = c.name.toLowerCase();
-        if (n.includes('leg') && (n.includes('upper_l') || n.includes('thigh_l') || n.includes('leftupleg'))) bones.legL = c;
-        if (n.includes('leg') && (n.includes('upper_r') || n.includes('thigh_r') || n.includes('rightupleg'))) bones.legR = c;
-        if (n.includes('arm') && (n.includes('upper_l') || n.includes('leftarm'))) bones.armL = c;
-        if (n.includes('arm') && (n.includes('upper_r') || n.includes('rightarm'))) bones.armR = c;
+        if (n.startsWith('arm_upper_l')) bones.armUpperL = c;
+        else if (n.startsWith('arm_upper_r')) bones.armUpperR = c;
+        else if (n.startsWith('arm_lower_l')) bones.armLowerL = c;
+        else if (n.startsWith('arm_lower_r')) bones.armLowerR = c;
+        else if (n.startsWith('leg_upper_l')) bones.legUpperL = c;
+        else if (n.startsWith('leg_upper_r')) bones.legUpperR = c;
+        else if (n.startsWith('leg_lower_l')) bones.legLowerL = c;
+        else if (n.startsWith('leg_lower_r')) bones.legLowerR = c;
+        else if (n.startsWith('head_0')) bones.head = c;
+        else if (n.startsWith('spine_1') || n.startsWith('spine_0')) bones.spine = c;
       }
     });
     group.characterBones = bones;
+    group.boneCount = totalBones;
+
+    // Initial tactical carry pose immediately upon model attach
+    if (bones.armUpperL) bones.armUpperL.rotation.set(-0.65, 0.45, -1.15);
+    if (bones.armUpperR) bones.armUpperR.rotation.set(-0.65, -0.45, 1.15);
+    if (bones.armLowerL) bones.armLowerL.rotation.y = -0.75;
+    if (bones.armLowerR) bones.armLowerR.rotation.y = 0.75;
 
     if (!CS2NetworkManager.loggedBones) {
-      console.log(`[BONES] Loaded ${team} operator bones:`, Object.keys(bones));
+      console.log(`[BONES] Loaded ${team} operator bones (${totalBones} total):`, Object.keys(bones));
       CS2NetworkManager.loggedBones = true;
     }
 

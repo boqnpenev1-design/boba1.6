@@ -653,6 +653,20 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
 
+    // 'H' toggles hitbox wireframes
+    if (e.code === 'KeyH') {
+      window.__showHitboxWireframes = !window.__showHitboxWireframes;
+      console.log('[HITBOX] Wireframe toggle:', window.__showHitboxWireframes);
+      if (gameManager && gameManager.net && gameManager.net.remotePlayers) {
+        Object.values(gameManager.net.remotePlayers).forEach(rp => {
+          if (rp.mesh) {
+            if (rp.mesh.bodyHitbox) rp.mesh.bodyHitbox.material.visible = window.__showHitboxWireframes;
+            if (rp.mesh.headHitbox) rp.mesh.headHitbox.material.visible = window.__showHitboxWireframes;
+          }
+        });
+      }
+    }
+
     // Tab opens Scoreboard
     if (e.code === 'Tab') {
       e.preventDefault();
@@ -1078,6 +1092,17 @@ document.addEventListener('DOMContentLoaded', () => {
           }
         }
 
+        let remoteModelStr = 'none';
+        if (net && net.remotePlayers && Object.keys(net.remotePlayers).length > 0) {
+          const rp = Object.values(net.remotePlayers)[0];
+          const modelType = (rp.team === 'CT') ? 'SAS' : 'Phoenix';
+          const scale = rp.mesh?.characterMesh?.scale?.x?.toFixed(2) || '1.20';
+          const rootY = rp.mesh?.position?.y?.toFixed(2) || '0.00';
+          const bones = rp.mesh?.boneCount || 169;
+          const state = rp.activeState || 'IDLE';
+          remoteModelStr = `${modelType} | scale: ${scale} | root Y: ${rootY} | bones: ${bones} | procedural: ${state} | hitbox: capsule (r=0.38, h=1.50) + sphere (r=0.18)`;
+        }
+
         let dropsStr = '0 (none)';
         if (window._droppedItems && window._droppedItems.length > 0) {
           const dParts = window._droppedItems.map(d => {
@@ -1107,6 +1132,7 @@ MAP BBOX:      ${bboxStr}
 SPAWN:         ${spawnStr}
 TEAM:          client: ${clientTeam} | server: ${serverTeam}
 REMOTES:       ${remotesStr}
+REMOTE MODEL:  ${remoteModelStr}
 DROPS:         ${dropsStr}
 CAMERA:        ${camStr} | fog: ${fogStr}
 PLAYER:        pos: ${pPosStr} | feetY: ${feetYStr}

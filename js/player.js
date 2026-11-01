@@ -1356,9 +1356,15 @@ class CS2Player {
         Object.entries(gameManager.net.remotePlayers).forEach(([id, p]) => {
           if (p.team === this.team) return;
           if (!p.mesh || !p.mesh.visible) return;
-          // Raycast the hitbox only, never the skinned mesh
-          const hitbox = p.mesh.getObjectByName('hitbox') || p.mesh;
-          const playerHits = this.shootRaycaster.intersectObject(hitbox, false);
+          // Raycast authentic body & head hitboxes only, never the skinned mesh
+          const hitboxTargets = [];
+          if (p.mesh.headHitbox) hitboxTargets.push(p.mesh.headHitbox);
+          if (p.mesh.bodyHitbox) hitboxTargets.push(p.mesh.bodyHitbox);
+          if (hitboxTargets.length === 0) {
+            const fallbackHb = p.mesh.getObjectByName('hitbox') || p.mesh;
+            hitboxTargets.push(fallbackHb);
+          }
+          const playerHits = this.shootRaycaster.intersectObjects(hitboxTargets, false);
           if (playerHits.length > 0 && playerHits[0].distance < 120) {
             const playerDist = playerHits[0].distance;
             let canHit = true;
@@ -1384,10 +1390,9 @@ class CS2Player {
             }
 
             if (canHit) {
-              const hitPoint = playerHits[0].point;
-              const relY = hitPoint.y - p.mesh.position.y;
-              const isHeadshot = relY >= 1.60;
-              const dmgMult = (isHeadshot ? 2.5 : 1.0) * penetrationPenalty;
+              const hitObj = playerHits[0].object;
+              const isHeadshot = (hitObj === p.mesh.headHitbox || (hitObj.userData && hitObj.userData.isHead === true));
+              const dmgMult = (isHeadshot ? 4.0 : 1.0) * penetrationPenalty;
               const finalDamage = Math.max(1, Math.round(pelletDmg * dmgMult));
 
               if (isHeadshot) {
