@@ -1,5 +1,38 @@
 // CS2 High-Performance Bootstrap & Server Browser Controller
 
+// Global Rate-Limited Error Logger
+(function() {
+  const errorCounts = new Map();
+  const LOG_INTERVAL = 1000;
+
+  function reportError(type, message, source, lineno, colno, error) {
+    const key = `${type}:${message}:${source}:${lineno}`;
+    const now = performance.now();
+    let entry = errorCounts.get(key);
+    if (!entry) {
+      entry = { lastTime: 0, count: 0 };
+      errorCounts.set(key, entry);
+    }
+    entry.count++;
+    if (now - entry.lastTime >= LOG_INTERVAL) {
+      const repeats = entry.count > 1 ? ` (${entry.count} repeats)` : '';
+      console.error(`[ENGINE_ERR:${type}] ${message}${repeats}\nSource: ${source}:${lineno}:${colno}\nStack:`, error ? error.stack : 'N/A');
+      entry.lastTime = now;
+      entry.count = 0;
+    }
+  }
+
+  window.addEventListener('error', (event) => {
+    reportError('UNCAUGHT', event.message, event.filename, event.lineno, event.colno, event.error);
+  });
+
+  window.addEventListener('unhandledrejection', (event) => {
+    const reason = event.reason;
+    const msg = reason && reason.message ? reason.message : String(reason);
+    reportError('UNHANDLED_REJECTION', msg, 'promise', 0, 0, reason);
+  });
+})();
+
 document.addEventListener('DOMContentLoaded', () => {
   // 1. High Performance WebGL Renderer (144+ FPS Optimized)
   const container = document.getElementById('game-canvas-container');
@@ -731,18 +764,25 @@ document.addEventListener('DOMContentLoaded', () => {
         const tris = rInfo.render ? rInfo.render.triangles : 0;
         const progCount = rInfo.programs ? rInfo.programs.length : 0;
 
-        // Map meshes & BBox
+        // Map meshes & BBox (Calculated strictly from real loaded map meshes)
+        let mapLoaded = false;
         let meshCount = 0;
+        let mapTriangles = 0;
         let bboxStr = 'no-map';
         if (gameManager.mapBuilder) {
-          if (gameManager.mapBuilder.groundMeshes) {
-            meshCount = gameManager.mapBuilder.groundMeshes.length;
-          }
-          if (gameManager.mapBuilder.mapGroup) {
-            const b = new THREE.Box3().setFromObject(gameManager.mapBuilder.mapGroup);
-            if (isFinite(b.min.x)) {
-              bboxStr = `min(${b.min.x.toFixed(1)}, ${b.min.y.toFixed(1)}, ${b.min.z.toFixed(1)}) max(${b.max.x.toFixed(1)}, ${b.max.y.toFixed(1)}, ${b.max.z.toFixed(1)})`;
+          mapLoaded = !!gameManager.mapBuilder.mapLoaded;
+          const gMeshes = gameManager.mapBuilder.groundMeshes || [];
+          meshCount = gMeshes.length;
+          const realBox = new THREE.Box3();
+          for (let i = 0; i < gMeshes.length; i++) {
+            const gm = gMeshes[i];
+            if (gm.geometry && gm.geometry.attributes && gm.geometry.attributes.position) {
+              mapTriangles += (gm.geometry.attributes.position.count / 3);
             }
+            realBox.expandByObject(gm);
+          }
+          if (!realBox.isEmpty() && isFinite(realBox.min.x)) {
+            bboxStr = `min(${realBox.min.x.toFixed(1)}, ${realBox.min.y.toFixed(1)}, ${realBox.min.z.toFixed(1)}) max(${realBox.max.x.toFixed(1)}, ${realBox.max.y.toFixed(1)}, ${realBox.max.z.toFixed(1)})`;
           }
         }
 
@@ -759,6 +799,38 @@ document.addEventListener('DOMContentLoaded', () => {
           pPosStr = `(${p.x.toFixed(2)}, ${p.y.toFixed(2)}, ${p.z.toFixed(2)})`;
           feetYStr = (p.y - gameManager.player.playerHeight).toFixed(2);
         }
+
+        // Weapon Inspection
+        let wpnName = 'none';
+        let wpnMeshName = 'none';
+        let wpnTexLoaded = 'none';
+        let wpnMatType = 'none';
+        if (gameManager.player) {
+          if (gameManager.player.activeWeapon) {
+            wpnName = gameManager.player.activeWeapon.name || gameManager.player.activeWeapon.id || 'unknown';
+          }
+          if (gameManager.player.weaponGroup) {
+            gameManager.player.weaponGroup.traverse(c => {
+              if (c.isMesh && wpnMeshName === 'none') {
+                wpnMeshName = c.name || 'unnamed_mesh';
+                const m = Array.isArray(c.material) ? c.material[0] : c.material;
+                if (m) {
+                  wpnMatType = m.type || 'unknown';
+                  if (m.map && m.map.image) {
+                    wpnTexLoaded = `${m.map.image.width}x${m.map.image.height}`;
+                  } else if (m.map) {
+                    wpnTexLoaded = 'loading';
+                  } else {
+                    wpnTexLoaded = 'NO_MAP';
+                  }
+                }
+              }
+            });
+          }
+        }
+
+        const recoilClimbDeg = (gameManager.player && typeof gameManager.player.currentRecoilPitchDeg === 'number')
+          ? gameManager.player.currentRecoilPitchDeg : 0;
 
         // Network state
         const net = gameManager.net;
@@ -795,10 +867,12 @@ document.addEventListener('DOMContentLoaded', () => {
 `[CS2 ENGINE DEBUG] ?debug=1
 BUILD_ID:      ${buildId}
 RENDER:        calls: ${calls} | triangles: ${tris} | programs: ${progCount}
-MAP MESHES:    count: ${meshCount}
+MAP:           loaded: ${mapLoaded ? 'YES' : 'NO'} | meshes: ${meshCount} | tris: ${mapTriangles}
 MAP BBOX:      ${bboxStr}
 CAMERA:        ${camStr} | fog: ${fogStr}
 PLAYER:        pos: ${pPosStr} | feetY: ${feetYStr}
+WEAPON:        ${wpnName} | mesh: ${wpnMeshName} | tex: ${wpnTexLoaded} | mat: ${wpnMatType}
+RECOIL:        climb: ${recoilClimbDeg.toFixed(1)}°
 NETWORK:       ${isOnline ? 'ONLINE' : 'OFFLINE'} | ws: ${wsState} | ping: ${pingVal}
 ROUND:         phase: ${gameManager.phase} | timer: ${gameManager.phaseTimer.toFixed(1)}s [${timerSource}]
 MATCH:         CT: ${gameManager.ctScore} | T: ${gameManager.tScore} | alive: CT ${ctAlive} : T ${tAlive}
