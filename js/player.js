@@ -162,6 +162,8 @@ class CS2Player {
     this.defuseProgress = 0;
     this.sensitivity = 1.8;
     this.invertY = false;
+    this.lastValidPosition = new THREE.Vector3(0, 0, 0);
+    this.currentRecoilPitchDeg = 0;
 
     // Recoil Punch
     this.recoilPitch = 0;
@@ -1996,9 +1998,18 @@ class CS2Player {
       let highestGroundY = -999;
       for (let i = 0; i < hits.length; i++) {
         const hit = hits[i];
-        // Enforce walkable slope: hit surface normal must have Y >= 0.70 (walkable angle <= 45 deg)
-        // Rejects steep canyon cliff faces and mountain meshes so player cannot surf/climb cliffs
-        if (hit.face && hit.face.normal && hit.face.normal.y < 0.70) {
+        // Enforce walkable slope: hit surface normal must have world Y >= 0.70 (walkable angle <= 45 deg)
+        // Rejects steep canyon cliff faces (e.g. B-window rock face) and prevents climbing unwalkable surfaces
+        let worldNormalY = 1.0;
+        if (hit.face && hit.face.normal) {
+          if (hit.object && hit.object.matrixWorld) {
+            const normMat = new THREE.Matrix3().getNormalMatrix(hit.object.matrixWorld);
+            worldNormalY = hit.face.normal.clone().applyMatrix3(normMat).normalize().y;
+          } else {
+            worldNormalY = hit.face.normal.y;
+          }
+        }
+        if (worldNormalY < 0.70) {
           continue;
         }
         const ptY = hit.point.y;
@@ -2010,10 +2021,12 @@ class CS2Player {
       if (foundGround) {
         targetGroundY = highestGroundY;
         this.lastGroundY = highestGroundY;
-      } else if (this.isGrounded && this.lastGroundY !== undefined) {
-        // Player tried to walk onto steep cliff: push back to previous valid horizontal position
-        this.position.x = oldX;
-        this.position.z = oldZ;
+        if (this.isGrounded && this.lastValidPosition) {
+          this.lastValidPosition.set(this.position.x, this.position.y, this.position.z);
+        }
+      } else if (this.isGrounded && this.lastValidPosition) {
+        // Player tried to walk onto steep cliff/unwalkable rock face: restore last valid walkable position
+        this.position.copy(this.lastValidPosition);
         this.velocity.x = 0;
         this.velocity.z = 0;
       }
@@ -2085,14 +2098,20 @@ class CS2Player {
     const fireInterval = (this.activeWeapon && this.activeWeapon.fireRate) ? this.activeWeapon.fireRate : 0.1;
 
     if (this.isShooting && idleTime <= fireInterval * 1.5) {
-      const easeSpeed = 1 - Math.exp(-30.0 * dt);
+      const easeSpeed = 1 - Math.exp(-32.0 * dt);
       this.recoilPitch += ((this.targetRecoilPitch || 0) - this.recoilPitch) * easeSpeed;
       this.recoilYaw += ((this.targetRecoilYaw || 0) - this.recoilYaw) * easeSpeed;
     } else {
       const recFactor = Math.exp(-9.0 * dt);
       this.recoilPitch *= recFactor;
       this.recoilYaw *= recFactor;
+      if (idleTime > fireInterval * 2.0) {
+        this.sprayCount = 0;
+        this.targetRecoilPitch = 0;
+        this.targetRecoilYaw = 0;
+      }
     }
+    this.currentRecoilPitchDeg = Math.abs(this.recoilPitch * 180 / Math.PI);
 
     this.camera.position.copy(this.position);
     this.camera.rotation.order = 'YXZ';

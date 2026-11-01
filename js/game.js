@@ -692,12 +692,24 @@ class CS2GameManager {
             actionPrompt.classList.add('hidden');
             // Determine exact contact ground/box surface Y via downward raycast
             let plantY = (siteY !== undefined) ? siteY : (this.player.position.y - this.player.playerHeight);
+            if (this.mapBuilder && this.mapBuilder.colliders) {
+              for (let i = 0; i < this.mapBuilder.colliders.length; i++) {
+                const c = this.mapBuilder.colliders[i];
+                if (c.box && this.player.position.x >= c.box.min.x && this.player.position.x <= c.box.max.x &&
+                    this.player.position.z >= c.box.min.z && this.player.position.z <= c.box.max.z) {
+                  if (c.topY !== undefined && Math.abs((this.player.position.y - this.player.playerHeight) - c.topY) < 0.6) {
+                    plantY = c.topY;
+                    break;
+                  }
+                }
+              }
+            }
             if (this.mapBuilder && this.mapBuilder.groundMeshes && this.mapBuilder.groundMeshes.length > 0) {
               const downOrigin = new THREE.Vector3(this.player.position.x, this.player.position.y + 0.5, this.player.position.z);
               const downDir = new THREE.Vector3(0, -1, 0);
               const rc = new THREE.Raycaster(downOrigin, downDir, 0.05, 6.0);
               const gHits = rc.intersectObjects(this.mapBuilder.groundMeshes, false);
-              if (gHits.length > 0) {
+              if (gHits.length > 0 && Math.abs(gHits[0].point.y - (this.player.position.y - this.player.playerHeight)) < 0.6) {
                 plantY = gHits[0].point.y;
               }
             }
