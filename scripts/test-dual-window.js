@@ -8,10 +8,8 @@ const targetUrl = 'https://boqnpenev1-design.github.io/boba1.6/?debug=1';
 const dir1 = path.join(process.env.TEMP || 'C:\\Temp', 'cs2_dual_w1');
 const dir2 = path.join(process.env.TEMP || 'C:\\Temp', 'cs2_dual_w2');
 
-try { fs.rmSync(dir1, { recursive: true, force: true }); } catch (e) {}
-try { fs.rmSync(dir2, { recursive: true, force: true }); } catch (e) {}
-fs.mkdirSync(dir1, { recursive: true });
-fs.mkdirSync(dir2, { recursive: true });
+if (!fs.existsSync(dir1)) fs.mkdirSync(dir1, { recursive: true });
+if (!fs.existsSync(dir2)) fs.mkdirSync(dir2, { recursive: true });
 
 console.log('[DUAL-WINDOW] Launching Chrome Window 1 on port 9222...');
 const p1 = spawn(chromePath, [
@@ -23,6 +21,8 @@ const p1 = spawn(chromePath, [
   '--window-position=0,0',
   '--window-size=960,1040',
   '--autoplay-policy=no-user-gesture-required',
+  '--disk-cache-size=1',
+  '--disable-cache',
   targetUrl
 ], { stdio: 'ignore' });
 
@@ -36,6 +36,8 @@ const p2 = spawn(chromePath, [
   '--window-position=960,0',
   '--window-size=960,1040',
   '--autoplay-policy=no-user-gesture-required',
+  '--disk-cache-size=1',
+  '--disable-cache',
   targetUrl
 ], { stdio: 'ignore' });
 
@@ -62,6 +64,7 @@ async function connectCDP(port, name) {
   let id = 1;
   const callbacks = new Map();
   const errors = [];
+  const warnings = [];
   const logs = [];
 
   await new Promise((res, rej) => {
@@ -89,6 +92,9 @@ async function connectCDP(port, name) {
       if (type === 'error') {
         errors.push(text);
         console.error(`[${name} CONSOLE_ERROR] ${text}`);
+      } else if (type === 'warning') {
+        warnings.push(text);
+        console.warn(`[${name} CONSOLE_WARN] ${text}`);
       } else {
         logs.push(`[${type}] ${text}`);
       }
@@ -97,19 +103,31 @@ async function connectCDP(port, name) {
         const text = data.params.entry.text;
         errors.push(text);
         console.error(`[${name} LOG_ERROR] ${text}`);
+      } else if (data.params.entry.level === 'warning') {
+        const text = data.params.entry.text;
+        warnings.push(text);
+        console.warn(`[${name} LOG_WARN] ${text}`);
       }
     }
   };
 
   await send('Runtime.enable');
   await send('Log.enable');
+  await send('Page.enable');
 
   async function evaluate(expr) {
     const res = await send('Runtime.evaluate', { expression: expr, returnByValue: true });
     return res && res.result ? res.result.value : null;
   }
 
-  return { name, ws, send, evaluate, errors, logs };
+  async function captureScreenshot(filepath) {
+    const res = await send('Page.captureScreenshot', { format: 'png' });
+    if (res && res.data) {
+      fs.writeFileSync(filepath, Buffer.from(res.data, 'base64'));
+    }
+  }
+
+  return { name, ws, send, evaluate, captureScreenshot, errors, warnings, logs };
 }
 
 async function run() {
@@ -189,16 +207,30 @@ async function run() {
       console.log(`WIN1 Errors: ${w1.errors.length} | WIN2 Errors: ${w2.errors.length}`);
     }
 
+    const shotsDir = path.join(__dirname, '../screenshots');
+    if (!fs.existsSync(shotsDir)) fs.mkdirSync(shotsDir, { recursive: true });
+    await w1.captureScreenshot(path.join(shotsDir, 'win1_t_live_3d.png'));
+    await w2.captureScreenshot(path.join(shotsDir, 'win2_ct_live_3d.png'));
+    console.log('[DUAL-WINDOW] Live 3D Screenshots saved to disk!');
+
     console.log('\n================ FINAL RESULTS ================');
-    console.log(`WIN1 (T) Total Red Errors: ${w1.errors.length}`);
+    console.log(`WIN1 (T) Total Red Errors: ${w1.errors.length} | Warnings: ${w1.warnings.length}`);
     if (w1.errors.length > 0) {
       console.log('WIN1 Errors list:');
       w1.errors.forEach(e => console.log('  ' + e));
     }
-    console.log(`WIN2 (CT) Total Red Errors: ${w2.errors.length}`);
+    if (w1.warnings.length > 0) {
+      console.log('WIN1 Warnings list:');
+      w1.warnings.forEach(w => console.log('  ' + w));
+    }
+    console.log(`WIN2 (CT) Total Red Errors: ${w2.errors.length} | Warnings: ${w2.warnings.length}`);
     if (w2.errors.length > 0) {
       console.log('WIN2 Errors list:');
       w2.errors.forEach(e => console.log('  ' + e));
+    }
+    if (w2.warnings.length > 0) {
+      console.log('WIN2 Warnings list:');
+      w2.warnings.forEach(w => console.log('  ' + w));
     }
 
     console.log('\n[WIN1 FINAL OVERLAY]');
