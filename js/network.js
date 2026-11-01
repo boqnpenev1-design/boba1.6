@@ -726,7 +726,9 @@ class CS2NetworkManager {
       if (!rp || !rp.mesh || !rp.mesh.visible || rp.buffer.length < 1) return;
 
       const buf = rp.buffer;
+      const latest = buf[buf.length - 1];
       const prevX = rp.mesh.position.x;
+      const prevY = rp.mesh.position.y;
       const prevZ = rp.mesh.position.z;
 
       // Drop older snapshots
@@ -748,7 +750,6 @@ class CS2NetworkManager {
         while (dy < -Math.PI) dy += Math.PI * 2;
         rp.mesh.rotation.y = s0.yaw + dy * frac;
       } else if (buf.length > 0) {
-        const latest = buf[buf.length - 1];
         const timeSince = renderTime - latest.t;
         if (timeSince > 0 && timeSince <= 150 && buf.length >= 2) {
           // Smooth extrapolation up to 150ms
