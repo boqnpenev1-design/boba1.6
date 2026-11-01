@@ -883,6 +883,18 @@ document.addEventListener('DOMContentLoaded', () => {
           spawnStr = `team: ${gameManager.player.team} | idx: ${sIdx}`;
         }
 
+        const clientTeam = gameManager.player ? gameManager.player.team : 'none';
+        const serverTeam = (net && net.serverTeam) ? net.serverTeam : clientTeam;
+        let playerListStr = `Local(${clientTeam}:${gameManager.player?.isAlive ? 'ALIVE' : 'DEAD'})`;
+        if (net && net.remotePlayers) {
+          Object.entries(net.remotePlayers).forEach(([id, rp]) => {
+            const rTeam = rp.team || 'T';
+            const rAlive = rp.isAlive ? 'ALIVE' : 'DEAD';
+            const rName = rp.name || id.substring(0, 5);
+            playerListStr += `, ${rName}(${rTeam}:${rAlive})`;
+          });
+        }
+
         overlay.textContent =
 `[CS2 ENGINE DEBUG] ?debug=1
 BUILD_ID:      ${buildId}
@@ -890,6 +902,7 @@ RENDER:        calls: ${calls} | triangles: ${tris} | programs: ${progCount}
 MAP:           loaded: ${mapLoaded ? 'YES' : 'NO'} | meshes: ${meshCount} | tris: ${mapTriangles}
 MAP BBOX:      ${bboxStr}
 SPAWN:         ${spawnStr}
+TEAM:          client: ${clientTeam} | server: ${serverTeam}
 CAMERA:        ${camStr} | fog: ${fogStr}
 PLAYER:        pos: ${pPosStr} | feetY: ${feetYStr}
 WEAPON:        ${wpnStr}${calibStr}
@@ -897,7 +910,7 @@ RECOIL:        climb: ${recoilClimbDeg.toFixed(1)}°
 NETWORK:       ${isOnline ? 'ONLINE' : 'OFFLINE'} | ws: ${wsState} | ping: ${pingVal}
 ROUND:         phase: ${gameManager.phase} | timer: ${gameManager.phaseTimer.toFixed(1)}s [${timerSource}]
 MATCH:         CT: ${gameManager.ctScore} | T: ${gameManager.tScore} | alive: CT ${ctAlive} : T ${tAlive}
-PLAYERS:       total: ${playerCount} | snapshot age: ${snapAge}`;
+PLAYERS:       ${playerListStr} (total: ${playerCount} | snapshot age: ${snapAge})`;
       } catch (e) {
         overlay.textContent = `[DEBUG OVERLAY ERROR]: ${e.message}`;
       }

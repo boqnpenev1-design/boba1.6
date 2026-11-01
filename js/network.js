@@ -268,6 +268,10 @@ class CS2NetworkManager {
         this.playerId = packet.playerId;
         this.inMatch = packet.inMatch;
         this.gm.matchId = packet.matchId;
+        this.serverTeam = packet.team;
+        if (packet.team && this.gm.player && this.gm.player.team !== packet.team) {
+          this.gm.player.setTeam(packet.team);
+        }
 
         // If reconnecting client sees a different matchId, reset local match state
         if (prevMatchId && packet.matchId && prevMatchId !== packet.matchId) {
@@ -509,9 +513,16 @@ class CS2NetworkManager {
     for (let i = 0; i < packet.players.length; i++) {
       const sp = packet.players[i];
       if (sp.id === this.playerId) {
+        this.serverTeam = sp.team;
+        if (this.gm.player && sp.team && this.gm.player.team !== sp.team) {
+          this.gm.player.setTeam(sp.team);
+        }
         // Sync local economy & server-authoritative death
         if (sp.money !== undefined && Math.abs(sp.money - this.gm.player.money.get()) > 50) {
           this.gm.player.money.set(sp.money);
+        }
+        if (sp.isAlive === false && this.gm.player.isAlive) {
+          this.gm.player.takeDamage(500, 'Server Elimination', 'world');
         }
         continue;
       }

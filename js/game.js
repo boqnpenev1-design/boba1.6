@@ -621,6 +621,8 @@ class CS2GameManager {
 
   // Automatic Team Elimination Check
   checkRoundElimination() {
+    // In online matches, round termination is 100% server-authoritative
+    if (this.net && this.net.isConnected) return;
     if (this.phase !== 'live') return;
 
     let livingCT = 0;
@@ -1121,6 +1123,26 @@ class CS2GameManager {
     const p = this.player;
     const h = this.hudEls;
     const c = this.cachedHUD;
+
+    // Synchronize alive counts
+    let curCtAlive = 0;
+    let curTAlive = 0;
+    if (p.health.get() > 0 && !p.isSpectating) {
+      if (p.team === 'CT') curCtAlive++;
+      else curTAlive++;
+    }
+    if (this.net && this.net.remotePlayers) {
+      Object.values(this.net.remotePlayers).forEach(rp => {
+        if (rp.isAlive) {
+          if (rp.team === 'CT') curCtAlive++;
+          else curTAlive++;
+        }
+      });
+    }
+    const ctAliveEl = document.getElementById('ct-alive-count') || document.getElementById('hud-ct-alive');
+    const tAliveEl = document.getElementById('t-alive-count') || document.getElementById('hud-t-alive');
+    if (ctAliveEl) ctAliveEl.innerText = `${curCtAlive} ALIVE`;
+    if (tAliveEl) tAliveEl.innerText = `${curTAlive} ALIVE`;
 
     if (c.ctScore !== this.ctScore) {
       c.ctScore = this.ctScore;
