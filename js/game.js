@@ -413,7 +413,8 @@ class CS2GameManager {
   onEntityKilled(attacker, victim, weapon, isHeadshot, victimTeam) {
     this.addToKillfeed(attacker, victim, weapon, isHeadshot, victimTeam);
 
-    if (attacker === 'Player') {
+    // Only apply client-side payout in offline singleplayer. In online matches, the server owns all economy payouts.
+    if ((!this.net || !this.net.isConnected) && attacker === 'Player') {
       const reward = (this.player.activeWeapon && this.player.activeWeapon.killReward) || 300;
       this.player.money.add(reward);
     }

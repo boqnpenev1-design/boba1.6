@@ -11,8 +11,8 @@ class CS2Player {
 
     // Protected Stats via AntiCheat memory canaries
     this.health = window.__CS2_AC.createProtectedValue(100);
-    this.armor = window.__CS2_AC.createProtectedValue(100);
-    this.hasHelmet = true;
+    this.armor = window.__CS2_AC.createProtectedValue(0);
+    this.hasHelmet = false;
     this.hasDefuseKit = false;
     this.money = window.__CS2_AC.createProtectedValue(800);
     this.team = 'CT';
@@ -1690,7 +1690,7 @@ class CS2Player {
     this.isGrounded = true;
     this.lastGroundY = posY - this.playerHeight;
     this.health.set(100);
-    this.armor.set(100);
+    // In CS2, armor is only granted via buy menu or carried over if surviving. Never reset to 100 on respawn.
     this.isReloading = false;
     this.isShooting = false;
     this.sprayCount = 0;
