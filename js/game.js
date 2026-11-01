@@ -975,7 +975,7 @@ class CS2GameManager {
         this.lastTimerText = timerStr;
         if (this.hudEls.roundTimer) this.hudEls.roundTimer.innerText = timerStr;
       }
-      const phaseLabel = (this.phase === 'freeze') ? 'FREEZETIME' : (this.phase === 'round_over' ? 'ROUND OVER' : 'ROUND LIVE');
+      const phaseLabel = (this.phase === 'freeze') ? 'FREEZETIME' : (this.phase === 'round_over' ? 'ROUND OVER' : (this.c4Planted ? 'BOMB PLANTED' : 'ROUND LIVE'));
       if (this.lastPhaseText !== phaseLabel) {
         this.lastPhaseText = phaseLabel;
         if (this.hudEls.roundPhaseLabel) this.hudEls.roundPhaseLabel.innerText = phaseLabel;
@@ -1015,59 +1015,62 @@ class CS2GameManager {
         this.hudEls.roundTimer.innerText = timerStr;
       }
 
-      if (this.c4Planted) {
-        this.c4Timer -= dt;
+      if (!this.c4Planted && now >= this.phaseEndTime) {
+        this.endRound('CT', 'TIME RAN OUT');
+      }
+    }
 
-        const beepInterval = Math.max(0.12, this.c4Timer / 40.0);
-        if (currentTime / 1000 - this.lastBeepTime > beepInterval) {
-          this.lastBeepTime = currentTime / 1000;
-          const urgency = 1.0 - (this.c4Timer / 40.0);
-          window.csAudio.playC4Beep(urgency);
+    // C4 Bomb Detonation & Beep Processing (Runs in BOTH online & offline modes)
+    if (this.c4Planted) {
+      this.c4Timer -= dt;
 
-          if (this.c4LedMat) this.c4LedMat.color.set(0xffffff);
-          setTimeout(() => {
-            if (this.c4LedMat) this.c4LedMat.color.set(0xff0000);
-          }, 70);
+      const beepInterval = Math.max(0.10, this.c4Timer / 40.0);
+      if (currentTime / 1000 - this.lastBeepTime > beepInterval) {
+        this.lastBeepTime = currentTime / 1000;
+        const urgency = Math.max(0, Math.min(1.0, 1.0 - (this.c4Timer / 40.0)));
+        window.csAudio.playC4Beep(urgency);
+
+        if (this.c4LedMat) this.c4LedMat.color.set(0xffffff);
+        setTimeout(() => {
+          if (this.c4LedMat) this.c4LedMat.color.set(0xff0000);
+        }, 60);
+      }
+
+      if (this.c4Timer <= 0) {
+        const boomPos = this.c4Pos
+          ? new THREE.Vector3(this.c4Pos.x, (this.c4Pos.y !== undefined ? this.c4Pos.y : 0.1), this.c4Pos.z)
+          : this.c4Mesh.position.clone();
+        this.c4Planted = false;
+        this.c4Mesh.visible = false;
+        window.csAudio.playExplosion();
+
+        // Spawn authentic fireball animation & shockwave
+        this.spawnC4ExplosionEffect(boomPos);
+
+        // Distance-based blast damage: closer to bomb = greater damage (lethal up to 55m)
+        const dist = this.player.position.distanceTo(boomPos);
+        if (dist < 55) {
+          const factor = Math.pow(Math.max(0, 1 - dist / 55), 1.6);
+          const blastDamage = Math.round(500 * factor);
+          this.player.takeDamage(blastDamage, 'C4 Explosive', 'c4');
         }
 
-        if (this.c4Timer <= 0) {
-          const boomPos = this.c4Pos
-            ? new THREE.Vector3(this.c4Pos.x, (this.c4Pos.y !== undefined ? this.c4Pos.y : 0.1), this.c4Pos.z)
-            : this.c4Mesh.position.clone();
-          this.c4Planted = false;
-          this.c4Mesh.visible = false;
-          window.csAudio.playExplosion();
-
-          // Spawn authentic fireball animation & shockwave
-          this.spawnC4ExplosionEffect(boomPos);
-
-          // Distance-based blast damage: closer to bomb = greater damage (lethal up to 55m)
-          const dist = this.player.position.distanceTo(boomPos);
-          if (dist < 55) {
-            const factor = Math.pow(Math.max(0, 1 - dist / 55), 1.6);
-            const blastDamage = Math.round(500 * factor);
-            this.player.takeDamage(blastDamage, 'C4 Explosive', 'c4');
-          }
-
-          // Damage remote players
-          if (this.net && this.net.remotePlayers) {
-            Object.entries(this.net.remotePlayers).forEach(([id, rp]) => {
-              if (rp && rp.mesh) {
-                const rDist = rp.mesh.position.distanceTo(boomPos);
-                if (rDist < 55) {
-                  const factor = Math.pow(Math.max(0, 1 - rDist / 55), 1.6);
-                  const dmg = Math.round(500 * factor);
-                  this.net.sendDamage(id, dmg, 'C4 Explosive', false);
-                }
+        // Damage remote players
+        if (this.net && this.net.remotePlayers) {
+          Object.entries(this.net.remotePlayers).forEach(([id, rp]) => {
+            if (rp && rp.mesh) {
+              const rDist = rp.mesh.position.distanceTo(boomPos);
+              if (rDist < 55) {
+                const factor = Math.pow(Math.max(0, 1 - rDist / 55), 1.6);
+                const dmg = Math.round(500 * factor);
+                this.net.sendDamage(id, dmg, 'C4 Explosive', false);
               }
-            });
-          }
-
-          this.endRound('T', 'TARGET DESTROYED');
+            }
+          });
         }
-      } else {
-        if (now >= this.phaseEndTime) {
-          this.endRound('CT', 'TIME RAN OUT');
+
+        if (!this.net || !this.net.isConnected) {
+          this.endRound('T', 'TARGET DESTROYED');
         }
       }
     }

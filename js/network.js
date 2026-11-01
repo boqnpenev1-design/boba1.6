@@ -392,6 +392,10 @@ class CS2NetworkManager {
 
       case 'c4_planted':
         this.gm.onC4Planted(packet.pos, packet.site);
+        if (packet.explodeTime) {
+          const timeLeft = Math.max(0, (packet.explodeTime - Date.now()) / 1000);
+          this.gm.c4Timer = timeLeft;
+        }
         break;
 
       case 'bomb_exploded':

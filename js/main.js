@@ -895,6 +895,13 @@ document.addEventListener('DOMContentLoaded', () => {
           });
         }
 
+        let bombStr = 'planted: NO';
+        if (gameManager.c4Planted) {
+          const bPos = gameManager.c4Pos || gameManager.c4Mesh?.position;
+          const posText = bPos ? `pos(${bPos.x.toFixed(1)}, ${bPos.y.toFixed(1)}, ${bPos.z.toFixed(1)})` : 'pos(unknown)';
+          bombStr = `planted: YES | time: ${gameManager.c4Timer.toFixed(1)}s | ${posText} | site: ${gameManager.c4Site || 'A'}`;
+        }
+
         overlay.textContent =
 `[CS2 ENGINE DEBUG] ?debug=1
 BUILD_ID:      ${buildId}
@@ -909,6 +916,7 @@ WEAPON:        ${wpnStr}${calibStr}
 RECOIL:        climb: ${recoilClimbDeg.toFixed(1)}°
 NETWORK:       ${isOnline ? 'ONLINE' : 'OFFLINE'} | ws: ${wsState} | ping: ${pingVal}
 ROUND:         phase: ${gameManager.phase} | timer: ${gameManager.phaseTimer.toFixed(1)}s [${timerSource}]
+BOMB:          ${bombStr}
 MATCH:         CT: ${gameManager.ctScore} | T: ${gameManager.tScore} | alive: CT ${ctAlive} : T ${tAlive}
 PLAYERS:       ${playerListStr} (total: ${playerCount} | snapshot age: ${snapAge})`;
       } catch (e) {
