@@ -1929,7 +1929,12 @@ class CS2Player {
     this.isCrouched = !!(this.keys[this.keybinds.crouch] || this.keys['KeyC']);
     const targetHeight = this.isCrouched ? 1.35 : 2.2;
     const hLerp = 1 - Math.exp(-14.0 * dt);
+    const prevHeight = this.playerHeight;
     this.playerHeight += (targetHeight - this.playerHeight) * hLerp;
+    if (this.isGrounded) {
+      // Keep feetY strictly constant on ground surface during crouch transitions
+      this.position.y += (this.playerHeight - prevHeight);
+    }
 
     const oldX = this.position.x;
     const oldZ = this.position.z;
@@ -2060,22 +2065,24 @@ class CS2Player {
 
     const groundSurfaceY = targetGroundY + this.playerHeight;
     const heightDiff = groundSurfaceY - this.position.y;
+    const preFallVelocityY = this.velocity.y;
 
     if (this.position.y <= groundSurfaceY) {
       this.position.y = groundSurfaceY;
       this.velocity.y = 0;
       this.isGrounded = true;
-    } else if (this.isGrounded && heightDiff >= -0.05 && heightDiff <= 0.45) {
-      // Step up gentle elevation
+    } else if (this.isGrounded && heightDiff >= -0.55 && heightDiff <= 0.45) {
+      // Step up gentle elevation or smoothly snap down walkable slopes (keeps player continuously grounded)
       this.position.y = groundSurfaceY;
       this.velocity.y = 0;
+      this.isGrounded = true;
     } else {
       // Natural free-fall off crates and ledges (zero teleportation)
       this.isGrounded = false;
     }
 
-    // Landing audio effect
-    if (!wasGrounded && this.isGrounded && this.velocity.y <= 0) {
+    // Landing audio effect: strictly after a genuine vertical drop (downward speed < -4.0 m/s, never on crouch or ramp)
+    if (!wasGrounded && this.isGrounded && preFallVelocityY < -4.0) {
       window.csAudio.playLand();
     }
 
