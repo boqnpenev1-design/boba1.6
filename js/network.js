@@ -360,7 +360,9 @@ class CS2NetworkManager {
             delete this.gm.player.inventory[5];
           }
           this.gm.player.updateSlotHUD();
-          this.gm.player.respawn();
+          const spawns = (this.gm.mapBuilder && this.gm.mapBuilder.spawnPoints && this.gm.mapBuilder.spawnPoints[this.gm.player.team]) || [];
+          const s = spawns.length > 0 ? spawns[Math.floor(Math.random() * spawns.length)] : null;
+          this.gm.player.respawn(s);
         }
         this.gm.updateHUD();
         break;

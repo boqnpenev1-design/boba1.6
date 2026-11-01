@@ -1723,9 +1723,14 @@ class CS2Player {
     const defaultZ = this.team === 'CT' ? -98.0 : 35.0;
     const defaultYaw = this.team === 'CT' ? Math.PI : 0;
 
-    const posX = (spawnPos && spawnPos.x !== undefined) ? spawnPos.x : defaultX;
-    let posY = (spawnPos && spawnPos.y !== undefined) ? spawnPos.y : defaultY;
-    const posZ = (spawnPos && spawnPos.z !== undefined) ? spawnPos.z : defaultZ;
+    const hasValidSpawnPos = spawnPos && typeof spawnPos.x === 'number' && typeof spawnPos.z === 'number' && !(spawnPos.x === 0 && spawnPos.z === 0);
+    const chosenSpawn = hasValidSpawnPos ? spawnPos : { x: defaultX, y: defaultY, z: defaultZ, yaw: defaultYaw, index: 0 };
+    this.spawnIndex = (typeof chosenSpawn.index === 'number') ? chosenSpawn.index : (typeof spawnPos?.spawnIndex === 'number' ? spawnPos.spawnIndex : 0);
+
+    const posX = chosenSpawn.x;
+    let posY = (typeof chosenSpawn.y === 'number') ? chosenSpawn.y : defaultY;
+    const posZ = chosenSpawn.z;
+    const spawnYaw = (typeof chosenSpawn.yaw === 'number') ? chosenSpawn.yaw : defaultYaw;
 
     // Raycast straight down from spawn to find real ground surface if map is loaded
     if (this.map && this.map.groundMeshes && this.map.groundMeshes.length > 0) {
@@ -1746,7 +1751,7 @@ class CS2Player {
     }
 
     this.position.set(posX, posY, posZ);
-    this.yaw = (spawnPos && spawnPos.yaw !== undefined) ? spawnPos.yaw : defaultYaw;
+    this.yaw = spawnYaw;
     this.velocity.set(0, 0, 0);
     this.isGrounded = true;
     this.lastGroundY = posY - this.playerHeight;

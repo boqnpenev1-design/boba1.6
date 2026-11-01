@@ -877,12 +877,19 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         const snapAge = (net && net.lastSnapshotTime) ? `${Date.now() - net.lastSnapshotTime}ms` : 'never';
 
+        let spawnStr = 'team: none | idx: 0';
+        if (gameManager.player) {
+          const sIdx = (typeof gameManager.player.spawnIndex !== 'undefined') ? gameManager.player.spawnIndex : 0;
+          spawnStr = `team: ${gameManager.player.team} | idx: ${sIdx}`;
+        }
+
         overlay.textContent =
 `[CS2 ENGINE DEBUG] ?debug=1
 BUILD_ID:      ${buildId}
 RENDER:        calls: ${calls} | triangles: ${tris} | programs: ${progCount}
 MAP:           loaded: ${mapLoaded ? 'YES' : 'NO'} | meshes: ${meshCount} | tris: ${mapTriangles}
 MAP BBOX:      ${bboxStr}
+SPAWN:         ${spawnStr}
 CAMERA:        ${camStr} | fog: ${fogStr}
 PLAYER:        pos: ${pPosStr} | feetY: ${feetYStr}
 WEAPON:        ${wpnStr}${calibStr}

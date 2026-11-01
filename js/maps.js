@@ -230,7 +230,7 @@ class CS2MapBuilder {
               newGeo.computeBoundingBox();
               newGeo.computeBoundingSphere();
               const m = bucket.mat;
-              m.side = THREE.FrontSide;
+              m.side = THREE.DoubleSide;
               const newMesh = new THREE.Mesh(newGeo, m);
               consolidatedMeshes.push(newMesh);
             });
