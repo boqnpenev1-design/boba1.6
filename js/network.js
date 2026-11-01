@@ -498,10 +498,13 @@ class CS2NetworkManager {
     rp.isAlive = sp.isAlive;
     rp.mesh.visible = (sp.inMatch !== false && sp.isAlive);
 
+    const playerH = (this.gm.player && typeof this.gm.player.playerHeight === 'number') ? this.gm.player.playerHeight : 2.2;
+    const feetY = sp.pos.y - playerH;
+
     // Push into snapshot interpolation buffer (100ms render delay)
     rp.buffer.push({
       t: now,
-      pos: new THREE.Vector3(sp.pos.x, sp.pos.y - 1.75, sp.pos.z),
+      pos: new THREE.Vector3(sp.pos.x, feetY, sp.pos.z),
       yaw: sp.yaw || 0,
       pitch: sp.pitch || 0
     });
@@ -512,14 +515,17 @@ class CS2NetworkManager {
     }
   }
 
-  // Smooth 100ms snapshot interpolation for remote players
+  // Smooth 100ms snapshot interpolation for remote players (with <=150ms extrapolation)
   renderInterpolatedPlayers(now) {
     const renderTime = now - 100; // 100ms buffer delay
 
     Object.values(this.remotePlayers).forEach(rp => {
-      if (!rp || !rp.mesh || !rp.mesh.visible || rp.buffer.length < 2) return;
+      if (!rp || !rp.mesh || !rp.mesh.visible || rp.buffer.length < 1) return;
 
       const buf = rp.buffer;
+      const prevX = rp.mesh.position.x;
+      const prevZ = rp.mesh.position.z;
+
       // Drop older snapshots
       while (buf.length >= 2 && buf[1].t <= renderTime) {
         buf.shift();
@@ -540,8 +546,40 @@ class CS2NetworkManager {
         rp.mesh.rotation.y = s0.yaw + dy * frac;
       } else if (buf.length > 0) {
         const latest = buf[buf.length - 1];
-        rp.mesh.position.copy(latest.pos);
+        const timeSince = renderTime - latest.t;
+        if (timeSince > 0 && timeSince <= 150 && buf.length >= 2) {
+          // Smooth extrapolation up to 150ms
+          const prev = buf[buf.length - 2];
+          const dtSnap = (latest.t - prev.t) / 1000;
+          if (dtSnap > 0.001) {
+            const vx = (latest.pos.x - prev.pos.x) / dtSnap;
+            const vz = (latest.pos.z - prev.pos.z) / dtSnap;
+            rp.mesh.position.set(
+              latest.pos.x + vx * (timeSince / 1000),
+              latest.pos.y,
+              latest.pos.z + vz * (timeSince / 1000)
+            );
+          } else {
+            rp.mesh.position.copy(latest.pos);
+          }
+        } else {
+          rp.mesh.position.copy(latest.pos);
+        }
         rp.mesh.rotation.y = latest.yaw;
+      }
+
+      // Procedural walking articulation or mixer animation
+      const moveSpeed = Math.hypot(rp.mesh.position.x - prevX, rp.mesh.position.z - prevZ);
+      if (rp.mixer) {
+        rp.mixer.update(0.016);
+      } else if (rp.mesh.characterBones) {
+        const b = rp.mesh.characterBones;
+        const walkCycle = Math.sin(now * 0.012);
+        const walkAmp = Math.min(0.45, moveSpeed * 3.5);
+        if (b.legL) b.legL.rotation.x = walkCycle * walkAmp;
+        if (b.legR) b.legR.rotation.x = -walkCycle * walkAmp;
+        if (b.armL) b.armL.rotation.x = -walkCycle * walkAmp * 0.7;
+        if (b.armR) b.armR.rotation.x = walkCycle * walkAmp * 0.7;
       }
     });
   }
@@ -549,11 +587,11 @@ class CS2NetworkManager {
   createTacticalCharacterModel(team, callsign = 'OPERATOR') {
     const group = new THREE.Group();
 
-    // 1. Full-Body Hitbox Cylinder for hit detection
-    const hitboxGeo = new THREE.CylinderGeometry(0.52, 0.52, 2.0, 10);
+    // 1. Full-Body Hitbox Cylinder for hit detection (authoritative box raycasted only)
+    const hitboxGeo = new THREE.CylinderGeometry(0.48, 0.48, 1.85, 10);
     const hitboxMat = new THREE.MeshBasicMaterial({ visible: false });
     const hitbox = new THREE.Mesh(hitboxGeo, hitboxMat);
-    hitbox.position.y = 1.0;
+    hitbox.position.y = 0.925;
     hitbox.name = 'hitbox';
     group.add(hitbox);
 
@@ -571,7 +609,7 @@ class CS2NetworkManager {
       new THREE.PlaneGeometry(1.4, 0.35),
       new THREE.MeshBasicMaterial({ map: nameTex, transparent: true, side: THREE.DoubleSide })
     );
-    namePlane.position.set(0, 2.15, 0);
+    namePlane.position.set(0, 2.05, 0);
     group.add(namePlane);
     group.nameTagMesh = namePlane;
     group.nameCanvas = nameCanvas;
@@ -598,14 +636,34 @@ class CS2NetworkManager {
       ? THREE.SkeletonUtils.clone(srcModel)
       : srcModel.clone(true);
 
-    if (team === 'T') {
-      // Phoenix model natural height 78 units -> 1.95m
-      clone.scale.set(0.025, 0.025, 0.025);
-    } else {
-      // SAS model natural height 2.0m
-      clone.scale.set(1.0, 1.0, 1.0);
+    // Dynamic normalization to authentic 1.85m player height with pivot at feet
+    const bbox = new THREE.Box3().setFromObject(srcModel);
+    const size = new THREE.Vector3();
+    bbox.getSize(size);
+    const targetHeight = 1.85;
+    const normScale = size.y > 0 ? (targetHeight / size.y) : 1.0;
+
+    clone.scale.set(normScale, normScale, normScale);
+    // Align bottom of model with feet (Y=0)
+    clone.position.set(0, -bbox.min.y * normScale, 0);
+
+    // Extract named bones for procedural articulation
+    const bones = {};
+    clone.traverse(c => {
+      if (c.isBone) {
+        const n = c.name.toLowerCase();
+        if (n.includes('leg') && (n.includes('upper_l') || n.includes('thigh_l') || n.includes('leftupleg'))) bones.legL = c;
+        if (n.includes('leg') && (n.includes('upper_r') || n.includes('thigh_r') || n.includes('rightupleg'))) bones.legR = c;
+        if (n.includes('arm') && (n.includes('upper_l') || n.includes('leftarm'))) bones.armL = c;
+        if (n.includes('arm') && (n.includes('upper_r') || n.includes('rightarm'))) bones.armR = c;
+      }
+    });
+    group.characterBones = bones;
+
+    if (!CS2Network.loggedBones) {
+      console.log(`[BONES] Loaded ${team} operator bones:`, Object.keys(bones));
+      CS2Network.loggedBones = true;
     }
-    clone.position.set(0, 0, 0);
 
     group.add(clone);
     group.characterMesh = clone;

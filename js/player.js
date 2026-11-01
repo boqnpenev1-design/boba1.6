@@ -1351,7 +1351,9 @@ class CS2Player {
         Object.entries(gameManager.net.remotePlayers).forEach(([id, p]) => {
           if (p.team === this.team) return;
           if (!p.mesh || !p.mesh.visible) return;
-          const playerHits = this.shootRaycaster.intersectObject(p.mesh, true);
+          // Raycast the hitbox only, never the skinned mesh
+          const hitbox = p.mesh.getObjectByName('hitbox') || p.mesh;
+          const playerHits = this.shootRaycaster.intersectObject(hitbox, false);
           if (playerHits.length > 0 && playerHits[0].distance < 120) {
             const playerDist = playerHits[0].distance;
             let canHit = true;

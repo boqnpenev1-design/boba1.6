@@ -53,18 +53,27 @@ class CS2Bot {
     }
   }
 
-  applyModel(srcModel, scale) {
+  applyModel(srcModel) {
     if (!srcModel || !this.mesh) return;
     const clone = (typeof THREE.SkeletonUtils !== 'undefined' && THREE.SkeletonUtils.clone)
       ? THREE.SkeletonUtils.clone(srcModel)
       : srcModel.clone(true);
-    clone.scale.set(scale, scale, scale);
-    clone.position.set(0, 0, 0);
 
-    // Clean any prior children
+    const bbox = new THREE.Box3().setFromObject(srcModel);
+    const size = new THREE.Vector3();
+    bbox.getSize(size);
+    const targetHeight = 1.85;
+    const normScale = size.y > 0 ? (targetHeight / size.y) : 1.0;
+
+    clone.scale.set(normScale, normScale, normScale);
+    clone.position.set(0, -bbox.min.y * normScale, 0);
+
+    // Keep hitbox child
+    const hitbox = this.mesh.getObjectByName('hitbox');
     while (this.mesh.children.length > 0) {
       this.mesh.remove(this.mesh.children[0]);
     }
+    if (hitbox) this.mesh.add(hitbox);
     this.mesh.add(clone);
   }
 
@@ -74,7 +83,8 @@ class CS2Bot {
     const hitboxGeo = new THREE.CylinderGeometry(0.5, 0.5, 1.85, 10);
     const hitboxMat = new THREE.MeshBasicMaterial({ visible: false });
     const hitbox = new THREE.Mesh(hitboxGeo, hitboxMat);
-    hitbox.position.y = 0.95;
+    hitbox.position.y = 0.925;
+    hitbox.name = 'hitbox';
     group.add(hitbox);
     return group;
   }
