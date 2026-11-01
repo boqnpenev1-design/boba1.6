@@ -14,6 +14,8 @@ class CS2Player {
     this.armor = window.__CS2_AC.createProtectedValue(0);
     this.hasHelmet = false;
     this.hasDefuseKit = false;
+    this.isAlive = true;
+    this.isSpectating = false;
     this.money = window.__CS2_AC.createProtectedValue(800);
     this.team = 'CT';
 
@@ -448,19 +450,39 @@ class CS2Player {
   }
 
   setTeam(team) {
+    this.rebuildLoadout(team, false);
+  }
+
+  rebuildLoadout(team, isCarrier = false) {
     this.team = team;
-    if (team === 'CT') {
-      this.inventory[2] = CS2_WEAPONS.usp;
-      this.inventory[4] = null;
-      this.inventory[5] = null;
-      this.hasDefuseKit = false;
-    } else {
-      this.inventory[2] = CS2_WEAPONS.glock;
-      this.inventory[4] = null;
-      this.inventory[5] = CS2_WEAPONS.c4;
-      this.hasDefuseKit = false;
+    for (let s = 1; s <= 5; s++) {
+      this.inventory[s] = null;
+      delete this.inventory[s];
     }
     this.grenades = [];
+    this.hasC4 = false;
+    this.hasDefuseKit = false;
+    this.plantProgress = 0;
+    this.defuseProgress = 0;
+    this.isPlanting = false;
+    this.isDefusing = false;
+    if (this.preparedWeaponCache) {
+      this.preparedWeaponCache = {};
+    }
+
+    if (team === 'CT') {
+      this.inventory[2] = CS2_WEAPONS.usp;
+      this.inventory[3] = CS2_WEAPONS.knife;
+    } else {
+      this.team = 'T';
+      this.inventory[2] = CS2_WEAPONS.glock;
+      this.inventory[3] = CS2_WEAPONS.knife;
+      if (isCarrier) {
+        this.inventory[5] = CS2_WEAPONS.c4;
+        this.hasC4 = true;
+      }
+    }
+
     this.weaponAmmo = {};
     if (this.inventory[2]) {
       this.weaponAmmo[this.inventory[2].id] = {
@@ -468,7 +490,15 @@ class CS2Player {
         reserve: this.inventory[2].reserve
       };
     }
+    if (this.inventory[3]) {
+      this.weaponAmmo[this.inventory[3].id] = { clip: 1, reserve: 0 };
+    }
+    if (this.inventory[5]) {
+      this.weaponAmmo[this.inventory[5].id] = { clip: 1, reserve: 0 };
+    }
+
     this.switchSlot(2);
+    this.updateSlotHUD();
   }
 
   // Builds realistic tactical viewmodel arms, hands and 100% textured 3D weapon models

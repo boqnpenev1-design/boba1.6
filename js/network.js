@@ -288,8 +288,8 @@ class CS2NetworkManager {
         this.inMatch = packet.inMatch;
         this.gm.matchId = packet.matchId;
         this.serverTeam = packet.team;
-        if (packet.team && this.gm.player && this.gm.player.team !== packet.team) {
-          this.gm.player.setTeam(packet.team);
+        if (packet.team && this.gm) {
+          this.gm.setAuthoritativeTeam(packet.team, packet.c4CarrierId === this.playerId);
         }
 
         // If reconnecting client sees a different matchId, reset local match state
@@ -334,9 +334,13 @@ class CS2NetworkManager {
         }
 
         if (packet.inMatch === false && packet.phase === 'live' && this.gm.player) {
+          this.gm.player.isAlive = false;
           this.gm.player.enterSpectatorMode();
-        } else if (packet.inMatch === true && this.gm.player && this.gm.player.isSpectating) {
-          this.gm.player.isSpectating = false;
+        } else if (this.gm.player) {
+          this.gm.player.isAlive = true;
+          if (this.gm.player.isSpectating) {
+            this.gm.player.isSpectating = false;
+          }
         }
         this.gm.updateHUD();
         break;
@@ -381,11 +385,11 @@ class CS2NetworkManager {
           if (hud) hud.classList.remove('hidden');
 
           const isCarrier = (packet.c4CarrierId === this.playerId);
-          this.gm.player.hasC4 = isCarrier;
-          if (isCarrier) {
-            this.gm.player.inventory[5] = CS2_WEAPONS.c4;
-          } else {
-            delete this.gm.player.inventory[5];
+          if (packet.team) {
+            this.serverTeam = packet.team;
+          }
+          if (this.serverTeam && this.gm) {
+            this.gm.setAuthoritativeTeam(this.serverTeam, isCarrier);
           }
           this.gm.player.updateSlotHUD();
           const spawns = (this.gm.mapBuilder && this.gm.mapBuilder.spawnPoints && this.gm.mapBuilder.spawnPoints[this.gm.player.team]) || [];
@@ -402,11 +406,25 @@ class CS2NetworkManager {
         this.gm.onRoundEnd(packet.winner, packet.reason, packet.mvp);
         break;
 
+      case 'team_swapped':
+        if (packet.playerId === this.playerId && this.gm) {
+          this.serverTeam = packet.newTeam;
+          this.gm.setAuthoritativeTeam(packet.newTeam, false);
+        } else if (this.remotePlayers[packet.playerId]) {
+          this.remotePlayers[packet.playerId].team = packet.newTeam;
+          if (this.remotePlayers[packet.playerId].mesh) {
+            this.applyAuthenticModel(this.remotePlayers[packet.playerId].mesh, packet.newTeam);
+          }
+        }
+        break;
+
       case 'halftime_swap':
         this.gm.score.CT = packet.ctScore;
         this.gm.score.T = packet.tScore;
         if (this.gm.player) {
-          this.gm.player.team = (this.gm.player.team === 'CT') ? 'T' : 'CT';
+          const nextTeam = (this.gm.player.team === 'CT') ? 'T' : 'CT';
+          this.serverTeam = nextTeam;
+          this.gm.setAuthoritativeTeam(nextTeam, false);
           this.gm.player.money.set(800);
           this.gm.player.hasHelmet = false;
           this.gm.player.armor.set(0);
@@ -594,9 +612,11 @@ class CS2NetworkManager {
     for (let i = 0; i < packet.players.length; i++) {
       const sp = packet.players[i];
       if (sp.id === this.playerId) {
-        this.serverTeam = sp.team;
-        if (this.gm.player && sp.team && this.gm.player.team !== sp.team) {
-          this.gm.player.setTeam(sp.team);
+        if (sp.team && sp.team !== this.serverTeam) {
+          this.serverTeam = sp.team;
+          if (this.gm) {
+            this.gm.setAuthoritativeTeam(sp.team, !!sp.hasC4);
+          }
         }
         // Sync local economy & server-authoritative death
         if (sp.transactions && Array.isArray(sp.transactions)) {
@@ -605,8 +625,12 @@ class CS2NetworkManager {
         if (sp.money !== undefined && Math.abs(sp.money - this.gm.player.money.get()) > 0) {
           this.gm.player.money.set(sp.money);
         }
-        if (sp.isAlive === false && this.gm.player.isAlive) {
-          this.gm.player.takeDamage(500, 'Server Elimination', 'world');
+        if (this.gm.player) {
+          if (sp.isAlive === false && this.gm.player.isAlive) {
+            this.gm.player.takeDamage(500, 'Server Elimination', 'world');
+          } else if (sp.isAlive === true) {
+            this.gm.player.isAlive = true;
+          }
         }
         continue;
       }

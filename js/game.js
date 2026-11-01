@@ -251,10 +251,27 @@ class CS2GameManager {
     document.getElementById('team-select-screen').classList.remove('hidden');
   }
 
+  setAuthoritativeTeam(team, isCarrier = false) {
+    if (!team) return;
+    this.selectedTeam = team;
+    if (this.net) this.net.serverTeam = team;
+    if (this.player) {
+      this.player.team = team;
+      this.player.rebuildLoadout(team, isCarrier);
+    }
+    this.updateHUD();
+  }
+
   chooseTeam(team) {
     this.selectedTeam = team;
     this.playerInMatch = true;
-    this.player.setTeam(team);
+    if (this.net) {
+      this.net.serverTeam = team;
+      this.net.sendSelectTeam(team);
+    }
+    if (this.player) {
+      this.player.setTeam(team);
+    }
 
     document.getElementById('team-select-screen').classList.add('hidden');
     // Auto-fullscreen & Keyboard Lock to prevent Ctrl+W/Ctrl+N browser shortcuts during gameplay (only if user gesture is active)
@@ -765,8 +782,9 @@ class CS2GameManager {
     this.player.isPlanting = false;
     this.player.isDefusing = false;
 
-    // T planting C4
-    if (this.player.team === 'T' && !this.c4Planted && this.player.inventory[5]) {
+    // T planting C4: strictly living Terrorist C4 carrier only
+    const plantTeam = (this.net && this.net.serverTeam) || this.player.team;
+    if (plantTeam === 'T' && this.player.team === 'T' && !this.c4Planted && this.player.inventory[5] && this.player.hasC4) {
       let inSite = null;
       let siteY = 0.1;
       const playerFeetY = this.player.position.y - this.player.playerHeight;

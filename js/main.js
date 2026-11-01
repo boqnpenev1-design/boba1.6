@@ -413,7 +413,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const grid = document.getElementById('buy-items-grid');
     grid.innerHTML = '';
     const playerCash = gameManager.player.money.get();
-    const playerTeam = gameManager.player.team;
+    const playerTeam = (gameManager.net && gameManager.net.serverTeam) || gameManager.player.team;
 
     Object.values(CS2_WEAPONS).forEach(weapon => {
       if (weapon.category !== category) return;
@@ -1077,6 +1077,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const clientTeam = gameManager.player ? gameManager.player.team : 'none';
         const serverTeam = (net && net.serverTeam) ? net.serverTeam : clientTeam;
+        const netTeam = (net && net.serverTeam) || clientTeam;
+        const gmTeam = gameManager.selectedTeam || netTeam;
+        const playerTeam = clientTeam;
+        const loadoutTeam = (gameManager.player && gameManager.player.activeWeapon) ? (gameManager.player.activeWeapon.team === 'ANY' ? netTeam : gameManager.player.activeWeapon.team) : netTeam;
+        const buyMenuTeam = netTeam;
+        const plantTeam = netTeam;
+        const teamSourcesStr = `net=${netTeam}, gm=${gmTeam}, player=${playerTeam}, loadout=${loadoutTeam}, buyMenu=${buyMenuTeam}, plant=${plantTeam}`;
         let playerListStr = `Local(${clientTeam}:${gameManager.player?.isAlive ? 'ALIVE' : 'DEAD'})`;
         if (net && net.remotePlayers) {
           Object.entries(net.remotePlayers).forEach(([id, rp]) => {
@@ -1192,6 +1199,7 @@ FRAME TIME:    ${(gameManager.avgFrameMs || 0).toFixed(1)}ms (JS frame duration)
 MAP:           loaded: ${mapLoaded ? 'YES' : 'NO'} | meshes: ${meshCount} | tris: ${mapTriangles}
 MAP BBOX:      ${bboxStr}
 SPAWN:         ${spawnStr}
+TEAM SOURCES:  ${teamSourcesStr}
 TEAM:          client: ${clientTeam} | server: ${serverTeam}
 REMOTES:       ${remotesStr}
 REMOTE MODEL:  ${remoteModelStr}
