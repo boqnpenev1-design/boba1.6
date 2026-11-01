@@ -890,19 +890,9 @@ class CS2Player {
     this.dropWeaponBySlot(this.activeSlot);
   }
 
-  dropWeaponBySlot(dropSlot) {
-    // Cannot drop knife (Slot 3)
-    if (dropSlot === 3) return;
-    if (!this.inventory[dropSlot]) return;
-
-    const droppedWeapon = this.inventory[dropSlot];
-
-    // Create authentic 3D pickup mesh on the ground
+  createWorldWeaponMesh(weaponId) {
     const dropGroup = new THREE.Group();
-    let meshCreated = false;
-
-    if (dropSlot === 5 || (droppedWeapon && droppedWeapon.id === 'c4')) {
-      // 3D Physical C4 explosive pack dropped on ground
+    if (weaponId === 'c4') {
       const c4Pack = new THREE.Group();
       const bodyMat = new THREE.MeshLambertMaterial({ color: 0x5a523a });
       const body = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.12, 0.18), bodyMat);
@@ -915,40 +905,52 @@ class CS2Player {
       led.position.set(0.08, 0.07, 0);
       c4Pack.add(led);
       dropGroup.add(c4Pack);
-      meshCreated = true;
-    } else if (this.weaponModelsLoaded && this.weaponMeshCache) {
-      const meshName = CS2Player.WEAPON_MESH_MAP[droppedWeapon.id];
-      if (meshName) {
-        const cached = this.findWeaponMesh(meshName);
-        if (cached) {
-          const clone = cached.clone(true);
-          const texFile = CS2Player.WEAPON_TEX_MAP[droppedWeapon.id];
-          if (texFile) {
-            const tex = this.getWeaponTexture(texFile);
-            clone.traverse((child) => {
-              if (child.isMesh) {
-                child.material = new THREE.MeshBasicMaterial({
-                  map: tex,
-                  side: THREE.FrontSide
-                });
-              }
+      return dropGroup;
+    }
+
+    const meshName = CS2Player.WEAPON_MESH_MAP[weaponId];
+    if (meshName && this.findWeaponMesh) {
+      const cached = this.findWeaponMesh(meshName);
+      if (cached) {
+        const clone = cached.clone(true);
+        const texFile = CS2Player.WEAPON_TEX_MAP[weaponId] || 'w_rif_ak47.png';
+        const tex = this.getWeaponTexture(texFile);
+        clone.traverse((child) => {
+          if (child.isMesh) {
+            child.material = new THREE.MeshBasicMaterial({
+              map: tex,
+              side: THREE.FrontSide
             });
           }
-          clone.scale.set(0.016, 0.016, 0.016);
-          clone.rotation.set(Math.PI / 2, 0, Math.PI);
-          dropGroup.add(clone);
-          meshCreated = true;
-        }
+        });
+        clone.scale.set(0.016, 0.016, 0.016);
+        // Lie completely flat on ground
+        clone.rotation.set(Math.PI / 2, 0, Math.PI);
+        dropGroup.add(clone);
+        return dropGroup;
       }
     }
 
-    if (!meshCreated) {
-      const texFile = CS2Player.WEAPON_TEX_MAP[droppedWeapon.id] || 'w_rif_ak47.png';
-      const tex = this.getWeaponTexture(texFile);
-      const boxMat = new THREE.MeshBasicMaterial({ map: tex, color: 0xffffff, side: THREE.DoubleSide });
-      const box = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.08, 0.45), boxMat);
-      dropGroup.add(box);
-    }
+    // Proportional fallback box so pistols never look like rifles
+    const w = CS2_WEAPONS[weaponId];
+    const isPistol = (w && (w.slot === 2 || w.category === 'pistols'));
+    const texFile = CS2Player.WEAPON_TEX_MAP[weaponId] || 'w_rif_ak47.png';
+    const tex = this.getWeaponTexture(texFile);
+    const boxMat = new THREE.MeshBasicMaterial({ map: tex, color: 0xffffff, side: THREE.DoubleSide });
+    const length = isPistol ? 0.22 : 0.70;
+    const box = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.05, length), boxMat);
+    box.rotation.set(0, 0, Math.PI / 2);
+    dropGroup.add(box);
+    return dropGroup;
+  }
+
+  dropWeaponBySlot(dropSlot) {
+    // Cannot drop knife (Slot 3)
+    if (dropSlot === 3) return;
+    if (!this.inventory[dropSlot]) return;
+
+    const droppedWeapon = this.inventory[dropSlot];
+    const dropGroup = this.createWorldWeaponMesh(droppedWeapon.id);
 
     // Position weapon in front of player with launch velocity and spin
     const fwd = new THREE.Vector3(-Math.sin(this.yaw), 0, -Math.cos(this.yaw));

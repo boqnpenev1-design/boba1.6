@@ -1078,6 +1078,16 @@ document.addEventListener('DOMContentLoaded', () => {
           }
         }
 
+        let dropsStr = '0 (none)';
+        if (window._droppedItems && window._droppedItems.length > 0) {
+          const dParts = window._droppedItems.map(d => {
+            const wId = d.weapon ? d.weapon.id : 'unknown';
+            const p = d.mesh ? d.mesh.position : (d.pos || { x: 0, y: 0, z: 0 });
+            return `${wId}(${p.x.toFixed(1)}, ${p.y.toFixed(1)}, ${p.z.toFixed(1)})`;
+          });
+          dropsStr = `${window._droppedItems.length} | ${dParts.join('; ')}`;
+        }
+
         let txStr = 'none';
         const txList = gameManager.transactions || [];
         if (txList.length > 0) {
@@ -1097,6 +1107,7 @@ MAP BBOX:      ${bboxStr}
 SPAWN:         ${spawnStr}
 TEAM:          client: ${clientTeam} | server: ${serverTeam}
 REMOTES:       ${remotesStr}
+DROPS:         ${dropsStr}
 CAMERA:        ${camStr} | fog: ${fogStr}
 PLAYER:        pos: ${pPosStr} | feetY: ${feetYStr}
 WEAPON:        ${wpnStr}${calibStr}

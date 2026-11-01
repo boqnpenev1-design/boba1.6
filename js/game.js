@@ -112,12 +112,9 @@ class CS2GameManager {
     if (!item || !item.weaponId || !this.player) return;
     const w = CS2_WEAPONS[item.weaponId];
     if (!w) return;
-    const meshName = CS2Player.WEAPON_MESH_MAP[w.id];
-    const cachedMesh = this.player.findWeaponMesh(meshName);
-    const mesh = this.player.prepareWeaponModel(cachedMesh, w.id);
+    const mesh = this.player.createWorldWeaponMesh(item.weaponId);
     if (!mesh) return;
     mesh.position.set(item.pos.x, item.pos.y, item.pos.z);
-    mesh.rotation.x = Math.PI / 2;
     this.scene.add(mesh);
     if (!window._droppedItems) window._droppedItems = [];
     window._droppedItems.push({

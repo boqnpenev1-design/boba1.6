@@ -365,6 +365,7 @@ class CS2NetworkManager {
         this.gm.score.CT = this.gm.ctScore;
         this.gm.score.T = this.gm.tScore;
         this.gm.resetBombHUD();
+        this.gm.clearAllDroppedItems();
         const roundEndOverlay = document.getElementById('round-end-overlay');
         if (roundEndOverlay) roundEndOverlay.classList.add('hidden');
         this.inMatch = true;
