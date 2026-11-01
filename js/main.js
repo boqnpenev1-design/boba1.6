@@ -903,6 +903,23 @@ document.addEventListener('DOMContentLoaded', () => {
           bombStr = `planted: YES | time: ${gameManager.c4Timer.toFixed(1)}s | ${posText} | site: ${gameManager.c4Site || 'A'}`;
         }
 
+        let remotesStr = '0 (none)';
+        if (net && net.remotePlayers) {
+          const rKeys = Object.keys(net.remotePlayers);
+          if (rKeys.length === 0) {
+            remotesStr = '0 (none)';
+          } else {
+            const parts = rKeys.map(id => {
+              const rp = net.remotePlayers[id];
+              const rPos = rp.mesh ? rp.mesh.position : (rp.pos || { x: 0, y: 0, z: 0 });
+              const rVis = (rp.mesh && rp.mesh.visible) ? 'YES' : 'NO';
+              const mLoaded = rp.mesh && rp.mesh.characterMesh ? '3D' : 'BOX';
+              return `${rp.name || id.substring(0, 5)}[${rp.team || '?'}:${mLoaded}]: pos(${rPos.x.toFixed(1)}, ${rPos.y.toFixed(1)}, ${rPos.z.toFixed(1)}) vis:${rVis}`;
+            });
+            remotesStr = `${rKeys.length} | ${parts.join('; ')}`;
+          }
+        }
+
         overlay.textContent =
 `[CS2 ENGINE DEBUG] ?debug=1
 BUILD_ID:      ${buildId}
@@ -911,6 +928,7 @@ MAP:           loaded: ${mapLoaded ? 'YES' : 'NO'} | meshes: ${meshCount} | tris
 MAP BBOX:      ${bboxStr}
 SPAWN:         ${spawnStr}
 TEAM:          client: ${clientTeam} | server: ${serverTeam}
+REMOTES:       ${remotesStr}
 CAMERA:        ${camStr} | fog: ${fogStr}
 PLAYER:        pos: ${pPosStr} | feetY: ${feetYStr}
 WEAPON:        ${wpnStr}${calibStr}

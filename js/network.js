@@ -571,6 +571,12 @@ class CS2NetworkManager {
     rp.isAlive = sp.isAlive;
     rp.mesh.visible = (sp.inMatch !== false && sp.isAlive);
 
+    if (!rp.hasAuthenticModel) {
+      if (this.applyAuthenticModel(rp.mesh, sp.team)) {
+        rp.hasAuthenticModel = true;
+      }
+    }
+
     const playerH = (this.gm.player && typeof this.gm.player.playerHeight === 'number') ? this.gm.player.playerHeight : 2.2;
     const feetY = sp.pos.y - playerH;
 
@@ -638,6 +644,9 @@ class CS2NetworkManager {
         } else {
           rp.mesh.position.copy(latest.pos);
         }
+        if (rp.mesh.nameTagMesh && this.gm.camera) {
+          rp.mesh.nameTagMesh.quaternion.copy(this.gm.camera.quaternion);
+        }
         rp.mesh.rotation.y = latest.yaw;
       }
 
@@ -698,7 +707,7 @@ class CS2NetworkManager {
 
   applyAuthenticModel(group, team) {
     const srcModel = (team === 'T') ? this.tModel : this.ctModel;
-    if (!srcModel) return;
+    if (!srcModel) return false;
 
     if (group.characterMesh) {
       group.remove(group.characterMesh);
@@ -720,6 +729,25 @@ class CS2NetworkManager {
     // Align bottom of model with feet (Y=0)
     clone.position.set(0, -bbox.min.y * normScale, 0);
 
+    // Ensure all materials are visible, DoubleSide and sRGB
+    clone.traverse(child => {
+      if (child.isMesh) {
+        child.visible = true;
+        child.castShadow = false;
+        child.receiveShadow = false;
+        if (child.material) {
+          const mats = Array.isArray(child.material) ? child.material : [child.material];
+          mats.forEach(m => {
+            m.side = THREE.DoubleSide;
+            if (m.map) {
+              m.map.encoding = THREE.sRGBEncoding;
+              m.map.needsUpdate = true;
+            }
+          });
+        }
+      }
+    });
+
     // Extract named bones for procedural articulation
     const bones = {};
     clone.traverse(c => {
@@ -740,6 +768,7 @@ class CS2NetworkManager {
 
     group.add(clone);
     group.characterMesh = clone;
+    return true;
   }
 
   removeRemotePlayer(id) {
