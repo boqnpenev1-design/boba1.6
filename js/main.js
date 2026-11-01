@@ -59,15 +59,36 @@ document.addEventListener('DOMContentLoaded', () => {
   const noPost = urlParams.get('nopost') === '1';
   const noOverlay = urlParams.get('nooverlay') === '1';
   const noRemote = urlParams.get('noremote') === '1';
+  const noVm = urlParams.get('novm') === '1';
+  const lowTex = urlParams.get('lowtex') === '1';
+  const noAniso = urlParams.get('noaniso') === '1';
   window.__noRemote = noRemote;
   window.__noOverlay = noOverlay;
+  window.__noVm = noVm;
+  window.__lowTex = lowTex;
+  window.__noAniso = noAniso;
 
   const defaultPR = forcePR1 ? 1.0 : Math.min(window.devicePixelRatio || 1, 1.0);
   renderer.setPixelRatio(defaultPR);
   renderer.shadowMap.enabled = !noShadow && false; // Off by default for competitive 60+ FPS
-  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMapping = noPost ? THREE.LinearToneMapping : THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.0;
   renderer.outputEncoding = THREE.sRGBEncoding;
+
+  let unmaskedGpu = 'unknown';
+  let unmaskedVendor = 'unknown';
+  try {
+    const gl = renderer.getContext();
+    const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
+    if (debugInfo) {
+      unmaskedGpu = gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL);
+      unmaskedVendor = gl.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL);
+    }
+    window.__maxAniso = renderer.capabilities ? renderer.capabilities.getMaxAnisotropy() : 1;
+  } catch (e) {}
+  window.__unmaskedGpu = unmaskedGpu;
+  window.__unmaskedVendor = unmaskedVendor;
+
   container.appendChild(renderer.domElement);
 
   // Fast Competitive Lighting (Authentic CS2 Desert Sun - warm contrast, zero blowout)
@@ -1010,14 +1031,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // 11. High Performance Animation Loop
   let lastTime = performance.now();
+  let lastFrameTime = performance.now();
+  let frameToFrameMs = 16.6;
   const hudElement = document.getElementById('hud');
   const specHudElement = document.getElementById('spectator-hud');
 
   function animate(currentTime) {
     requestAnimationFrame(animate);
 
+    frameToFrameMs = currentTime - lastFrameTime;
+    lastFrameTime = currentTime;
+    window.__lastFrameToFrameMs = frameToFrameMs;
+
     const dt = Math.min((currentTime - lastTime) / 1000, 0.05);
     lastTime = currentTime;
+
+    if (window.__noVm && gameManager.player && gameManager.player.viewmodelGroup) {
+      gameManager.player.viewmodelGroup.visible = false;
+    }
 
     if ((hudElement && !hudElement.classList.contains('hidden')) ||
         (specHudElement && !specHudElement.classList.contains('hidden'))) {
@@ -1383,6 +1414,10 @@ document.addEventListener('DOMContentLoaded', () => {
         overlay.textContent =
 `[CS2 ENGINE DEBUG] ?debug=1
 BUILD_ID:      ${buildId}
+GPU:           ${window.__unmaskedGpu || 'unknown'} (${window.__unmaskedVendor || 'unknown'})
+GPU PERF:      frame-to-frame: ${(window.__lastFrameToFrameMs || 16.6).toFixed(1)}ms | JS: ${(gameManager.avgFrameMs || 0).toFixed(1)}ms
+VIEWPORT:      ${window.innerWidth}x${window.innerHeight} @ dpr: ${(window.devicePixelRatio || 1).toFixed(2)} (canvas: ${renderer.domElement.width}x${renderer.domElement.height})
+TEXTURE MEM:   textures: ${rInfo.memory ? rInfo.memory.textures : 0} | geometries: ${rInfo.memory ? rInfo.memory.geometries : 0} | aniso: ${window.__maxAniso || 1}
 RENDER:        calls: ${calls} | triangles: ${tris} | programs: ${progCount}
 FRAME TIME:    ${(gameManager.avgFrameMs || 0).toFixed(1)}ms (JS frame duration)
 MAP:           loaded: ${mapLoaded ? 'YES' : 'NO'} | meshes: ${meshCount} | tris: ${mapTriangles}

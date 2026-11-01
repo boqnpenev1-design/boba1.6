@@ -88,6 +88,12 @@ class CS2MapBuilder {
       const objLoader = new THREE.OBJLoader();
 
       const urlParams = (typeof window !== 'undefined' && window.location) ? new URLSearchParams(window.location.search) : null;
+      if (urlParams && urlParams.get('nomap') === '1') {
+        console.log('[MAP] ?nomap=1 active — skipping 3D map build.');
+        this.mapLoaded = true;
+        this.isLoading = false;
+        return;
+      }
       // Default is CONSOLIDATED merged map for 60+ FPS. ?nomerge=1 enables original unmerged path.
       const useMerge = !(urlParams && urlParams.get('nomerge') === '1');
 
@@ -116,6 +122,11 @@ class CS2MapBuilder {
                 mats.forEach(mat => {
                   if (mat.map) {
                     mat.map.encoding = THREE.sRGBEncoding;
+                    const noAniso = (urlParams && urlParams.get('noaniso') === '1');
+                    const targetAniso = (!noAniso && window.__maxAniso) ? window.__maxAniso : 1;
+                    mat.map.anisotropy = targetAniso;
+                    mat.map.minFilter = THREE.LinearMipmapLinearFilter;
+                    mat.map.magFilter = THREE.LinearFilter;
                     if (mat.map.image) mat.map.needsUpdate = true;
                   }
                   if (mat.emissive) mat.emissive.setHex(0x000000);
@@ -232,7 +243,7 @@ class CS2MapBuilder {
               newGeo.computeBoundingBox();
               newGeo.computeBoundingSphere();
               const m = bucket.mat;
-              m.side = THREE.DoubleSide;
+              m.side = THREE.FrontSide;
               const newMesh = new THREE.Mesh(newGeo, m);
               consolidatedMeshes.push(newMesh);
             });
