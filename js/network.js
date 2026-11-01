@@ -468,6 +468,46 @@ class CS2NetworkManager {
         }
         break;
 
+      case 'buy_success':
+        if (this.gm.player && typeof packet.remainingMoney === 'number') {
+          this.gm.player.money.set(packet.remainingMoney);
+        }
+        if (packet.transactions) {
+          this.gm.transactions = packet.transactions;
+        }
+        if (window.__onBuySuccess) {
+          window.__onBuySuccess(packet);
+        }
+        this.gm.updateHUD();
+        break;
+
+      case 'buy_error':
+        console.warn('[BUY_ERROR]', packet.reason);
+        if (window.__onBuyError) {
+          window.__onBuyError(packet);
+        }
+        break;
+
+      case 'refund_success':
+        if (this.gm.player && typeof packet.remainingMoney === 'number') {
+          this.gm.player.money.set(packet.remainingMoney);
+        }
+        if (packet.transactions) {
+          this.gm.transactions = packet.transactions;
+        }
+        if (window.__onRefundSuccess) {
+          window.__onRefundSuccess(packet);
+        }
+        this.gm.updateHUD();
+        break;
+
+      case 'refund_error':
+        console.warn('[REFUND_ERROR]', packet.reason);
+        if (window.__onRefundError) {
+          window.__onRefundError(packet);
+        }
+        break;
+
       case 'pong':
         this.lastPingMs = Math.max(0, Date.now() - (packet.t || this.lastPingSentAt || Date.now()));
         const fpsEl = document.getElementById('net-graph-fps');
@@ -558,7 +598,10 @@ class CS2NetworkManager {
           this.gm.player.setTeam(sp.team);
         }
         // Sync local economy & server-authoritative death
-        if (sp.money !== undefined && Math.abs(sp.money - this.gm.player.money.get()) > 50) {
+        if (sp.transactions && Array.isArray(sp.transactions)) {
+          this.gm.transactions = sp.transactions;
+        }
+        if (sp.money !== undefined && Math.abs(sp.money - this.gm.player.money.get()) > 0) {
           this.gm.player.money.set(sp.money);
         }
         if (sp.isAlive === false && this.gm.player.isAlive) {
@@ -872,10 +915,25 @@ class CS2NetworkManager {
     });
   }
 
-  sendBuyItem(cost, weaponId) {
+  sendBuyItem(cost, weaponId, slot = 1) {
     this.send({
       type: 'buy_item',
       cost: cost,
+      weaponId: weaponId,
+      slot: slot
+    });
+  }
+
+  sendRefundItem(weaponId) {
+    this.send({
+      type: 'refund_item',
+      weaponId: weaponId
+    });
+  }
+
+  sendWeaponFired(weaponId) {
+    this.send({
+      type: 'weapon_fired',
       weaponId: weaponId
     });
   }

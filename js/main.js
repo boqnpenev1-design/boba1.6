@@ -446,7 +446,68 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  // Server-authoritative buy and refund responses
+  window.__onBuySuccess = (packet) => {
+    const weapon = CS2_WEAPONS[packet.weaponId];
+    if (!weapon) return;
+    if (weapon.category === 'equipment') {
+      if (weapon.type === 'armor') {
+        gameManager.player.armor.set(100);
+      } else if (weapon.type === 'helmet') {
+        gameManager.player.armor.set(100);
+        gameManager.player.hasHelmet = true;
+      } else if (weapon.type === 'kit') {
+        gameManager.player.hasDefuseKit = true;
+      } else if (weapon.slot === 4 || weapon.type === 'grenade' || weapon.id === 'flashbang' || weapon.id === 'hegrenade' || weapon.id === 'smokegrenade' || weapon.id === 'molotov') {
+        gameManager.player.grenades = gameManager.player.grenades || [];
+        gameManager.player.grenades.push(weapon);
+        gameManager.player.inventory[4] = weapon;
+        gameManager.player.switchSlot(4);
+      }
+    } else if (weapon.slot) {
+      gameManager.player.inventory[weapon.slot] = weapon;
+      gameManager.player.switchSlot(weapon.slot);
+    }
+    gameManager.purchaseHistory.push(weapon);
+    window.csAudio.playRadioTone('buy');
+    renderBuyItems(currentBuyCategory);
+    gameManager.updateHUD();
+  };
+
+  window.__onRefundSuccess = (packet) => {
+    const weapon = CS2_WEAPONS[packet.weaponId];
+    const idx = gameManager.purchaseHistory.findIndex(p => p.id === packet.weaponId);
+    if (idx !== -1) {
+      gameManager.purchaseHistory.splice(idx, 1);
+    }
+    if (weapon && weapon.category === 'equipment') {
+      if (weapon.id === 'kevlar' || weapon.id === 'armor') gameManager.player.armor.set(0);
+      else if (weapon.id === 'helmet') { gameManager.player.hasHelmet = false; }
+      else if (weapon.id === 'defuser') { gameManager.player.hasDefuseKit = false; }
+      else if (weapon.slot === 4) {
+        const gIdx = gameManager.player.grenades.findIndex(g => g.id === weapon.id);
+        if (gIdx !== -1) gameManager.player.grenades.splice(gIdx, 1);
+        gameManager.player.inventory[4] = gameManager.player.grenades[0] || null;
+      }
+    } else if (packet.slot) {
+      gameManager.player.inventory[packet.slot] = null;
+      if (gameManager.player.activeSlot === packet.slot) {
+        if (gameManager.player.inventory[2]) gameManager.player.switchSlot(2);
+        else gameManager.player.switchSlot(3);
+      }
+    }
+    window.csAudio.playRadioTone('buy');
+    renderBuyItems(currentBuyCategory);
+    gameManager.updateHUD();
+  };
+
   function refundWeapon(weapon) {
+    if (gameManager.net && gameManager.net.isConnected) {
+      gameManager.net.sendRefundItem(weapon.id);
+      return;
+    }
+
+    // Local / offline fallback
     const idx = gameManager.purchaseHistory.findIndex(p => p.id === weapon.id);
     if (idx !== -1) {
       gameManager.purchaseHistory.splice(idx, 1);
@@ -480,8 +541,17 @@ document.addEventListener('DOMContentLoaded', () => {
     const cash = gameManager.player.money.get();
     if (cash < weapon.cost) return;
 
-    // When buying a primary (slot 1) and player already holds a primary:
-    // Drop the current primary to the ground so other players can pick it up!
+    if (gameManager.net && gameManager.net.isConnected) {
+      if (weapon.slot === 1 && gameManager.player.inventory[1]) {
+        gameManager.player.dropWeaponBySlot(1);
+      } else if (weapon.slot === 2 && gameManager.player.inventory[2]) {
+        gameManager.player.dropWeaponBySlot(2);
+      }
+      gameManager.net.sendBuyItem(weapon.cost, weapon.id, weapon.slot);
+      return;
+    }
+
+    // Local / offline fallback
     if (weapon.slot === 1 && gameManager.player.inventory[1]) {
       gameManager.player.dropWeaponBySlot(1);
     } else if (weapon.slot === 2 && gameManager.player.inventory[2]) {
@@ -1008,6 +1078,16 @@ document.addEventListener('DOMContentLoaded', () => {
           }
         }
 
+        let txStr = 'none';
+        const txList = gameManager.transactions || [];
+        if (txList.length > 0) {
+          txStr = txList.slice(-5).map(t => {
+            const sign = (typeof t.amount === 'number' && t.amount > 0) ? '+' : '';
+            const timeStr = t.t ? new Date(t.t).toTimeString().substring(0, 8) : '';
+            return `[${timeStr}] ${sign}$${t.amount} (${t.reason || t.type})`;
+          }).join('\n               ');
+        }
+
         overlay.textContent =
 `[CS2 ENGINE DEBUG] ?debug=1
 BUILD_ID:      ${buildId}
@@ -1025,7 +1105,8 @@ NETWORK:       ${isOnline ? 'ONLINE' : 'OFFLINE'} | ws: ${wsState} | ping: ${pin
 ROUND:         phase: ${gameManager.phase} | timer: ${gameManager.phaseTimer.toFixed(1)}s [${timerSource}]
 BOMB:          ${bombStr}
 MATCH:         CT: ${gameManager.ctScore} | T: ${gameManager.tScore} | alive: CT ${ctAlive} : T ${tAlive}
-PLAYERS:       ${playerListStr} (total: ${playerCount} | snapshot age: ${snapAge})`;
+PLAYERS:       ${playerListStr} (total: ${playerCount} | snapshot age: ${snapAge})
+TX:            ${txStr}`;
       } catch (e) {
         overlay.textContent = `[DEBUG OVERLAY ERROR]: ${e.message}`;
       }
