@@ -1335,7 +1335,8 @@ document.addEventListener('DOMContentLoaded', () => {
           const dParts = window._droppedItems.map(d => {
             const wId = d.weapon ? d.weapon.id : 'unknown';
             const p = d.mesh ? d.mesh.position : (d.pos || { x: 0, y: 0, z: 0 });
-            return `${wId}(${p.x.toFixed(1)}, ${p.y.toFixed(1)}, ${p.z.toFixed(1)})`;
+            const dId = d.id || 'local';
+            return `${dId}, ${wId}, (${p.x.toFixed(1)}, ${p.y.toFixed(1)}, ${p.z.toFixed(1)})`;
           });
           dropsStr = `${window._droppedItems.length} | ${dParts.join('; ')}`;
         }

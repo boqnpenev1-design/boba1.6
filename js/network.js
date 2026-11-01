@@ -462,8 +462,16 @@ class CS2NetworkManager {
         break;
 
       case 'item_dropped':
-        if (packet.item && packet.item.droppedBy !== this.playerId && this.gm) {
-          this.gm.spawnRemoteDroppedWeapon(packet.item);
+        if (packet.item) {
+          if (packet.item.droppedBy === this.playerId) {
+            const localItem = (window._droppedItems || []).find(d => !d.serverAssignedId && d.weapon && d.weapon.id === packet.item.weaponId);
+            if (localItem) {
+              localItem.id = packet.item.id;
+              localItem.serverAssignedId = true;
+            }
+          } else if (this.gm) {
+            this.gm.spawnRemoteDroppedWeapon(packet.item);
+          }
         }
         break;
 
@@ -471,6 +479,18 @@ class CS2NetworkManager {
         if (packet.weaponId && this.gm) {
           this.gm.removeRemoteDroppedWeapon(packet.itemId, packet.weaponId);
         }
+        break;
+
+      case 'drop_error':
+        console.warn('[DROP_ERROR]', packet.reason);
+        if (window.showCS2Toast) window.showCS2Toast(`Drop rejected: ${packet.reason}`, 'warning');
+        window.__lastReject = { type: 'drop_error', reason: packet.reason, time: new Date().toLocaleTimeString() };
+        break;
+
+      case 'pickup_error':
+        console.warn('[PICKUP_ERROR]', packet.reason);
+        if (window.showCS2Toast) window.showCS2Toast(`Pickup rejected: ${packet.reason}`, 'warning');
+        window.__lastReject = { type: 'pickup_error', reason: packet.reason, time: new Date().toLocaleTimeString() };
         break;
 
       case 'c4_dropped':

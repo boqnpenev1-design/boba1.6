@@ -1044,17 +1044,60 @@ class CS2Player {
     return dropGroup;
   }
 
+  playViewmodelToss(onComplete) {
+    if (!this.weaponRig) {
+      if (onComplete) onComplete();
+      return;
+    }
+    const origY = this.weaponRig.position.y;
+    const origZ = this.weaponRig.position.z;
+    const origRotX = this.weaponRig.rotation.x;
+    const startTime = performance.now();
+    const duration = 110;
+
+    const step = (t) => {
+      const elapsed = t - startTime;
+      const progress = Math.min(1.0, elapsed / duration);
+      if (progress < 0.5) {
+        const p = progress / 0.5;
+        this.weaponRig.position.y = origY - 0.08 * p;
+        this.weaponRig.position.z = origZ + 0.12 * p;
+        this.weaponRig.rotation.x = origRotX - 0.30 * p;
+      } else {
+        const p = (progress - 0.5) / 0.5;
+        this.weaponRig.position.y = origY - 0.08 * (1 - p);
+        this.weaponRig.position.z = origZ + 0.12 * (1 - p);
+        this.weaponRig.rotation.x = origRotX - 0.30 * (1 - p);
+      }
+      if (progress < 1.0) {
+        requestAnimationFrame(step);
+      } else {
+        this.weaponRig.position.y = origY;
+        this.weaponRig.position.z = origZ;
+        this.weaponRig.rotation.x = origRotX;
+        if (onComplete) onComplete();
+      }
+    };
+    requestAnimationFrame(step);
+  }
+
   dropWeaponBySlot(dropSlot) {
     // Cannot drop knife (Slot 3)
-    if (dropSlot === 3) return;
+    if (dropSlot === 3) {
+      if (window.showCS2Toast) window.showCS2Toast('Cannot drop knife', 'warning');
+      window.__lastReject = { type: 'drop_weapon', reason: 'Cannot drop knife', time: new Date().toLocaleTimeString() };
+      return;
+    }
     if (!this.inventory[dropSlot]) return;
+
+    this.playViewmodelToss();
 
     const droppedWeapon = this.inventory[dropSlot];
     const dropGroup = this.createWorldWeaponMesh(droppedWeapon.id);
 
     // Position weapon in front of player with launch velocity and spin
     const fwd = new THREE.Vector3(-Math.sin(this.yaw), 0, -Math.cos(this.yaw));
-    const dropPos = this.position.clone().addScaledVector(fwd, 0.45);
+    const dropPos = this.position.clone().addScaledVector(fwd, 0.55);
     dropPos.y = this.position.y - 0.35; // Chest/hands height
     dropGroup.position.copy(dropPos);
     dropGroup.rotation.y = this.yaw;
@@ -1069,15 +1112,18 @@ class CS2Player {
       }
     }
 
+    const dropId = `drop_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+
     // Register into active dropped items with authentic physics trajectory
     if (!window._droppedItems) window._droppedItems = [];
     window._droppedItems.push({
+      id: dropId,
       mesh: dropGroup,
       weapon: droppedWeapon,
       slot: dropSlot,
       pos: dropGroup.position,
-      velocity: new THREE.Vector3(fwd.x * 1.8, 2.4, fwd.z * 1.8),
-      angularVelocity: new THREE.Vector3(3.2, 2.5, 1.0),
+      velocity: new THREE.Vector3(fwd.x * 2.8, 2.2, fwd.z * 2.8),
+      angularVelocity: new THREE.Vector3(3.5, 4.0, 1.5),
       groundY: finalGroundY,
       isResting: false,
       droppedAt: performance.now()
@@ -1110,6 +1156,7 @@ class CS2Player {
     if (window.csGameManager && window.csGameManager.net) {
       window.csGameManager.net.send({
         type: 'drop_weapon',
+        itemId: dropId,
         weaponId: droppedWeapon.id,
         slot: dropSlot,
         pos: { x: dropPos.x, y: dropPos.y, z: dropPos.z }
@@ -1179,6 +1226,7 @@ class CS2Player {
           if (window.csGameManager && window.csGameManager.net) {
             window.csGameManager.net.send({
               type: 'pickup_weapon',
+              itemId: item.id,
               weaponId: item.weapon.id,
               slot: targetSlot
             });
@@ -1788,11 +1836,9 @@ class CS2Player {
     document.getElementById('action-prompt').classList.add('hidden');
     document.getElementById('interaction-bar-container').classList.add('hidden');
 
-    // Drop weapons on death where player died
+    // Drop primary weapon (and C4 if carrying) on death
     if (this.inventory[1]) this.dropWeaponBySlot(1);
-    if (this.inventory[2]) this.dropWeaponBySlot(2);
-    if (this.inventory[4]) this.dropWeaponBySlot(4);
-    if (this.inventory[5]) this.dropWeaponBySlot(5);
+    if (this.hasC4 && this.inventory[5]) this.dropWeaponBySlot(5);
 
     this.enterSpectatorMode();
     if (window.csGameManager) {
