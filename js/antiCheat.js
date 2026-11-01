@@ -4,6 +4,15 @@
 (function(global) {
   'use strict';
 
+  // Evaluate debug flag from URL query string
+  const urlParams = (typeof window !== 'undefined' && window.location) ? new URLSearchParams(window.location.search) : null;
+  const isDebug = !!(urlParams && urlParams.get('debug') === '1');
+
+  // Internal mutable engine state
+  let _enabled = !isDebug;
+  let _violations = 0;
+  let _timingInterval = null;
+
   // Private cryptographic salt generated per session
   const _SALT = Math.floor(Math.random() * 0xFFFFFF) ^ 0xA5B3C1;
   const _CANARY_SECRET = (Date.now() & 0xFFFF) ^ 0x5C3A;
@@ -40,8 +49,11 @@
 
   // Anti-Cheat Core Engine
   const AntiCheat = {
-    _enabled: true,
-    _violations: 0,
+    get enabled() { return _enabled; },
+    get _enabled() { return _enabled; },
+    set _enabled(val) { _enabled = !!val; },
+    get isDebug() { return isDebug; },
+    get violations() { return _violations; },
     _lastFrameTime: performance.now(),
     _maxMoveSpeed: 16.0, // Maximum allowed units/second in 3D space
 
@@ -51,7 +63,7 @@
 
     // Speedhack / Movement validator
     validateMovementDelta(oldPos, newPos, dt) {
-      if (!this._enabled || dt <= 0) return newPos;
+      if (!_enabled || dt <= 0) return newPos;
       
       const dx = newPos.x - oldPos.x;
       const dz = newPos.z - oldPos.z;
@@ -73,25 +85,19 @@
 
     // DevTools & Debugger Deterrent
     initDevToolsGuard() {
-      const urlParams = (typeof window !== 'undefined' && window.location) ? new URLSearchParams(window.location.search) : null;
-      const isDebug = urlParams && urlParams.get('debug') === '1';
-
       if (isDebug) {
-        this._enabled = false;
+        _enabled = false;
+        if (_timingInterval) {
+          clearInterval(_timingInterval);
+          _timingInterval = null;
+        }
         console.log('[DEBUG] AntiCheat guard disabled via ?debug=1. Developer tools unlocked.');
-        window.addEventListener('DOMContentLoaded', () => {
-          const badge = document.createElement('div');
-          badge.id = 'hud-debug-badge';
-          badge.style.cssText = 'position:fixed;bottom:8px;left:8px;font-family:monospace;font-size:11px;color:#00ff88;z-index:99999;background:rgba(0,0,0,0.7);padding:2px 8px;border-radius:4px;border:1px solid #00ff88;pointer-events:none;';
-          badge.innerText = `BUILD: ${window.BUILD_ID || 'v6.1-dev'} | DEBUG MODE`;
-          document.body.appendChild(badge);
-        });
         return;
       }
 
-      // Block common inspect shortcuts
+      // Block common inspect shortcuts in production mode
       window.addEventListener('keydown', (e) => {
-        if (!this._enabled) return;
+        if (!_enabled) return;
         // F12
         if (e.keyCode === 123) {
           e.preventDefault();
@@ -114,21 +120,20 @@
 
       // Disable Right Click context menu inside game viewport
       window.addEventListener('contextmenu', (e) => {
-        if (this._enabled && document.pointerLockElement) {
+        if (_enabled && document.pointerLockElement) {
           e.preventDefault();
         }
       });
 
       // Background timing anomaly check (detects devtools pause / breakpoints)
-      setInterval(() => {
-        if (!this._enabled) return;
+      _timingInterval = setInterval(() => {
+        if (!_enabled) return;
         const start = performance.now();
-        // Timing benchmark
         for (let i = 0; i < 100; i++) {}
         const diff = performance.now() - start;
-        if (diff > 120) { // Execution was paused by a debugger breakpoint
-          this._violations++;
-          if (this._violations > 3) {
+        if (diff > 120) {
+          _violations++;
+          if (_violations > 3) {
             console.clear();
           }
         }
@@ -136,7 +141,7 @@
     },
 
     setEnabled(status) {
-      this._enabled = !!status;
+      _enabled = !!status;
     }
   };
 

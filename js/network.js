@@ -18,6 +18,10 @@ class CS2NetworkManager {
     this.wakeOverlay = null;
     this.wakeTimerInterval = null;
     this.connectStartTime = 0;
+    this.lastPingMs = 0;
+    this.lastPingSentAt = 0;
+    this.lastSnapshotTime = 0;
+    this.pingInterval = null;
 
     // Load authentic CS character models
     this.gltfLoader = typeof THREE.GLTFLoader !== 'undefined' ? new THREE.GLTFLoader() : null;
@@ -147,6 +151,17 @@ class CS2NetworkManager {
       // Start 20Hz persistent player input loop
       this.startInputLoop();
 
+      // Start periodic ping measurement
+      this.lastPingSentAt = Date.now();
+      this.send({ type: 'ping', t: this.lastPingSentAt });
+      if (this.pingInterval) clearInterval(this.pingInterval);
+      this.pingInterval = setInterval(() => {
+        if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+          this.lastPingSentAt = Date.now();
+          this.send({ type: 'ping', t: this.lastPingSentAt });
+        }
+      }, 2500);
+
       const statusEl = document.getElementById('sb-net-status');
       if (statusEl) statusEl.innerHTML = `ONLINE DEDICATED SERVER &bull; CONNECTED`;
 
@@ -165,6 +180,10 @@ class CS2NetworkManager {
     this.ws.onclose = () => {
       this.isConnected = false;
       this.hostConnection.open = false;
+      if (this.pingInterval) {
+        clearInterval(this.pingInterval);
+        this.pingInterval = null;
+      }
       this.stopInputLoop();
       this.clearAllRemotePlayers();
 
@@ -343,6 +362,14 @@ class CS2NetworkManager {
         }
         break;
 
+      case 'pong':
+        this.lastPingMs = Math.max(0, Date.now() - (packet.t || this.lastPingSentAt || Date.now()));
+        const fpsEl = document.getElementById('net-graph-fps');
+        if (fpsEl && this.gm) {
+          fpsEl.innerHTML = `${this.gm.currentFPS || 144} FPS &bull; ${this.lastPingMs}ms &bull; TICK 64`;
+        }
+        break;
+
       case 'kicked_idle':
         alert(packet.message || 'DISCONNECTED FOR INACTIVITY');
         window.location.reload();
@@ -353,12 +380,18 @@ class CS2NetworkManager {
   // Process 25Hz server state snapshot
   handleSnapshot(packet) {
     if (!packet || !packet.players) return;
+    this.lastSnapshotTime = Date.now();
 
-    this.gm.roundTime = packet.timer;
-    this.gm.score.CT = packet.ctScore;
-    this.gm.score.T = packet.tScore;
-    this.gm.currentRound = packet.round;
-    this.gm.phase = packet.phase;
+    if (this.gm) {
+      this.gm.roundTime = packet.timer;
+      this.gm.ctScore = (typeof packet.ctScore === 'number') ? packet.ctScore : this.gm.ctScore;
+      this.gm.tScore = (typeof packet.tScore === 'number') ? packet.tScore : this.gm.tScore;
+      if (!this.gm.score) this.gm.score = { CT: this.gm.ctScore, T: this.gm.tScore };
+      this.gm.score.CT = this.gm.ctScore;
+      this.gm.score.T = this.gm.tScore;
+      this.gm.currentRound = packet.round;
+      this.gm.phase = packet.phase;
+    }
 
     // Update HUD living player counts from snapshot
     const ctAlive = packet.players.filter(p => p.team === 'CT' && p.isAlive).length;

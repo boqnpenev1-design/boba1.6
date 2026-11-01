@@ -762,7 +762,8 @@ class CS2Player {
       // Position debug hotkey (P key)
       if (e.code === 'KeyP') {
         const feetY = (this.position.y - this.playerHeight).toFixed(2);
-        console.log(`[POS DEBUG] X: ${this.position.x.toFixed(2)}, Y: ${this.position.y.toFixed(2)}, Z: ${this.position.z.toFixed(2)} | feetY: ${feetY}, groundY: ${(this.lastGroundY || 0).toFixed(2)}, yaw: ${this.yaw.toFixed(2)}`);
+        const gY = (typeof this.lastGroundY === 'number') ? this.lastGroundY.toFixed(2) : 'n/a';
+        console.log(`[POS DEBUG] X: ${this.position.x.toFixed(2)}, Y: ${this.position.y.toFixed(2)}, Z: ${this.position.z.toFixed(2)} | feetY: ${feetY}, groundY: ${gY}, yaw: ${this.yaw.toFixed(2)}, pitch: ${this.pitch.toFixed(2)}, isGrounded: ${this.isGrounded}`);
       }
     });
 

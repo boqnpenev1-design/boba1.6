@@ -39,24 +39,13 @@ document.addEventListener('DOMContentLoaded', () => {
     renderer.setSize(window.innerWidth, window.innerHeight);
   });
 
-  // 2. Anti-Cheat & Game Engine
-  window.__CS2_AC.initDevToolsGuard();
-  const gameManager = new CS2GameManager(scene, camera);
+  // Display BUILD_ID in UI
+  const buildId = window.BUILD_ID || 'dev-local';
+  document.querySelectorAll('.build-id-label').forEach(el => { el.textContent = buildId; });
+  const hudBuildEl = document.getElementById('hud-build-id');
+  if (hudBuildEl) hudBuildEl.textContent = `BUILD: ${buildId}`;
 
-  // 3. Main Menu Navigation
-  const navTabs = document.querySelectorAll('.nav-tab');
-  navTabs.forEach(tab => {
-    tab.addEventListener('click', () => {
-      navTabs.forEach(t => t.classList.remove('active'));
-      document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
-
-      tab.classList.add('active');
-      const targetPane = document.getElementById(`pane-${tab.dataset.tab}`);
-      if (targetPane) targetPane.classList.add('active');
-    });
-  });
-
-  // 4. Player Nickname Validation & Server Connect Button (Dust II)
+  // Robust UI initialization: Register nickname validation and connect buttons FIRST
   const nickInput = document.getElementById('player-nickname-input');
   const btnDust2 = document.getElementById('btn-connect-dust2');
   let savedNick = localStorage.getItem('cs2_player_name') || '';
@@ -73,7 +62,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if (valid) {
       localStorage.setItem('cs2_player_name', val);
       window.cs2PlayerCallsign = val;
-      if (gameManager.player) gameManager.player.name = val;
+      if (window.csGameManager && window.csGameManager.player) {
+        window.csGameManager.player.name = val;
+      }
     }
     return valid;
   };
@@ -93,13 +84,39 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
     window.csAudio.ensureContext();
-    gameManager.connectToServer('dust2');
+    if (window.csGameManager) window.csGameManager.connectToServer('dust2');
   };
 
   if (btnDust2) btnDust2.addEventListener('click', connectDust2);
   const cardDust2 = document.querySelector('.server-card');
   if (cardDust2) cardDust2.addEventListener('click', (e) => {
     if (e.target.id !== 'btn-connect-dust2') connectDust2();
+  });
+
+  // Initialize Anti-Cheat safely (never stops startup)
+  try {
+    if (window.__CS2_AC && typeof window.__CS2_AC.initDevToolsGuard === 'function') {
+      window.__CS2_AC.initDevToolsGuard();
+    }
+  } catch (err) {
+    console.error('[SECURITY] Anti-Cheat init non-fatal warning:', err);
+  }
+
+  // Initialize Game Engine
+  const gameManager = new CS2GameManager(scene, camera);
+  setupDebugOverlay(gameManager, renderer, scene, camera);
+
+  // 3. Main Menu Navigation
+  const navTabs = document.querySelectorAll('.nav-tab');
+  navTabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      navTabs.forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+
+      tab.classList.add('active');
+      const targetPane = document.getElementById(`pane-${tab.dataset.tab}`);
+      if (targetPane) targetPane.classList.add('active');
+    });
   });
 
   // 5. Team Selection (Terrorists | Line | Counter-Terrorists)
@@ -679,4 +696,118 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   requestAnimationFrame(animate);
+
+  // CS2 Engine In-Game Debug Overlay (?debug=1)
+  function setupDebugOverlay(gameManager, renderer, scene, camera) {
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('debug') !== '1') return;
+
+    const overlay = document.createElement('div');
+    overlay.id = 'cs2-debug-overlay';
+    overlay.style.cssText = [
+      'position: fixed',
+      'top: 12px',
+      'left: 12px',
+      'z-index: 999999',
+      'background: rgba(10, 16, 24, 0.92)',
+      'border: 1px solid #00ff88',
+      'border-radius: 4px',
+      'padding: 10px 14px',
+      'font-family: Consolas, "Courier New", monospace',
+      'font-size: 11px',
+      'line-height: 1.45',
+      'color: #00ff88',
+      'pointer-events: none',
+      'box-shadow: 0 4px 16px rgba(0,0,0,0.8)',
+      'white-space: pre'
+    ].join(';');
+    document.body.appendChild(overlay);
+
+    const update = () => {
+      try {
+        const buildId = window.BUILD_ID || 'dev-local';
+        const rInfo = renderer.info;
+        const calls = rInfo.render ? rInfo.render.calls : 0;
+        const tris = rInfo.render ? rInfo.render.triangles : 0;
+        const progCount = rInfo.programs ? rInfo.programs.length : 0;
+
+        // Map meshes & BBox
+        let meshCount = 0;
+        let bboxStr = 'no-map';
+        if (gameManager.mapBuilder) {
+          if (gameManager.mapBuilder.groundMeshes) {
+            meshCount = gameManager.mapBuilder.groundMeshes.length;
+          }
+          if (gameManager.mapBuilder.mapGroup) {
+            const b = new THREE.Box3().setFromObject(gameManager.mapBuilder.mapGroup);
+            if (isFinite(b.min.x)) {
+              bboxStr = `min(${b.min.x.toFixed(1)}, ${b.min.y.toFixed(1)}, ${b.min.z.toFixed(1)}) max(${b.max.x.toFixed(1)}, ${b.max.y.toFixed(1)}, ${b.max.z.toFixed(1)})`;
+            }
+          }
+        }
+
+        // Camera & Fog
+        const cPos = camera.position;
+        const camStr = `pos(${cPos.x.toFixed(1)}, ${cPos.y.toFixed(1)}, ${cPos.z.toFixed(1)}) | far: ${camera.far}`;
+        const fogStr = scene.fog ? `ON (#${scene.fog.color.getHexString()})` : 'OFF';
+
+        // Player pos & feetY
+        let pPosStr = 'none';
+        let feetYStr = 'none';
+        if (gameManager.player && gameManager.player.position) {
+          const p = gameManager.player.position;
+          pPosStr = `(${p.x.toFixed(2)}, ${p.y.toFixed(2)}, ${p.z.toFixed(2)})`;
+          feetYStr = (p.y - gameManager.player.playerHeight).toFixed(2);
+        }
+
+        // Network state
+        const net = gameManager.net;
+        const isOnline = !!(net && net.isConnected);
+        const wsState = (net && net.ws) ? ['CONNECTING', 'OPEN', 'CLOSING', 'CLOSED'][net.ws.readyState] : 'NONE';
+        const pingVal = (net && typeof net.lastPingMs === 'number') ? `${net.lastPingMs}ms` : 'n/a';
+        const timerSource = (isOnline && net && net.lastSnapshotTime) ? 'SERVER' : 'LOCAL';
+
+        // Scores, alive, players, snapshot age
+        let ctAlive = 0;
+        let tAlive = 0;
+        let playerCount = 0;
+        if (gameManager.player) {
+          playerCount = 1;
+          if (gameManager.player.isAlive) {
+            if (gameManager.player.team === 'CT') ctAlive++;
+            else tAlive++;
+          }
+        }
+        if (net && net.remotePlayers) {
+          Object.values(net.remotePlayers).forEach(rp => {
+            playerCount++;
+            const alive = rp.data ? rp.data.isAlive : true;
+            if (alive) {
+              const team = rp.team || (rp.data ? rp.data.team : 'T');
+              if (team === 'CT') ctAlive++;
+              else tAlive++;
+            }
+          });
+        }
+        const snapAge = (net && net.lastSnapshotTime) ? `${Date.now() - net.lastSnapshotTime}ms` : 'never';
+
+        overlay.textContent =
+`[CS2 ENGINE DEBUG] ?debug=1
+BUILD_ID:      ${buildId}
+RENDER:        calls: ${calls} | triangles: ${tris} | programs: ${progCount}
+MAP MESHES:    count: ${meshCount}
+MAP BBOX:      ${bboxStr}
+CAMERA:        ${camStr} | fog: ${fogStr}
+PLAYER:        pos: ${pPosStr} | feetY: ${feetYStr}
+NETWORK:       ${isOnline ? 'ONLINE' : 'OFFLINE'} | ws: ${wsState} | ping: ${pingVal}
+ROUND:         phase: ${gameManager.phase} | timer: ${gameManager.phaseTimer.toFixed(1)}s [${timerSource}]
+MATCH:         CT: ${gameManager.ctScore} | T: ${gameManager.tScore} | alive: CT ${ctAlive} : T ${tAlive}
+PLAYERS:       total: ${playerCount} | snapshot age: ${snapAge}`;
+      } catch (e) {
+        overlay.textContent = `[DEBUG OVERLAY ERROR]: ${e.message}`;
+      }
+    };
+
+    setInterval(update, 100);
+  }
 });

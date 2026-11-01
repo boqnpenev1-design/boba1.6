@@ -29,9 +29,7 @@ jobs:
 
       - name: Inject Commit Version & Build ID
         run: |
-          SHORT_SHA=$(git rev-parse --short HEAD)
-          sed -i -E "s/\?v=[0-9a-zA-Z._-]+/?v=${SHORT_SHA}/g" index.html
-          sed -i "s/BUILD_ID = 'dev-build'/BUILD_ID = '${SHORT_SHA}'/g" index.html
+          node scripts/stamp-build.js
 
       - name: Setup Pages
         uses: actions/configure-pages@v5

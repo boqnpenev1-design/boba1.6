@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:ital,wght@0,400;0,600;0,700;1,700&family=Rajdhani:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=5.9">
+  <link rel="stylesheet" href="css/style.css?v=edb1d2e">
   
   <!-- Three.js 3D Engine & PeerJS (Multiplayer) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -20,7 +20,7 @@
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/OBJLoader.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/utils/SkeletonUtils.js"></script>
   <script>
-    window.BUILD_ID = 'dev-build';
+    window.BUILD_ID = 'edb1d2e';
     window.SERVER_URL = (new URLSearchParams(window.location.search).get('server')) || 'wss://cs2-server-1zcq.onrender.com';
   </script>
 </head>
@@ -108,6 +108,7 @@
     <!-- Top Right: Killfeed & FPS Net-Graph -->
     <div class="hud-top-right">
       <div class="net-graph-counter" id="net-graph-fps">144 FPS &bull; 8ms &bull; TICK 64</div>
+      <div class="hud-build-tag" id="hud-build-id" style="font-family:monospace;font-size:10px;color:rgba(255,255,255,0.45);text-align:right;margin-top:2px;">BUILD: <span class="build-id-label">dev-build</span></div>
       <div class="killfeed" id="killfeed"></div>
     </div>
 
@@ -363,6 +364,7 @@
             <button class="btn-connect-server" id="btn-connect-dust2" disabled style="opacity: 0.6; cursor: not-allowed;">
               ENTER CALLSIGN TO CONNECT
             </button>
+            <div style="font-family:monospace;font-size:11px;color:#788898;margin-top:10px;text-align:right;">BUILD: <span class="build-id-label">dev-build</span></div>
           </div>
         </div>
       </div>
@@ -499,14 +501,14 @@
   </div>
 
   <!-- Game Scripts (v6.0 Engine Overhaul) -->
-  <script src="js/audio.js?v=6.0"></script>
-  <script src="js/antiCheat.js?v=6.0"></script>
-  <script src="js/weapons.js?v=6.0"></script>
-  <script src="js/maps.js?v=6.0"></script>
-  <script src="js/player.js?v=6.0"></script>
-  <script src="js/bots.js?v=6.0"></script>
-  <script src="js/network.js?v=6.0"></script>
-  <script src="js/game.js?v=6.0"></script>
-  <script src="js/main.js?v=6.0"></script>
+  <script src="js/audio.js?v=edb1d2e"></script>
+  <script src="js/antiCheat.js?v=edb1d2e"></script>
+  <script src="js/weapons.js?v=edb1d2e"></script>
+  <script src="js/maps.js?v=edb1d2e"></script>
+  <script src="js/player.js?v=edb1d2e"></script>
+  <script src="js/bots.js?v=edb1d2e"></script>
+  <script src="js/network.js?v=edb1d2e"></script>
+  <script src="js/game.js?v=edb1d2e"></script>
+  <script src="js/main.js?v=edb1d2e"></script>
 </body>
 </html>
