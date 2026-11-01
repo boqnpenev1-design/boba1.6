@@ -1114,7 +1114,10 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     calibPanel.innerHTML = `
-      <div style="font-weight:bold;margin-bottom:6px;color:#fff;">WEAPON CALIBRATION CONTROLS</div>
+      <div style="font-weight:bold;margin-bottom:6px;color:#fff;display:flex;justify-content:space-between;align-items:center;">
+        <span>WEAPON CALIBRATION [<span id="calib-active-cat" style="color:#00e5ff;">rifles</span>]</span>
+        <button id="calib-copy-btn" style="cursor:pointer;padding:2px 8px;background:#00e5ff;color:#000;border:none;border-radius:3px;font-weight:bold;font-size:10px;" onclick="window.copyWeaponCalibrations()">COPY VALUES</button>
+      </div>
       <div style="margin-bottom:4px;">
         Rot X: <button style="cursor:pointer;padding:1px 6px;margin:0 2px;" onclick="window.__adjustCalib('rot',0,-1)">-</button><button style="cursor:pointer;padding:1px 6px;margin:0 2px;" onclick="window.__adjustCalib('rot',0,1)">+</button>
         Rot Y: <button style="cursor:pointer;padding:1px 6px;margin:0 2px;" onclick="window.__adjustCalib('rot',1,-1)">-</button><button style="cursor:pointer;padding:1px 6px;margin:0 2px;" onclick="window.__adjustCalib('rot',1,1)">+</button>
@@ -1351,6 +1354,17 @@ document.addEventListener('DOMContentLoaded', () => {
           }).join('\n               ');
         }
 
+        let heldTexStr = 'none';
+        if (window.__heldWeaponDiagnostics) {
+          const d = window.__heldWeaponDiagnostics;
+          heldTexStr = `${d.textureFile || 'none'} (${d.mapDimensions || 'none'}) -> ${d.textureUrl || 'none'}`;
+        }
+
+        const catEl = document.getElementById('calib-active-cat');
+        if (catEl && gameManager.player && gameManager.player.activeWeapon) {
+          catEl.innerText = `${gameManager.player.activeWeapon.category || 'rifles'}:${gameManager.player.activeWeapon.id}`;
+        }
+
         overlay.textContent =
 `[CS2 ENGINE DEBUG] ?debug=1
 BUILD_ID:      ${buildId}
@@ -1370,6 +1384,8 @@ CAMERA:        ${camStr} | fog: ${fogStr}
 PLAYER:        pos: ${pPosStr} | feetY: ${feetYStr}
 LAST CORRECTION: ${corrStr}
 WEAPON:        ${wpnStr}${calibStr}
+HELD TEXTURE:  ${heldTexStr}
+TEC-9 NOTE:    shared w_pist_elite_single (Provide tec9.fbx or tec9.glb in models/)
 VM SCREEN BOX: ${vmBoxStr}
 RECOIL:        climb: ${recoilClimbDeg.toFixed(1)}°
 NETWORK:       ${isOnline ? 'ONLINE' : 'OFFLINE'} | ws: ${wsState} | ping: ${pingVal}

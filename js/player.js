@@ -330,16 +330,16 @@ class CS2Player {
 
   // Viewmodel positioning per weapon category: authentic forward orientation into crosshair
   static WEAPON_VIEWMODEL = {
-    'pistols':    { pos: [0.16, -0.16, -0.32], scale: 0.018, rot: [0, Math.PI, 0] },
-    'mid-tier':   { pos: [0.15, -0.16, -0.30], scale: 0.017, rot: [0, Math.PI, 0] },
-    'smgs':       { pos: [0.15, -0.16, -0.30], scale: 0.017, rot: [0, Math.PI, 0] },
-    'rifles':     { pos: [0.15, -0.16, -0.30], scale: 0.016, rot: [0, Math.PI, 0] },
-    'shotguns':   { pos: [0.15, -0.16, -0.30], scale: 0.016, rot: [0, Math.PI, 0] },
-    'machineguns':{ pos: [0.14, -0.16, -0.30], scale: 0.016, rot: [0, Math.PI, 0] },
-    'snipers':    { pos: [0.14, -0.15, -0.28], scale: 0.016, rot: [0, Math.PI, 0] },
-    'equipment':  { pos: [0.15, -0.16, -0.30], scale: 0.020, rot: [0, 0, 0] },
-    'melee':      { pos: [0.18, -0.16, -0.32], scale: 0.016, rot: [Math.PI / 2, -0.35, 0.25] },
-    'knife':      { pos: [0.18, -0.16, -0.32], scale: 0.016, rot: [Math.PI / 2, -0.35, 0.25] }
+    'pistols':    { pos: [0.16, -0.16, -0.32], scale: 0.018, rot: [0, Math.PI, -Math.PI / 2] },
+    'mid-tier':   { pos: [0.15, -0.16, -0.30], scale: 0.017, rot: [-3 * Math.PI / 2, -Math.PI, 0] },
+    'smgs':       { pos: [0.15, -0.16, -0.30], scale: 0.017, rot: [-3 * Math.PI / 2, -Math.PI, 0] },
+    'rifles':     { pos: [0.15, -0.16, -0.30], scale: 0.016, rot: [-3 * Math.PI / 2, -Math.PI, 0] },
+    'shotguns':   { pos: [0.15, -0.16, -0.30], scale: 0.016, rot: [-3 * Math.PI / 2, -Math.PI, 0] },
+    'machineguns':{ pos: [0.14, -0.16, -0.30], scale: 0.016, rot: [-3 * Math.PI / 2, -Math.PI, 0] },
+    'snipers':    { pos: [0.14, -0.15, -0.28], scale: 0.016, rot: [-3 * Math.PI / 2, -Math.PI, 0] },
+    'equipment':  { pos: [0.15, -0.16, -0.30], scale: 0.020, rot: [-3 * Math.PI / 2, -Math.PI, 0] },
+    'melee':      { pos: [0.17, -0.16, -0.31], scale: 0.016, rot: [-Math.PI / 2, 0, Math.PI / 2] },
+    'knife':      { pos: [0.17, -0.16, -0.31], scale: 0.016, rot: [-Math.PI / 2, 0, Math.PI / 2] }
   };
 
   // Loads the FBX file containing all CSS weapon meshes
@@ -533,41 +533,96 @@ class CS2Player {
     const armsGroup = new THREE.Group();
     armsGroup.name = 'viewmodelArms';
 
-    // Sleeve color: CT = navy blue (0x1b2838), T = olive drab (0x484131)
+    // Sleeve color: CT = navy blue (0x1b2838) with ribbing (0x283b54), T = olive drab (0x484131) with ribbing (0x5c533f)
     const isCT = (team === 'CT');
     const sleeveColor = isCT ? 0x1b2838 : 0x484131;
+    const ribColor = isCT ? 0x283b54 : 0x5c533f;
     const sleeveMat = new THREE.MeshLambertMaterial({ color: sleeveColor });
-    const gloveMat = new THREE.MeshLambertMaterial({ color: 0x141414 });
+    const ribMat = new THREE.MeshLambertMaterial({ color: ribColor });
+    const gloveMat = new THREE.MeshLambertMaterial({ color: 0x1a1a1a });
+    const knuckleMat = new THREE.MeshLambertMaterial({ color: 0x272727 });
 
     const isKnife = (weapon && (weapon.id === 'knife' || weapon.category === 'melee'));
     const isPistol = (weapon && (weapon.slot === 2 || weapon.category === 'pistols'));
 
-    // Right Arm (grip & trigger hand)
-    const rForearmGeo = new THREE.CylinderGeometry(0.038, 0.046, 0.42, 12);
+    // Right Arm: Tactical anatomical forearm entering from bottom-right (4-6% screen width)
+    const rForearmGeo = new THREE.CylinderGeometry(0.026, 0.034, 0.35, 12);
     const rForearm = new THREE.Mesh(rForearmGeo, sleeveMat);
-    rForearm.position.set(0.18, -0.26, -0.16);
-    rForearm.rotation.set(-0.7, 0.25, -0.15);
+    rForearm.position.set(0.19, -0.26, -0.16);
+    rForearm.rotation.set(-0.68, 0.22, -0.14);
     armsGroup.add(rForearm);
 
-    const rGloveGeo = new THREE.BoxGeometry(0.065, 0.065, 0.11);
-    const rGlove = new THREE.Mesh(rGloveGeo, gloveMat);
-    rGlove.position.set(0.17, -0.17, -0.28);
-    rGlove.rotation.set(-0.45, 0.2, -0.1);
-    armsGroup.add(rGlove);
+    // Sleeve cuff ring
+    const rCuffGeo = new THREE.CylinderGeometry(0.034, 0.034, 0.025, 12);
+    const rCuff = new THREE.Mesh(rCuffGeo, ribMat);
+    rCuff.position.set(0.18, -0.20, -0.23);
+    rCuff.rotation.set(-0.68, 0.22, -0.14);
+    armsGroup.add(rCuff);
 
-    // Left Arm (support handguard for 2-handed weapons)
+    // Right Hand: Tactical composite glove palm & wrist
+    const rGlovePalmGeo = new THREE.BoxGeometry(0.046, 0.042, 0.070);
+    const rGlovePalm = new THREE.Mesh(rGlovePalmGeo, gloveMat);
+    rGlovePalm.position.set(0.168, -0.170, -0.28);
+    rGlovePalm.rotation.set(-0.45, 0.18, -0.10);
+    armsGroup.add(rGlovePalm);
+
+    // Knuckle protector plate
+    const rKnuckleGeo = new THREE.BoxGeometry(0.048, 0.016, 0.032);
+    const rKnuckle = new THREE.Mesh(rKnuckleGeo, knuckleMat);
+    rKnuckle.position.set(0.168, -0.158, -0.29);
+    rKnuckle.rotation.set(-0.45, 0.18, -0.10);
+    armsGroup.add(rKnuckle);
+
+    // Articulated fingers wrapping the weapon grip
+    // 1. Index finger along frame/trigger
+    const rIndexGeo = new THREE.BoxGeometry(0.012, 0.012, 0.040);
+    const rIndex = new THREE.Mesh(rIndexGeo, gloveMat);
+    rIndex.position.set(0.152, -0.165, -0.32);
+    rIndex.rotation.set(-0.35, 0.20, -0.12);
+    armsGroup.add(rIndex);
+
+    // 2. Middle, ring, pinky fingers curled across grip
+    for (let f = 0; f < 3; f++) {
+      const fingerGeo = new THREE.BoxGeometry(0.036, 0.012, 0.014);
+      const finger = new THREE.Mesh(fingerGeo, gloveMat);
+      finger.position.set(0.162, -0.178 - f * 0.014, -0.295 + f * 0.006);
+      finger.rotation.set(-0.35, 0.18, -0.15);
+      armsGroup.add(finger);
+    }
+
+    // 3. Thumb wrapping left side of grip
+    const rThumbGeo = new THREE.BoxGeometry(0.014, 0.014, 0.034);
+    const rThumb = new THREE.Mesh(rThumbGeo, gloveMat);
+    rThumb.position.set(0.178, -0.160, -0.29);
+    rThumb.rotation.set(-0.25, 0.40, 0.10);
+    armsGroup.add(rThumb);
+
+    // Left Arm & Support Hand: strictly for 2-handed weapons (rifles, smgs, snipers, shotguns, machineguns)
     if (!isKnife && !isPistol) {
-      const lForearmGeo = new THREE.CylinderGeometry(0.036, 0.044, 0.40, 12);
+      const lForearmGeo = new THREE.CylinderGeometry(0.024, 0.032, 0.34, 12);
       const lForearm = new THREE.Mesh(lForearmGeo, sleeveMat);
-      lForearm.position.set(-0.06, -0.27, -0.22);
-      lForearm.rotation.set(-0.55, -0.45, 0.45);
+      lForearm.position.set(-0.06, -0.26, -0.24);
+      lForearm.rotation.set(-0.50, -0.42, 0.42);
       armsGroup.add(lForearm);
 
-      const lGloveGeo = new THREE.BoxGeometry(0.062, 0.062, 0.10);
+      const lCuffGeo = new THREE.CylinderGeometry(0.032, 0.032, 0.025, 12);
+      const lCuff = new THREE.Mesh(lCuffGeo, ribMat);
+      lCuff.position.set(-0.02, -0.21, -0.29);
+      lCuff.rotation.set(-0.50, -0.42, 0.42);
+      armsGroup.add(lCuff);
+
+      const lGloveGeo = new THREE.BoxGeometry(0.045, 0.040, 0.065);
       const lGlove = new THREE.Mesh(lGloveGeo, gloveMat);
-      lGlove.position.set(0.05, -0.16, -0.38);
-      lGlove.rotation.set(-0.35, -0.35, 0.3);
+      lGlove.position.set(0.05, -0.165, -0.36);
+      lGlove.rotation.set(-0.30, -0.30, 0.28);
       armsGroup.add(lGlove);
+
+      // Support hand cupped fingers supporting the underside of handguard
+      const lFingersGeo = new THREE.BoxGeometry(0.038, 0.014, 0.030);
+      const lFingers = new THREE.Mesh(lFingersGeo, gloveMat);
+      lFingers.position.set(0.05, -0.155, -0.37);
+      lFingers.rotation.set(-0.25, -0.25, 0.20);
+      armsGroup.add(lFingers);
     }
 
     return armsGroup;
@@ -598,7 +653,7 @@ class CS2Player {
         const mat = origMat ? origMat.clone() : new THREE.MeshPhongMaterial();
         mat.map = tex;
         mat.color.setHex(0xffffff);
-        mat.side = THREE.DoubleSide;
+        mat.side = THREE.FrontSide;
         mat.needsUpdate = true;
         child.material = mat;
         matType = mat.type;
@@ -615,7 +670,9 @@ class CS2Player {
       matType: matType,
       mapLoaded: mapLoaded,
       mapDimensions: mapDimensions,
-      vmLightCount: this.viewmodelGroup.children.filter(c => c.isLight).length
+      textureFile: texFile,
+      textureUrl: (tex && tex.image && tex.image.src) ? tex.image.src : `models/${texFile}`,
+      vmLightCount: this.viewmodelGroup ? this.viewmodelGroup.children.filter(c => c.isLight).length : 0
     };
 
     const wrapper = new THREE.Group();
@@ -871,6 +928,9 @@ class CS2Player {
             const logStr = `cat=${cat} rot=[${deg.join(', ')}°] pos=[${vm.pos.map(p=>p.toFixed(3)).join(', ')}] scale=${(vm.scale || 0.016).toFixed(3)}`;
             console.log(`[CALIBRATION] ${logStr}`);
             window.__lastWeaponCalibration = logStr;
+            try {
+              localStorage.setItem('cs2_vm_calibration', JSON.stringify(CS2Player.WEAPON_VIEWMODEL));
+            } catch (err) {}
           }
         }
       }
