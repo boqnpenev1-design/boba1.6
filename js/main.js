@@ -576,45 +576,63 @@ document.addEventListener('DOMContentLoaded', () => {
   function renderScoreboardRows() {
     const ctTbody = document.getElementById('sb-ct-rows');
     const tTbody = document.getElementById('sb-t-rows');
+    if (!ctTbody || !tTbody) return;
     ctTbody.innerHTML = '';
     tTbody.innerHTML = '';
 
     const localCallsign = gameManager.player.name || window.cs2PlayerCallsign || 'YOU';
+    const isPlayerAlive = gameManager.player.isAlive && (gameManager.player.health.get() > 0);
     const playerRow = document.createElement('tr');
-    playerRow.className = `is-you ${gameManager.player.health.get() <= 0 ? 'is-dead' : ''}`;
+    playerRow.className = `is-you ${!isPlayerAlive ? 'is-dead' : ''}`;
+    const myKills = gameManager.player.kills || 0;
+    const myDeaths = gameManager.player.deaths || 0;
+    const myCash = gameManager.player.money ? gameManager.player.money.get() : 800;
+    const myPing = (gameManager.net && gameManager.net.lastPingMs !== undefined) ? `${gameManager.net.lastPingMs}ms` : '5ms';
+
     playerRow.innerHTML = `
-      <td class="col-status">${gameManager.player.health.get() > 0 ? '●' : '💀'}</td>
+      <td class="col-status">${isPlayerAlive ? '●' : '💀'}</td>
       <td class="col-name">${localCallsign} (YOU)</td>
-      <td class="col-ping">5ms</td>
-      <td class="col-kills">${gameManager.player.team === 'CT' ? gameManager.ctScore : gameManager.tScore}</td>
+      <td class="col-ping">${myPing}</td>
+      <td class="col-kills">${myKills}</td>
       <td class="col-assists">0</td>
-      <td class="col-deaths">0</td>
-      <td class="col-mvp">★ 1</td>
-      <td class="col-score">10</td>
-      <td class="col-cash">$${gameManager.player.money.get()}</td>
+      <td class="col-deaths">${myDeaths}</td>
+      <td class="col-mvp">★ ${gameManager.player.mvps || 0}</td>
+      <td class="col-score">${myKills * 2}</td>
+      <td class="col-cash">$${myCash}</td>
     `;
 
     if (gameManager.player.team === 'CT') ctTbody.appendChild(playerRow);
     else tTbody.appendChild(playerRow);
 
-    Object.entries(gameManager.net.remotePlayers).forEach(([id, p]) => {
-      const row = document.createElement('tr');
-      const rName = p.name || `Operator_${id.substring(0, 5)}`;
-      row.innerHTML = `
-        <td class="col-status">${p.health > 0 ? '●' : '💀'}</td>
-        <td class="col-name">${rName}</td>
-        <td class="col-ping">18ms</td>
-        <td class="col-kills">0</td>
-        <td class="col-assists">0</td>
-        <td class="col-deaths">0</td>
-        <td class="col-mvp">★ 0</td>
-        <td class="col-score">0</td>
-        <td class="col-cash">$800</td>
-      `;
+    if (gameManager.net && gameManager.net.remotePlayers) {
+      Object.entries(gameManager.net.remotePlayers).forEach(([id, p]) => {
+        const row = document.createElement('tr');
+        const pData = p.data || {};
+        const rName = p.name || pData.callsign || `Operator_${id.substring(0, 5)}`;
+        const rHealth = (typeof pData.health === 'number') ? pData.health : (p.health || 0);
+        const rAlive = (pData.isAlive !== undefined) ? pData.isAlive : (rHealth > 0);
+        const rKills = (typeof pData.kills === 'number') ? pData.kills : 0;
+        const rDeaths = (typeof pData.deaths === 'number') ? pData.deaths : 0;
+        const rCash = (typeof pData.money === 'number') ? pData.money : 800;
+        const rTeam = p.team || pData.team || 'CT';
 
-      if (p.team === 'CT') ctTbody.appendChild(row);
-      else tTbody.appendChild(row);
-    });
+        row.className = rAlive ? '' : 'is-dead';
+        row.innerHTML = `
+          <td class="col-status">${rAlive ? '●' : '💀'}</td>
+          <td class="col-name">${rName}</td>
+          <td class="col-ping">15ms</td>
+          <td class="col-kills">${rKills}</td>
+          <td class="col-assists">0</td>
+          <td class="col-deaths">${rDeaths}</td>
+          <td class="col-mvp">★ 0</td>
+          <td class="col-score">${rKills * 2}</td>
+          <td class="col-cash">$${rCash}</td>
+        `;
+
+        if (rTeam === 'CT') ctTbody.appendChild(row);
+        else tTbody.appendChild(row);
+      });
+    }
   }
 
   // 10. Sensitivity & Crosshair

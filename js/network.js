@@ -415,6 +415,8 @@ class CS2NetworkManager {
     this.lastSnapshotTime = Date.now();
 
     if (this.gm) {
+      this.gm.phase = packet.phase;
+      this.gm.phaseTimer = packet.timer;
       this.gm.roundTime = packet.timer;
       this.gm.ctScore = (typeof packet.ctScore === 'number') ? packet.ctScore : this.gm.ctScore;
       this.gm.tScore = (typeof packet.tScore === 'number') ? packet.tScore : this.gm.tScore;
@@ -422,14 +424,16 @@ class CS2NetworkManager {
       this.gm.score.CT = this.gm.ctScore;
       this.gm.score.T = this.gm.tScore;
       this.gm.currentRound = packet.round;
-      this.gm.phase = packet.phase;
+
+      if (this.gm.hudEls.ctScore) this.gm.hudEls.ctScore.innerText = this.gm.ctScore;
+      if (this.gm.hudEls.tScore) this.gm.hudEls.tScore.innerText = this.gm.tScore;
     }
 
     // Update HUD living player counts from snapshot
     const ctAlive = packet.players.filter(p => p.team === 'CT' && p.isAlive).length;
     const tAlive = packet.players.filter(p => p.team === 'T' && p.isAlive).length;
-    const ctEl = document.getElementById('hud-ct-alive');
-    const tEl = document.getElementById('hud-t-alive');
+    const ctEl = document.getElementById('ct-alive-count') || document.getElementById('hud-ct-alive');
+    const tEl = document.getElementById('t-alive-count') || document.getElementById('hud-t-alive');
     if (ctEl) ctEl.innerText = `${ctAlive} ALIVE`;
     if (tEl) tEl.innerText = `${tAlive} ALIVE`;
 

@@ -915,8 +915,24 @@ class CS2GameManager {
 
     const now = Date.now();
 
-    // Freezetime phase (Timestamp-backed, immune to alt-tab / menu pause)
-    if (this.phase === 'freeze') {
+    // Round Timer & Phase Logic: In online mode, strictly owned by server snapshot
+    if (this.net && this.net.isConnected) {
+      const totalSecs = Math.max(0, Math.floor(this.phaseTimer));
+      const mins = Math.floor(totalSecs / 60);
+      const secs = totalSecs % 60;
+      const timerStr = (this.phase === 'freeze')
+        ? `0:${secs.toString().padStart(2, '0')}`
+        : `${mins}:${secs.toString().padStart(2, '0')}`;
+      if (this.lastTimerText !== timerStr) {
+        this.lastTimerText = timerStr;
+        if (this.hudEls.roundTimer) this.hudEls.roundTimer.innerText = timerStr;
+      }
+      const phaseLabel = (this.phase === 'freeze') ? 'FREEZETIME' : (this.phase === 'round_over' ? 'ROUND OVER' : 'ROUND LIVE');
+      if (this.lastPhaseText !== phaseLabel) {
+        this.lastPhaseText = phaseLabel;
+        if (this.hudEls.roundPhaseLabel) this.hudEls.roundPhaseLabel.innerText = phaseLabel;
+      }
+    } else if (this.phase === 'freeze') {
       const secsLeft = Math.max(0, Math.ceil((this.phaseEndTime - now) / 1000));
       this.phaseTimer = secsLeft;
 
