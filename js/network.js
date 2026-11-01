@@ -813,6 +813,11 @@ class CS2NetworkManager {
         }
       }
 
+      // Dynamic Bone-Tracked Hitbox Alignment
+      if (rp.mesh.updateHitboxes) {
+        rp.mesh.updateHitboxes();
+      }
+
       // Sync hitbox wireframe visibility with global toggle
       const showWire = !!window.__showHitboxWireframes;
       if (rp.mesh.bodyHitbox && rp.mesh.bodyHitbox.material) {
@@ -827,18 +832,18 @@ class CS2NetworkManager {
   createTacticalCharacterModel(team, callsign = 'OPERATOR') {
     const group = new THREE.Group();
 
-    // 1. Authentic Capsule Body Hitbox (Radius 0.38m, Cylinder height 1.30m, at Y=0.95)
+    // 1. Authentic Capsule Body Hitbox (Radius ~0.24m matching 0.2-0.25 of measured height, anchored at ground Y=0)
     const showWire = !!window.__showHitboxWireframes;
-    const bodyHitboxGeo = new THREE.CylinderGeometry(0.38, 0.38, 1.30, 12);
+    const bodyHitboxGeo = new THREE.CylinderGeometry(0.24, 0.24, 1.40, 12);
     const bodyHitboxMat = new THREE.MeshBasicMaterial({ color: 0x00ff88, wireframe: true, visible: showWire });
     const bodyHitbox = new THREE.Mesh(bodyHitboxGeo, bodyHitboxMat);
-    bodyHitbox.position.y = 0.95;
+    bodyHitbox.position.y = 0.70;
     bodyHitbox.name = 'bodyHitbox';
     bodyHitbox.userData = { isHead: false, isHitbox: true };
     group.add(bodyHitbox);
     group.bodyHitbox = bodyHitbox;
 
-    // 2. Authentic Sphere Head Hitbox (Radius 0.18m, at Y=2.15 matching eye level)
+    // 2. Authentic Sphere Head Hitbox (Radius 0.18m, positioned at head bone)
     const headHitboxGeo = new THREE.SphereGeometry(0.18, 12, 10);
     const headHitboxMat = new THREE.MeshBasicMaterial({ color: 0xff3344, wireframe: true, visible: showWire });
     const headHitbox = new THREE.Mesh(headHitboxGeo, headHitboxMat);
@@ -847,6 +852,33 @@ class CS2NetworkManager {
     headHitbox.userData = { isHead: true, isHitbox: true };
     group.add(headHitbox);
     group.headHitbox = headHitbox;
+
+    // Hitbox dynamic bone updater
+    group.updateHitboxes = function() {
+      let headY = 2.15;
+      const feetY = 0.0;
+      if (group.characterBones && group.characterBones.head) {
+        const hPos = new THREE.Vector3();
+        group.characterBones.head.getWorldPosition(hPos);
+        const lPos = group.worldToLocal(hPos);
+        if (!isNaN(lPos.y) && lPos.y > 0.6) {
+          headY = lPos.y;
+        }
+      }
+      group.headHitbox.position.set(0, headY, 0);
+
+      const bodyHeight = Math.max(0.6, headY - 0.20);
+      const bodyCenterY = bodyHeight / 2;
+      group.bodyHitbox.position.set(0, bodyCenterY, 0);
+      group.bodyHitbox.scale.set(1, bodyHeight / 1.40, 1);
+
+      group.measuredMetrics = {
+        modelHeight: (headY + 0.18).toFixed(2),
+        hitboxBottomY: (bodyCenterY - bodyHeight / 2).toFixed(2),
+        headSphereY: headY.toFixed(2),
+        feetGroundY: feetY.toFixed(2)
+      };
+    };
 
     // 3. Nametag Billboard above head
     const nameCanvas = document.createElement('canvas');

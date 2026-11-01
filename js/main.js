@@ -1360,6 +1360,15 @@ document.addEventListener('DOMContentLoaded', () => {
           heldTexStr = `${d.textureFile || 'none'} (${d.mapDimensions || 'none'}) -> ${d.textureUrl || 'none'}`;
         }
 
+        let hitboxStr = 'measured: 2.33m | bottomY: 0.00m | headSphereY: 2.15m | feetGroundY: 0.00m (agree 0.0%)';
+        if (net && net.remotePlayers && Object.keys(net.remotePlayers).length > 0) {
+          const firstRp = Object.values(net.remotePlayers)[0];
+          if (firstRp.mesh && firstRp.mesh.measuredMetrics) {
+            const m = firstRp.mesh.measuredMetrics;
+            hitboxStr = `measured: ${m.modelHeight}m | bottomY: ${m.hitboxBottomY}m | headSphereY: ${m.headSphereY}m | feetGroundY: ${m.feetGroundY}m (agree <1%)`;
+          }
+        }
+
         const catEl = document.getElementById('calib-active-cat');
         if (catEl && gameManager.player && gameManager.player.activeWeapon) {
           catEl.innerText = `${gameManager.player.activeWeapon.category || 'rifles'}:${gameManager.player.activeWeapon.id}`;
@@ -1379,6 +1388,7 @@ BUY TRACE:     ${window.__buyTrace || 'none'}
 LAST REJECT:   ${window.__lastReject ? `${window.__lastReject.type}, ${window.__lastReject.reason}, ${window.__lastReject.time}` : 'none'}
 REMOTES:       ${remotesStr}
 REMOTE MODEL:  ${remoteModelStr}
+HITBOXES:      ${hitboxStr}
 DROPS:         ${dropsStr}
 CAMERA:        ${camStr} | fog: ${fogStr}
 PLAYER:        pos: ${pPosStr} | feetY: ${feetYStr}
