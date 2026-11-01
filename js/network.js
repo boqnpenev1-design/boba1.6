@@ -169,11 +169,17 @@ class CS2NetworkManager {
     };
 
     this.ws.onmessage = (event) => {
+      let packet = null;
       try {
-        const packet = JSON.parse(event.data);
+        packet = JSON.parse(event.data);
+      } catch (parseErr) {
+        console.error('[NET_PARSE_ERROR] Failed to parse JSON:', event.data, parseErr);
+        return;
+      }
+      try {
         this.handleServerPacket(packet);
       } catch (err) {
-        console.warn('Packet parse error:', err);
+        console.error('[NET_PACKET_ERROR] Error handling packet type:', packet ? packet.type : 'unknown', '\nPacket data:', packet, '\nStack:', err.stack);
       }
     };
 
@@ -249,13 +255,18 @@ class CS2NetworkManager {
     switch (packet.type) {
       case 'match_sync':
         this.playerId = packet.playerId;
+        this.inMatch = packet.inMatch;
         this.gm.matchId = packet.matchId;
         this.gm.currentRound = packet.currentRound || 1;
-        this.gm.score.CT = packet.ctScore || 0;
-        this.gm.score.T = packet.tScore || 0;
+        this.gm.ctScore = (typeof packet.ctScore === 'number') ? packet.ctScore : 0;
+        this.gm.tScore = (typeof packet.tScore === 'number') ? packet.tScore : 0;
+        if (!this.gm.score) this.gm.score = { CT: 0, T: 0 };
+        this.gm.score.CT = this.gm.ctScore;
+        this.gm.score.T = this.gm.tScore;
         this.gm.phase = packet.phase || 'freeze';
         this.gm.roundTime = packet.phaseTimer || 15;
-        this.gm.phaseEndTime = packet.phaseEndTime || (performance.now() + 15000);
+        this.gm.phaseTimer = packet.phaseTimer || 15;
+        this.gm.phaseEndTime = packet.phaseEndTime || (Date.now() + 15000);
 
         if (packet.c4Planted) {
           this.gm.c4Planted = true;
@@ -265,10 +276,13 @@ class CS2NetworkManager {
 
         if (packet.c4CarrierId === this.playerId && this.gm.player) {
           this.gm.player.inventory[5] = CS2_WEAPONS.c4;
+          this.gm.player.hasC4 = true;
         }
 
         if (packet.inMatch === false && packet.phase === 'live' && this.gm.player) {
           this.gm.player.enterSpectatorMode();
+        } else if (packet.inMatch === true && this.gm.player && this.gm.player.isSpectating) {
+          this.gm.player.isSpectating = false;
         }
         this.gm.updateHUD();
         break;
@@ -280,7 +294,8 @@ class CS2NetworkManager {
       case 'phase_change':
         this.gm.phase = packet.phase;
         this.gm.roundTime = packet.timer;
-        this.gm.phaseEndTime = packet.phaseEndTime || (performance.now() + packet.timer * 1000);
+        this.gm.phaseTimer = packet.timer;
+        this.gm.phaseEndTime = packet.phaseEndTime || (Date.now() + packet.timer * 1000);
         this.gm.updateHUD();
         break;
 
@@ -288,17 +303,34 @@ class CS2NetworkManager {
         this.gm.currentRound = packet.round;
         this.gm.phase = packet.phase || 'freeze';
         this.gm.roundTime = packet.timer || 15;
-        this.gm.phaseEndTime = packet.phaseEndTime || (performance.now() + 15000);
-        this.gm.score.CT = packet.ctScore || 0;
-        this.gm.score.T = packet.tScore || 0;
+        this.gm.phaseTimer = packet.timer || 15;
+        this.gm.phaseEndTime = packet.phaseEndTime || (Date.now() + 15000);
+        this.gm.ctScore = (typeof packet.ctScore === 'number') ? packet.ctScore : 0;
+        this.gm.tScore = (typeof packet.tScore === 'number') ? packet.tScore : 0;
+        if (!this.gm.score) this.gm.score = { CT: 0, T: 0 };
+        this.gm.score.CT = this.gm.ctScore;
+        this.gm.score.T = this.gm.tScore;
         this.gm.c4Planted = false;
+        this.inMatch = true;
 
         // Reset player round state
         if (this.gm.player) {
           this.gm.player.health.set(100);
           this.gm.player.isAlive = true;
           this.gm.player.isSpectating = false;
-          this.gm.player.inventory[5] = (packet.c4CarrierId === this.playerId) ? CS2_WEAPONS.c4 : null;
+          const spectHud = document.getElementById('spectator-hud');
+          if (spectHud) spectHud.classList.add('hidden');
+          const hud = document.getElementById('hud');
+          if (hud) hud.classList.remove('hidden');
+
+          const isCarrier = (packet.c4CarrierId === this.playerId);
+          this.gm.player.hasC4 = isCarrier;
+          if (isCarrier) {
+            this.gm.player.inventory[5] = CS2_WEAPONS.c4;
+          } else {
+            delete this.gm.player.inventory[5];
+          }
+          this.gm.player.updateSlotHUD();
           this.gm.player.respawn();
         }
         this.gm.updateHUD();

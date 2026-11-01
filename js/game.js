@@ -12,6 +12,7 @@ class CS2GameManager {
     this.currentRound = 1;
     this.ctScore = 0;
     this.tScore = 0;
+    this.score = { CT: 0, T: 0 };
     this.consecutiveLosses = { CT: 0, T: 0 };
 
     // Round Phases: 'freeze' (15s buy time) -> 'live' (1:55) -> 'round_over'
@@ -245,8 +246,8 @@ class CS2GameManager {
       }
     } catch (e) {}
 
-    // If joining client while round is currently LIVE, spectate until next round starts!
-    if (!this.net.isHost && this.phase === 'live') {
+    // In online mode, spectate only if server says inMatch is false
+    if (this.net && this.net.isConnected && this.phase === 'live' && this.net.inMatch === false) {
       this.player.enterSpectatorMode();
     } else {
       this.startRound();
@@ -323,15 +324,6 @@ class CS2GameManager {
     const spawns = (this.mapBuilder && this.mapBuilder.spawnPoints && this.mapBuilder.spawnPoints[this.player.team]) || [];
     const s = spawns.length > 0 ? spawns[Math.floor(Math.random() * spawns.length)] : null;
     this.player.respawn(s);
-
-    // If host, notify all connected clients to start new round
-    if (this.net && this.net.isHost) {
-      this.net.broadcast({
-        type: 'round_start',
-        round: this.currentRound,
-        phaseEndTime: this.phaseEndTime
-      });
-    }
 
     if (this.currentRound === 13) {
       this.handleHalftimeSwap();
@@ -462,15 +454,6 @@ class CS2GameManager {
     if (timerEl) timerEl.classList.remove('hidden');
     if (phaseEl) phaseEl.classList.remove('hidden');
     if (c4Clock) c4Clock.classList.add('hidden');
-
-    // Broadcast round end to all connected clients
-    if (this.net && this.net.isHost) {
-      this.net.broadcast({
-        type: 'round_end',
-        winner: winner,
-        reason: reason
-      });
-    }
 
     if (winner === 'CT') {
       this.ctScore++;
@@ -775,12 +758,8 @@ class CS2GameManager {
             this.onC4Defused();
 
             // Broadcast defusal
-            if (this.net) {
-              if (this.net.isHost) {
-                this.net.broadcast({ type: 'defuse_c4' });
-              } else if (this.net.hostConnection && this.net.hostConnection.open) {
-                this.net.hostConnection.send({ type: 'defuse_c4' });
-              }
+            if (this.net && this.net.isConnected) {
+              this.net.send({ type: 'defuse_progress', progress: 1.0 });
             }
           }
           return;
@@ -1029,21 +1008,7 @@ class CS2GameManager {
       }
     }
 
-    // Periodic authoritative timer sync to all clients (prevents desync on alt-tab or menu pause)
-    if (this.net && this.net.isHost && this.net.connections.length > 0) {
-      if (!this.lastTimerSync || (currentTime - this.lastTimerSync > 1500)) {
-        this.lastTimerSync = currentTime;
-        this.net.broadcast({
-          type: 'timer_sync',
-          phase: this.phase,
-          phaseEndTime: this.phaseEndTime,
-          liveRoundStartTime: this.liveRoundStartTime,
-          ctScore: this.ctScore,
-          tScore: this.tScore,
-          round: this.currentRound
-        });
-      }
-    }
+
 
     // Check for team elimination (All enemies killed)
     this.checkRoundElimination();
