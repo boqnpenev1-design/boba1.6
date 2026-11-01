@@ -1103,6 +1103,41 @@ document.addEventListener('DOMContentLoaded', () => {
           remoteModelStr = `${modelType} | scale: ${scale} | root Y: ${rootY} | bones: ${bones} | procedural: ${state} | hitbox: capsule (r=0.38, h=1.50) + sphere (r=0.18)`;
         }
 
+        let vmBoxStr = 'none';
+        if (gameManager.player && gameManager.player.activeWeaponMeshGroup && camera) {
+          try {
+            const meshGroup = gameManager.player.activeWeaponMeshGroup;
+            const bbox = new THREE.Box3().setFromObject(meshGroup);
+            if (!bbox.isEmpty()) {
+              const pts = [
+                new THREE.Vector3(bbox.min.x, bbox.min.y, bbox.min.z),
+                new THREE.Vector3(bbox.min.x, bbox.min.y, bbox.max.z),
+                new THREE.Vector3(bbox.min.x, bbox.max.y, bbox.min.z),
+                new THREE.Vector3(bbox.min.x, bbox.max.y, bbox.max.z),
+                new THREE.Vector3(bbox.max.x, bbox.min.y, bbox.min.z),
+                new THREE.Vector3(bbox.max.x, bbox.min.y, bbox.max.z),
+                new THREE.Vector3(bbox.max.x, bbox.max.y, bbox.min.z),
+                new THREE.Vector3(bbox.max.x, bbox.max.y, bbox.max.z)
+              ];
+              let minX = 100, maxX = 0, minY = 100, maxY = 0;
+              pts.forEach(p => {
+                const pr = p.clone().project(camera);
+                const sx = (pr.x * 0.5 + 0.5) * 100;
+                const sy = (-pr.y * 0.5 + 0.5) * 100;
+                if (sx < minX) minX = sx;
+                if (sx > maxX) maxX = sx;
+                if (sy < minY) minY = sy;
+                if (sy > maxY) maxY = sy;
+              });
+              minX = Math.max(0, Math.min(100, minX));
+              maxX = Math.max(0, Math.min(100, maxX));
+              minY = Math.max(0, Math.min(100, minY));
+              maxY = Math.max(0, Math.min(100, maxY));
+              vmBoxStr = `[X: ${minX.toFixed(1)}%-${maxX.toFixed(1)}%, Y: ${minY.toFixed(1)}%-${maxY.toFixed(1)}%]`;
+            }
+          } catch (e) {}
+        }
+
         let dropsStr = '0 (none)';
         if (window._droppedItems && window._droppedItems.length > 0) {
           const dParts = window._droppedItems.map(d => {
@@ -1137,6 +1172,7 @@ DROPS:         ${dropsStr}
 CAMERA:        ${camStr} | fog: ${fogStr}
 PLAYER:        pos: ${pPosStr} | feetY: ${feetYStr}
 WEAPON:        ${wpnStr}${calibStr}
+VM SCREEN BOX: ${vmBoxStr}
 RECOIL:        climb: ${recoilClimbDeg.toFixed(1)}°
 NETWORK:       ${isOnline ? 'ONLINE' : 'OFFLINE'} | ws: ${wsState} | ping: ${pingVal}
 ROUND:         phase: ${gameManager.phase} | timer: ${gameManager.phaseTimer.toFixed(1)}s [${timerSource}]

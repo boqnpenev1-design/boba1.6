@@ -169,11 +169,22 @@ class CS2Player {
     this.recoilPitch = 0;
     this.recoilYaw = 0;
 
-    // Viewmodel Rig (weapons lit cleanly by scene sun and hemisphere, zero world blowout)
+    // Viewmodel Rig & Dedicated Lighting (Layer 1 isolated from world map, zero world blowout)
     this.viewmodelGroup = new THREE.Group();
     this.camera.add(this.viewmodelGroup);
     this.weaponRig = new THREE.Group();
     this.viewmodelGroup.add(this.weaponRig);
+
+    this.camera.layers.enable(1);
+
+    const vmAmber = new THREE.DirectionalLight(0xfff0dd, 1.4);
+    vmAmber.position.set(0.25, 0.45, 0.20);
+    vmAmber.layers.set(1);
+    this.viewmodelGroup.add(vmAmber);
+
+    const vmFill = new THREE.AmbientLight(0x778899, 1.1);
+    vmFill.layers.set(1);
+    this.viewmodelGroup.add(vmFill);
 
     // Muzzle Flash (Subtle realistic muzzle spark, zero screen-blocking circle)
     const flashGeo = new THREE.SphereGeometry(0.010, 8, 8);
@@ -470,7 +481,62 @@ class CS2Player {
     // 1. Build authentic 100% Textured 3D Weapon Model using models/ & textures/
     this.buildTexturedWeaponModel(w, group);
 
+    // 2. Build tactical first-person arms & sleeves holding the weapon
+    const arms = this.buildFirstPersonArms(this.team, w);
+    if (arms) group.add(arms);
+
+    // 3. Set Layer 1 on viewmodel so dedicated lights illuminate it without leaking to map
+    group.traverse(c => {
+      if (c.isMesh) {
+        c.layers.enable(1);
+      }
+    });
+
     this.weaponRig.add(group);
+  }
+
+  buildFirstPersonArms(team, weapon) {
+    const armsGroup = new THREE.Group();
+    armsGroup.name = 'viewmodelArms';
+
+    // Sleeve color: CT = navy blue (0x1b2838), T = olive drab (0x484131)
+    const isCT = (team === 'CT');
+    const sleeveColor = isCT ? 0x1b2838 : 0x484131;
+    const sleeveMat = new THREE.MeshLambertMaterial({ color: sleeveColor });
+    const gloveMat = new THREE.MeshLambertMaterial({ color: 0x141414 });
+
+    const isKnife = (weapon && (weapon.id === 'knife' || weapon.category === 'melee'));
+    const isPistol = (weapon && (weapon.slot === 2 || weapon.category === 'pistols'));
+
+    // Right Arm (grip & trigger hand)
+    const rForearmGeo = new THREE.CylinderGeometry(0.038, 0.046, 0.42, 12);
+    const rForearm = new THREE.Mesh(rForearmGeo, sleeveMat);
+    rForearm.position.set(0.18, -0.26, -0.16);
+    rForearm.rotation.set(-0.7, 0.25, -0.15);
+    armsGroup.add(rForearm);
+
+    const rGloveGeo = new THREE.BoxGeometry(0.065, 0.065, 0.11);
+    const rGlove = new THREE.Mesh(rGloveGeo, gloveMat);
+    rGlove.position.set(0.17, -0.17, -0.28);
+    rGlove.rotation.set(-0.45, 0.2, -0.1);
+    armsGroup.add(rGlove);
+
+    // Left Arm (support handguard for 2-handed weapons)
+    if (!isKnife && !isPistol) {
+      const lForearmGeo = new THREE.CylinderGeometry(0.036, 0.044, 0.40, 12);
+      const lForearm = new THREE.Mesh(lForearmGeo, sleeveMat);
+      lForearm.position.set(-0.06, -0.27, -0.22);
+      lForearm.rotation.set(-0.55, -0.45, 0.45);
+      armsGroup.add(lForearm);
+
+      const lGloveGeo = new THREE.BoxGeometry(0.062, 0.062, 0.10);
+      const lGlove = new THREE.Mesh(lGloveGeo, gloveMat);
+      lGlove.position.set(0.05, -0.16, -0.38);
+      lGlove.rotation.set(-0.35, -0.35, 0.3);
+      armsGroup.add(lGlove);
+    }
+
+    return armsGroup;
   }
 
   // Prepares weapon model by centering pivot, applying authentic texture, and normalizing CS dimensions
