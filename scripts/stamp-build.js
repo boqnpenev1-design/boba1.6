@@ -18,3 +18,4 @@ if (fs.existsSync(htmlPath)) {
 } else {
   console.warn('[BUILD] index.html not found');
 }
+

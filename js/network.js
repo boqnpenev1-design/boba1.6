@@ -183,7 +183,7 @@ class CS2NetworkManager {
       }
     };
 
-    this.ws.onclose = () => {
+    this.ws.onclose = (event) => {
       this.isConnected = false;
       this.hostConnection.open = false;
       if (this.pingInterval) {
@@ -193,7 +193,17 @@ class CS2NetworkManager {
       this.stopInputLoop();
       this.clearAllRemotePlayers();
 
+      console.warn(`[WS_CLOSED] Code: ${event.code}, Reason: ${event.reason || 'None'}, WasClean: ${event.wasClean}`);
+
       const statusEl = document.getElementById('sb-net-status');
+      if (event.code === 1008) {
+        const originErr = `WEBSOCKET REJECTED: ORIGIN NOT ALLOWED (Code 1008) - Check ALLOWED_ORIGIN on Render`;
+        console.error(originErr);
+        if (statusEl) statusEl.innerHTML = originErr;
+        this.showKickBanner(originErr);
+        return;
+      }
+
       if (statusEl) statusEl.innerHTML = `RECONNECTING TO SERVER...`;
 
       // Automatic reconnection attempt after 3s
@@ -208,7 +218,7 @@ class CS2NetworkManager {
     };
 
     this.ws.onerror = (err) => {
-      console.warn('CS2 Server WebSocket Note:', err.message || err);
+      console.warn('[WS_ERROR] CS2 Server WebSocket Note:', err.message || err);
     };
   }
 
@@ -254,9 +264,28 @@ class CS2NetworkManager {
   handleServerPacket(packet) {
     switch (packet.type) {
       case 'match_sync':
+        const prevMatchId = this.gm.matchId;
         this.playerId = packet.playerId;
         this.inMatch = packet.inMatch;
         this.gm.matchId = packet.matchId;
+
+        // If reconnecting client sees a different matchId, reset local match state
+        if (prevMatchId && packet.matchId && prevMatchId !== packet.matchId) {
+          console.log(`[MATCH_RESET] matchId changed from ${prevMatchId} to ${packet.matchId} -> Resetting local match state`);
+          this.gm.ctScore = 0;
+          this.gm.tScore = 0;
+          this.gm.score = { CT: 0, T: 0 };
+          this.gm.currentRound = 1;
+          this.gm.c4Planted = false;
+          if (this.gm.c4Mesh) this.gm.c4Mesh.visible = false;
+          this.gm.clearAllDroppedItems();
+          if (this.gm.player) {
+            this.gm.player.money.set(800);
+            this.gm.player.setTeam(packet.team || this.gm.player.team);
+          }
+          this.showKickBanner('SERVER RESTARTED - NEW MATCH');
+        }
+
         this.gm.currentRound = packet.currentRound || 1;
         this.gm.ctScore = (typeof packet.ctScore === 'number') ? packet.ctScore : 0;
         this.gm.tScore = (typeof packet.tScore === 'number') ? packet.tScore : 0;
@@ -415,8 +444,18 @@ class CS2NetworkManager {
         break;
 
       case 'kicked_idle':
-        alert(packet.message || 'DISCONNECTED FOR INACTIVITY');
-        window.location.reload();
+        console.warn('[IDLE_KICK] Disconnected from server for inactivity.');
+        this.isConnected = false;
+        if (this.ws) {
+          try { this.ws.close(); } catch (e) {}
+        }
+        this.stopInputLoop();
+        if (this.gm) this.gm.playerInMatch = false;
+        if (document.exitPointerLock) document.exitPointerLock();
+        document.getElementById('hud')?.classList.add('hidden');
+        document.getElementById('spectator-hud')?.classList.add('hidden');
+        document.getElementById('main-menu')?.classList.remove('hidden');
+        this.showKickBanner('DISCONNECTED FOR INACTIVITY');
         break;
     }
   }
@@ -743,6 +782,36 @@ class CS2NetworkManager {
   }
 
   sendDeath(attacker, victim, weapon, isHeadshot, victimTeam) {}
+
+  showKickBanner(message) {
+    const existing = document.getElementById('cs2-kick-banner');
+    if (existing) existing.remove();
+
+    const banner = document.createElement('div');
+    banner.id = 'cs2-kick-banner';
+    banner.style.cssText = `
+      position: fixed;
+      top: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(220, 38, 38, 0.95);
+      border: 2px solid #ffffff;
+      border-radius: 6px;
+      color: #ffffff;
+      padding: 14px 28px;
+      font-family: Rajdhani, sans-serif;
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      z-index: 9999999;
+      box-shadow: 0 4px 25px rgba(0,0,0,0.85);
+      text-align: center;
+      pointer-events: auto;
+    `;
+    banner.innerHTML = `<div>${message}</div><button style="margin-top:8px;padding:4px 16px;background:#111;color:#fff;border:1px solid #fff;border-radius:3px;cursor:pointer;font-family:inherit;font-size:14px;" onclick="this.parentElement.remove()">CLOSE</button>`;
+    document.body.appendChild(banner);
+    setTimeout(() => { if (banner.parentElement) banner.remove(); }, 8000);
+  }
 }
 
 window.CS2NetworkManager = CS2NetworkManager;
