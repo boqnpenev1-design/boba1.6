@@ -460,6 +460,19 @@ class CS2NetworkManager {
     }
   }
 
+  logRateLimitedError(key, err) {
+    if (!this._rateLimitedErrors) this._rateLimitedErrors = {};
+    const now = Date.now();
+    const entry = this._rateLimitedErrors[key] || { count: 0, lastLog: 0 };
+    entry.count++;
+    if (now - entry.lastLog >= 1000) {
+      console.error(`[NET_ERROR] [${key}] (occurred ${entry.count} time(s)): ${err.message}`, err.stack);
+      entry.lastLog = now;
+      entry.count = 0;
+    }
+    this._rateLimitedErrors[key] = entry;
+  }
+
   // Process 25Hz server state snapshot
   handleSnapshot(packet) {
     if (!packet || !packet.players) return;
@@ -502,7 +515,11 @@ class CS2NetworkManager {
       }
 
       seenIds.add(sp.id);
-      this.updateRemotePlayerFromSnapshot(sp, now);
+      try {
+        this.updateRemotePlayerFromSnapshot(sp, now);
+      } catch (err) {
+        this.logRateLimitedError(`remote_player_${sp.id}`, err);
+      }
     }
 
     // Clean up disconnected players
@@ -699,9 +716,9 @@ class CS2NetworkManager {
     });
     group.characterBones = bones;
 
-    if (!CS2Network.loggedBones) {
+    if (!CS2NetworkManager.loggedBones) {
       console.log(`[BONES] Loaded ${team} operator bones:`, Object.keys(bones));
-      CS2Network.loggedBones = true;
+      CS2NetworkManager.loggedBones = true;
     }
 
     group.add(clone);
@@ -815,3 +832,4 @@ class CS2NetworkManager {
 }
 
 window.CS2NetworkManager = CS2NetworkManager;
+window.CS2Network = CS2NetworkManager;
