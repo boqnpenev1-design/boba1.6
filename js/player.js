@@ -157,9 +157,12 @@ class CS2Player {
     this.weaponRig = new THREE.Group();
     this.viewmodelGroup.add(this.weaponRig);
 
-    // Dedicated viewmodel light (Zero PointLight overhead, uniform 95% brightness)
+    // Dedicated viewmodel light (Zero PointLight overhead, uniform 95% brightness + directional)
     const vmLight = new THREE.AmbientLight(0xffffff, 0.95);
     this.viewmodelGroup.add(vmLight);
+    const vmDirLight = new THREE.DirectionalLight(0xffffff, 0.85);
+    vmDirLight.position.set(0.5, 1.0, 0.5);
+    this.viewmodelGroup.add(vmDirLight);
 
     // Muzzle Flash (Subtle realistic muzzle spark, zero screen-blocking circle)
     const flashGeo = new THREE.SphereGeometry(0.010, 8, 8);
@@ -177,7 +180,7 @@ class CS2Player {
   initWeaponTextures() {
     const texFiles = [
       'w_rif_ak47.png', 'w_rif_m4a1.png', 'w_snip_awp.png', 'w_pist_glock18.png',
-      'w_pist_usp.png', 'w_pist_deagle.png', 'w_knife_t.png', 'w_eq_smokegrenade.png',
+      'w_pist_usp.png', 'w_pist_deagle.png', 'w_knife_t.png', 'w_knife_ct.png', 'w_eq_smokegrenade.png',
       'w_eq_fraggrenade.png', 'w_eq_flashbang.png', 'w_rif_famas.png', 'w_rif_galil.png',
       'w_smg_mp5.png', 'w_smg_p90.png', 'w_shot_xm1014.png', 'w_rif_aug.png',
       'w_snip_scout.png', 'w_mach_m249.png', 'w_smg_mac10.png', 'w_smg_ump45.png',
@@ -194,11 +197,21 @@ class CS2Player {
         tex.wrapT = THREE.RepeatWrapping;
         tex.encoding = THREE.sRGBEncoding;
         this.weaponTextureCache[f] = tex;
+        if (this.activeWeapon) {
+          const expected = (this.activeWeapon.id === 'knife')
+            ? (this.team === 'CT' ? 'w_knife_ct.png' : 'w_knife_t.png')
+            : (CS2Player.WEAPON_TEX_MAP[this.activeWeapon.id]);
+          if (expected === f) {
+            if (this.preparedWeaponCache) delete this.preparedWeaponCache[this.activeWeapon.id];
+            this.buildCurrentWeaponModel();
+          }
+        }
       }, undefined, () => {
         loader.load('textures/' + f, (tex) => {
           tex.flipY = false;
           tex.wrapS = THREE.RepeatWrapping;
           tex.wrapT = THREE.RepeatWrapping;
+          tex.encoding = THREE.sRGBEncoding;
           this.weaponTextureCache[f] = tex;
         }, undefined, () => {});
       });
@@ -210,7 +223,7 @@ class CS2Player {
   // Weapon ID → FBX mesh name mapping
   static WEAPON_MESH_MAP = {
     'glock': 'w_pist_elite_single',   // 9mm semi-auto pistol in the pack
-    'usp': 'w_pist_usp',
+    'usp': 'w_pist_usp_silencer',
     'p250': 'w_pist_p228',             // 228_lol
     'deagle': 'w_pist_deagle',
     'dualberettas': 'w_pist_elite',
@@ -293,16 +306,16 @@ class CS2Player {
 
   // Viewmodel positioning per weapon category: authentic forward orientation into crosshair
   static WEAPON_VIEWMODEL = {
-    'pistols':    { pos: [0.14, -0.15, -0.28], scale: 0.018, rot: [Math.PI / 2, 0, 0] },
-    'mid-tier':   { pos: [0.15, -0.16, -0.30], scale: 0.017, rot: [Math.PI / 2, 0, 0] },
-    'smgs':       { pos: [0.15, -0.16, -0.30], scale: 0.017, rot: [Math.PI / 2, 0, 0] },
-    'rifles':     { pos: [0.15, -0.15, -0.28], scale: 0.016, rot: [Math.PI / 2, 0, 0] },
-    'shotguns':   { pos: [0.15, -0.16, -0.30], scale: 0.016, rot: [Math.PI / 2, 0, 0] },
-    'machineguns':{ pos: [0.14, -0.16, -0.30], scale: 0.016, rot: [Math.PI / 2, 0, 0] },
-    'snipers':    { pos: [0.14, -0.15, -0.28], scale: 0.016, rot: [Math.PI / 2, 0, 0] },
+    'pistols':    { pos: [0.14, -0.15, -0.28], scale: 0.018, rot: [0, Math.PI, 0] },
+    'mid-tier':   { pos: [0.15, -0.16, -0.30], scale: 0.017, rot: [0, Math.PI, 0] },
+    'smgs':       { pos: [0.15, -0.16, -0.30], scale: 0.017, rot: [0, Math.PI, 0] },
+    'rifles':     { pos: [0.15, -0.15, -0.28], scale: 0.016, rot: [0, Math.PI, 0] },
+    'shotguns':   { pos: [0.15, -0.16, -0.30], scale: 0.016, rot: [0, -Math.PI / 2, 0] },
+    'machineguns':{ pos: [0.14, -0.16, -0.30], scale: 0.016, rot: [0, Math.PI, 0] },
+    'snipers':    { pos: [0.14, -0.15, -0.28], scale: 0.016, rot: [0, Math.PI, 0] },
     'equipment':  { pos: [0.15, -0.16, -0.30], scale: 0.020, rot: [0, 0, 0] },
-    'melee':      { pos: [0.16, -0.16, -0.28], scale: 0.016, rot: [Math.PI / 2, 0, 0] },
-    'knife':      { pos: [0.16, -0.16, -0.28], scale: 0.016, rot: [Math.PI / 2, 0, 0] }
+    'melee':      { pos: [0.16, -0.16, -0.28], scale: 0.016, rot: [Math.PI / 2 - 0.2, 0.3, -0.2] },
+    'knife':      { pos: [0.16, -0.16, -0.28], scale: 0.016, rot: [Math.PI / 2 - 0.2, 0.3, -0.2] }
   };
 
   // Loads the FBX file containing all CSS weapon meshes
@@ -450,6 +463,9 @@ class CS2Player {
   // Prepares weapon model by centering pivot, applying authentic texture, and normalizing CS dimensions
   prepareWeaponModel(cachedMesh, weaponId) {
     if (!cachedMesh) return null;
+    if (this.preparedWeaponCache && this.preparedWeaponCache[weaponId]) {
+      return this.preparedWeaponCache[weaponId].clone(true);
+    }
     const clone = cachedMesh.clone(true);
 
     const isKnife = (weaponId === 'knife');
@@ -458,20 +474,46 @@ class CS2Player {
       : (CS2Player.WEAPON_TEX_MAP[weaponId] || 'w_rif_ak47.png');
     const tex = this.getWeaponTexture(texFile);
 
+    let matType = 'unknown';
+    let mapLoaded = false;
+    let mapDimensions = 'none';
+
     clone.traverse((child) => {
       if (child.isMesh) {
-        child.material = new THREE.MeshBasicMaterial({
-          map: tex,
-          side: THREE.FrontSide
-        });
-        child.material.needsUpdate = true;
+        // Keep each mesh's original material and swap only the map
+        const origMat = Array.isArray(child.material) ? child.material[0] : child.material;
+        const mat = origMat ? origMat.clone() : new THREE.MeshPhongMaterial();
+        mat.map = tex;
+        mat.color.setHex(0xffffff);
+        mat.side = THREE.DoubleSide;
+        mat.needsUpdate = true;
+        child.material = mat;
+        matType = mat.type;
+        if (tex && tex.image) {
+          mapLoaded = true;
+          mapDimensions = `${tex.image.width}x${tex.image.height}`;
+        }
       }
     });
+
+    window.__heldWeaponDiagnostics = {
+      weaponId: weaponId,
+      meshName: cachedMesh.name || 'unknown',
+      matType: matType,
+      mapLoaded: mapLoaded,
+      mapDimensions: mapDimensions,
+      vmLightCount: this.viewmodelGroup.children.filter(c => c.isLight).length
+    };
 
     const wrapper = new THREE.Group();
     const inner = new THREE.Group();
 
-    // Compute bounding box
+    // Reset transform & compute bounding box
+    clone.position.set(0, 0, 0);
+    clone.rotation.set(0, 0, 0);
+    clone.scale.set(1, 1, 1);
+    clone.updateMatrixWorld(true);
+
     const bbox = new THREE.Box3().setFromObject(clone);
     const center = new THREE.Vector3();
     bbox.getCenter(center);
@@ -505,6 +547,9 @@ class CS2Player {
     inner.scale.set(scaleFactor, scaleFactor, scaleFactor);
     wrapper.add(inner);
 
+    if (!this.preparedWeaponCache) this.preparedWeaponCache = {};
+    this.preparedWeaponCache[weaponId] = wrapper.clone(true);
+
     return wrapper;
   }
 
@@ -522,7 +567,7 @@ class CS2Player {
       return;
     }
 
-    // Try to use real FBX mesh first
+    // Use genuine FBX mesh
     if (this.weaponModelsLoaded && this.weaponMeshCache) {
       const isKnife = (w.id === 'knife');
       const meshName = isKnife
@@ -551,15 +596,13 @@ class CS2Player {
             const barrelTipZ = isSniper ? -0.92 : (isPistol ? -0.52 : -0.78);
             this.muzzleFlashMesh.position.set(vm.pos[0] + 0.01, vm.pos[1] + 0.03, barrelTipZ);
 
+            this.activeWeaponMeshGroup = prepGroup;
             group.add(prepGroup);
             return;
           }
         }
       }
     }
-
-    // Fallback: procedural model when FBX not loaded yet
-    this.buildProceduralWeapon(w, group);
   }
 
   // Authentic CS2 Molotov Cocktail model with amber bottle, rag wick, and flickering flame
@@ -663,52 +706,6 @@ class CS2Player {
     group.add(wire);
   }
 
-  // Fallback procedural weapon models (used before FBX loads)
-  buildProceduralWeapon(w, group) {
-    const texFile = CS2Player.WEAPON_TEX_MAP[w.id] || 'w_rif_m4a1.png';
-    const tex = this.getWeaponTexture(texFile);
-    const mat = new THREE.MeshLambertMaterial({ map: tex });
-
-    if (w.id === 'knife') {
-      const bladeGeo = new THREE.BoxGeometry(0.016, 0.065, 0.32);
-      const blade = new THREE.Mesh(bladeGeo, mat);
-      blade.position.set(0.14, -0.18, -0.42);
-      blade.rotation.x = 0.32;
-      group.add(blade);
-      const gripGeo = new THREE.CylinderGeometry(0.022, 0.020, 0.16, 8);
-      const grip = new THREE.Mesh(gripGeo, new THREE.MeshLambertMaterial({ color: 0x1b1f24 }));
-      grip.rotation.x = 0.32;
-      grip.position.set(0.14, -0.24, -0.20);
-      group.add(grip);
-    } else if (w.category === 'pistols') {
-      const slideGeo = new THREE.BoxGeometry(0.046, 0.052, 0.25);
-      const slide = new THREE.Mesh(slideGeo, mat);
-      slide.position.set(0.13, -0.17, -0.36);
-      group.add(slide);
-      const gripGeo = new THREE.BoxGeometry(0.040, 0.13, 0.085);
-      const grip = new THREE.Mesh(gripGeo, new THREE.MeshLambertMaterial({ color: 0x1c1e22 }));
-      grip.rotation.x = -0.32;
-      grip.position.set(0.13, -0.27, -0.28);
-      group.add(grip);
-    } else if (w.id === 'smokegrenade' || w.id === 'flashbang' || w.id === 'hegrenade' || w.id === 'molotov') {
-      const grenGeo = new THREE.CylinderGeometry(0.040, 0.040, 0.15, 12);
-      const gren = new THREE.Mesh(grenGeo, mat);
-      gren.position.set(0.13, -0.20, -0.38);
-      group.add(gren);
-    } else {
-      // Generic rifle/SMG/shotgun shape
-      const bodyGeo = new THREE.BoxGeometry(0.052, 0.095, 0.48);
-      const body = new THREE.Mesh(bodyGeo, mat);
-      body.position.set(0.13, -0.17, -0.42);
-      group.add(body);
-      const barGeo = new THREE.CylinderGeometry(0.015, 0.015, 0.35, 8);
-      const bar = new THREE.Mesh(barGeo, new THREE.MeshLambertMaterial({ color: 0x16181b }));
-      bar.rotation.x = Math.PI / 2;
-      bar.position.set(0.13, -0.16, -0.66);
-      group.add(bar);
-    }
-  }
-
   // Cycles through grenades in inventory when pressing key 4
   cycleGrenade() {
     if (!this.grenades || this.grenades.length <= 1) return;
@@ -726,6 +723,42 @@ class CS2Player {
       }
 
       this.keys[e.code] = true;
+
+      // Orientation calibration tool under ?debug=1 (I/K/J/L/U/O + Arrows + [])
+      if (window.__CS2_DEBUG && this.activeWeapon) {
+        let cat = this.activeWeapon.category || 'rifles';
+        if (this.activeWeapon.id === 'knife' || this.activeWeapon.category === 'melee') cat = 'knife';
+        const vm = CS2Player.WEAPON_VIEWMODEL[cat];
+        if (vm) {
+          const stepRad = e.shiftKey ? (5 * Math.PI / 180) : (Math.PI / 2);
+          const posStep = e.shiftKey ? 0.05 : 0.01;
+          let changed = false;
+          if (e.code === 'KeyI') { vm.rot[0] += stepRad; changed = true; }
+          if (e.code === 'KeyK') { vm.rot[0] -= stepRad; changed = true; }
+          if (e.code === 'KeyJ') { vm.rot[1] += stepRad; changed = true; }
+          if (e.code === 'KeyL') { vm.rot[1] -= stepRad; changed = true; }
+          if (e.code === 'KeyU') { vm.rot[2] += stepRad; changed = true; }
+          if (e.code === 'KeyO') { vm.rot[2] -= stepRad; changed = true; }
+          if (e.code === 'ArrowUp') { vm.pos[1] += posStep; changed = true; }
+          if (e.code === 'ArrowDown') { vm.pos[1] -= posStep; changed = true; }
+          if (e.code === 'ArrowLeft') { vm.pos[0] -= posStep; changed = true; }
+          if (e.code === 'ArrowRight') { vm.pos[0] += posStep; changed = true; }
+          if (e.code === 'PageUp') { vm.pos[2] -= posStep; changed = true; }
+          if (e.code === 'PageDown') { vm.pos[2] += posStep; changed = true; }
+          if (e.code === 'BracketLeft') { vm.scale = Math.max(0.001, (vm.scale || 0.016) - 0.001); changed = true; }
+          if (e.code === 'BracketRight') { vm.scale = (vm.scale || 0.016) + 0.001; changed = true; }
+          if (changed) {
+            if (this.activeWeaponMeshGroup) {
+              this.activeWeaponMeshGroup.position.set(vm.pos[0], vm.pos[1], vm.pos[2]);
+              this.activeWeaponMeshGroup.rotation.set(vm.rot[0], vm.rot[1], vm.rot[2]);
+            }
+            const deg = vm.rot.map(r => ((r * 180 / Math.PI) % 360).toFixed(1));
+            const logStr = `[CALIBRATION] cat=${cat} rot=[${deg.join(', ')}°] pos=[${vm.pos.map(p=>p.toFixed(3)).join(', ')}] scale=${(vm.scale || 0.016).toFixed(3)}`;
+            console.log(logStr);
+            window.__lastWeaponCalibration = logStr;
+          }
+        }
+      }
 
       // Discrete Space bar jump trigger: prevents continuous bunny-hop when holding space
       if (e.code === 'Space') {

@@ -56,6 +56,7 @@ document.addEventListener('DOMContentLoaded', () => {
   renderer.shadowMap.enabled = false;
   renderer.toneMapping = THREE.LinearToneMapping;
   renderer.toneMappingExposure = 1.0;
+  renderer.outputEncoding = THREE.sRGBEncoding;
   container.appendChild(renderer.domElement);
 
   // Fast Competitive Lighting (Soft Desert Sun - clean textures, zero blowout)
@@ -819,33 +820,14 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // Weapon Inspection
-        let wpnName = 'none';
-        let wpnMeshName = 'none';
-        let wpnTexLoaded = 'none';
-        let wpnMatType = 'none';
-        if (gameManager.player) {
-          if (gameManager.player.activeWeapon) {
-            wpnName = gameManager.player.activeWeapon.name || gameManager.player.activeWeapon.id || 'unknown';
-          }
-          if (gameManager.player.weaponGroup) {
-            gameManager.player.weaponGroup.traverse(c => {
-              if (c.isMesh && wpnMeshName === 'none') {
-                wpnMeshName = c.name || 'unnamed_mesh';
-                const m = Array.isArray(c.material) ? c.material[0] : c.material;
-                if (m) {
-                  wpnMatType = m.type || 'unknown';
-                  if (m.map && m.map.image) {
-                    wpnTexLoaded = `${m.map.image.width}x${m.map.image.height}`;
-                  } else if (m.map) {
-                    wpnTexLoaded = 'loading';
-                  } else {
-                    wpnTexLoaded = 'NO_MAP';
-                  }
-                }
-              }
-            });
-          }
+        let wpnStr = 'none';
+        if (window.__heldWeaponDiagnostics) {
+          const d = window.__heldWeaponDiagnostics;
+          wpnStr = `${d.weaponId} | mesh: ${d.meshName} | mat: ${d.matType} | tex: ${d.mapLoaded ? d.mapDimensions : 'LOADING'} | vm-lights: ${d.vmLightCount}`;
+        } else if (gameManager.player && gameManager.player.activeWeapon) {
+          wpnStr = gameManager.player.activeWeapon.id || 'unknown';
         }
+        const calibStr = window.__lastWeaponCalibration ? `\nCALIB:         ${window.__lastWeaponCalibration}` : '';
 
         const recoilClimbDeg = (gameManager.player && typeof gameManager.player.currentRecoilPitchDeg === 'number')
           ? gameManager.player.currentRecoilPitchDeg : 0;
@@ -889,7 +871,7 @@ MAP:           loaded: ${mapLoaded ? 'YES' : 'NO'} | meshes: ${meshCount} | tris
 MAP BBOX:      ${bboxStr}
 CAMERA:        ${camStr} | fog: ${fogStr}
 PLAYER:        pos: ${pPosStr} | feetY: ${feetYStr}
-WEAPON:        ${wpnName} | mesh: ${wpnMeshName} | tex: ${wpnTexLoaded} | mat: ${wpnMatType}
+WEAPON:        ${wpnStr}${calibStr}
 RECOIL:        climb: ${recoilClimbDeg.toFixed(1)}°
 NETWORK:       ${isOnline ? 'ONLINE' : 'OFFLINE'} | ws: ${wsState} | ping: ${pingVal}
 ROUND:         phase: ${gameManager.phase} | timer: ${gameManager.phaseTimer.toFixed(1)}s [${timerSource}]
