@@ -88,10 +88,10 @@ class CS2MapBuilder {
       const objLoader = new THREE.OBJLoader();
 
       const urlParams = (typeof window !== 'undefined' && window.location) ? new URLSearchParams(window.location.search) : null;
-      // Default is UNMERGED original map for guaranteed visual rendering. ?merge=1 enables consolidation.
-      const useMerge = !!(urlParams && urlParams.get('merge') === '1' && urlParams.get('nomerge') !== '1');
+      // Default is CONSOLIDATED merged map for 60+ FPS. ?nomerge=1 enables original unmerged path.
+      const useMerge = !(urlParams && urlParams.get('nomerge') === '1');
 
-      console.log(`[MAP] Initializing Dust II loader. Mode: ${useMerge ? 'CONSOLIDATED (?merge=1)' : 'UNMERGED ORIGINAL (default)'}`);
+      console.log(`[MAP] Initializing Dust II loader. Mode: ${useMerge ? 'CONSOLIDATED (default)' : 'UNMERGED ORIGINAL (?nomerge=1)'}`);
 
       const processObj = (obj) => {
         try {
