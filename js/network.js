@@ -28,6 +28,11 @@ class CS2NetworkManager {
     this.ctModel = null;
     this.tModel = null;
 
+    // Debug packet simulator helper (Item 1 Protocol verification)
+    window.__sim = (type, payload = {}) => {
+      this.handlePacket({ type, ...payload });
+    };
+
     if (this.gltfLoader) {
       // 1. Counter-Terrorist: Genuine CS2 SAS Operator Model
       this.gltfLoader.load('ctm_sas__cs2_agent_model.glb', (gltf) => {
@@ -220,6 +225,20 @@ class CS2NetworkManager {
     this.ws.onerror = (err) => {
       console.warn('[WS_ERROR] CS2 Server WebSocket Note:', err.message || err);
     };
+  }
+
+  // Custom Room Lobby Support (UI navigation compatibility)
+  createLobby(onSuccess) {
+    const code = Math.random().toString(36).substring(2, 8).toUpperCase();
+    if (onSuccess) onSuccess(code);
+  }
+
+  joinLobby(code, onSuccess, onError) {
+    if (code && code.trim().length >= 4) {
+      if (onSuccess) onSuccess();
+    } else {
+      if (onError) onError();
+    }
   }
 
   startInputLoop() {

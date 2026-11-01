@@ -700,7 +700,7 @@ class CS2Player {
     tape.rotation.set(-0.25, 0, 0);
     group.add(tape);
 
-    const keypadMat = new THREE.MeshLambertMaterial({ map: c4Tex, roughness: 0.4 });
+    const keypadMat = new THREE.MeshLambertMaterial({ map: c4Tex });
     const keypad = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, 0.02), keypadMat);
     keypad.position.set(0.06, -0.21, -0.23);
     keypad.rotation.set(-0.25, 0, 0);

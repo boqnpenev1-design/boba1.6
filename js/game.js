@@ -453,9 +453,23 @@ class CS2GameManager {
     }
   }
 
-  addToKillfeed(attacker, victim, weapon, isHeadshot, victimTeam) {
+  addKillFeed(attacker, victim, weapon, isHeadshot, victimTeam = null) {
+    this.addToKillfeed(attacker, victim, weapon, isHeadshot, victimTeam);
+  }
+
+  addToKillfeed(attacker, victim, weapon, isHeadshot, victimTeam = null) {
     const feed = document.getElementById('killfeed');
     if (!feed) return;
+
+    if (!victimTeam) {
+      if (victim === this.player.callsign || victim === 'You') {
+        victimTeam = this.player.team || 'CT';
+      } else if (this.net && this.net.remotePlayers) {
+        const rp = Object.values(this.net.remotePlayers).find(p => p.name === victim);
+        if (rp && rp.team) victimTeam = rp.team;
+      }
+      if (!victimTeam) victimTeam = (this.player.team === 'CT') ? 'T' : 'CT';
+    }
 
     const row = document.createElement('div');
     row.className = 'kill-row';
@@ -476,7 +490,26 @@ class CS2GameManager {
     }, 6000);
   }
 
-  endRound(winner, reason) {
+  onRoundEnd(winner, reason, mvp = null) {
+    this.endRound(winner, reason, mvp);
+  }
+
+  onBombDefused(defuserName = 'Counter-Terrorist') {
+    this.onC4Defused();
+  }
+
+  onHalftime() {
+    if (this.player) {
+      this.player.team = (this.player.team === 'CT') ? 'T' : 'CT';
+      this.player.money.set(800);
+      this.player.hasHelmet = false;
+      this.player.armor.set(0);
+      this.player.setTeam(this.player.team);
+    }
+    this.updateHUD();
+  }
+
+  endRound(winner, reason, mvp = null) {
     if (this.phase === 'round_over') return;
     this.phase = 'round_over';
     this.phaseTimer = 5;

@@ -140,6 +140,16 @@ document.addEventListener('DOMContentLoaded', () => {
   const gameManager = new CS2GameManager(scene, camera);
   window.game = gameManager;
   window.csGameManager = gameManager;
+
+  // Startup self-check: verify all required cross-class methods exist (Item 1)
+  const reqGmMethods = [
+    'onRoundEnd', 'addKillFeed', 'addToKillfeed', 'onBombDefused',
+    'onC4Defused', 'onC4Planted', 'startRound', 'updateHUD',
+    'spawnC4ExplosionEffect', 'spawnRemoteDroppedWeapon', 'removeRemoteDroppedWeapon'
+  ];
+  const missingGmMethods = reqGmMethods.filter(m => typeof gameManager[m] !== 'function');
+  console.log('MISSING METHODS:', missingGmMethods);
+
   setupDebugOverlay(gameManager, renderer, scene, camera);
 
   // Pre-compile all scene shaders on startup (eliminates mid-combat shader compile freezes)

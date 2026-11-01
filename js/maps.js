@@ -121,8 +121,10 @@ class CS2MapBuilder {
                   if (mat.emissive) mat.emissive.setHex(0x000000);
                   if (mat.specular) mat.specular.setHex(0x000000);
                   if (typeof mat.shininess !== 'undefined') mat.shininess = 0;
-                  if (typeof mat.roughness !== 'undefined') mat.roughness = 0.95;
-                  if (typeof mat.metalness !== 'undefined') mat.metalness = 0.0;
+                  if (mat.isMeshStandardMaterial || mat.isMeshPhysicalMaterial) {
+                    mat.roughness = 0.95;
+                    mat.metalness = 0.0;
+                  }
                 });
               }
               child.castShadow = false;
