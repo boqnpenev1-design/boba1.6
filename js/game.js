@@ -257,24 +257,29 @@ class CS2GameManager {
     this.player.setTeam(team);
 
     document.getElementById('team-select-screen').classList.add('hidden');
-    // Auto-fullscreen & Keyboard Lock to prevent Ctrl+W/Ctrl+N browser shortcuts during gameplay
-    try {
-      const el = document.documentElement;
-      if (el.requestFullscreen) el.requestFullscreen().catch(() => {});
-      else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
-    } catch (e) {}
-    try {
-      if (navigator.keyboard && navigator.keyboard.lock) {
-        navigator.keyboard.lock(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ControlLeft', 'ControlRight', 'ShiftLeft', 'Space']).catch(() => {});
-      }
-    } catch (e) {}
+    // Auto-fullscreen & Keyboard Lock to prevent Ctrl+W/Ctrl+N browser shortcuts during gameplay (only if user gesture is active)
+    const hasUserGesture = !!(navigator.userActivation && navigator.userActivation.isActive);
+    if (hasUserGesture) {
+      try {
+        const el = document.documentElement;
+        if (el.requestFullscreen) el.requestFullscreen().catch(() => {});
+        else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+      } catch (e) {}
+      try {
+        if (navigator.keyboard && navigator.keyboard.lock) {
+          navigator.keyboard.lock(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ControlLeft', 'ControlRight', 'ShiftLeft', 'Space']).catch(() => {});
+        }
+      } catch (e) {}
+    }
     document.getElementById('hud').classList.remove('hidden');
-    try {
-      const lockPromise = document.getElementById('game-canvas-container').requestPointerLock();
-      if (lockPromise && typeof lockPromise.catch === 'function') {
-        lockPromise.catch(() => {});
-      }
-    } catch (e) {}
+    if (hasUserGesture) {
+      try {
+        const lockPromise = document.getElementById('game-canvas-container').requestPointerLock();
+        if (lockPromise && typeof lockPromise.catch === 'function') {
+          lockPromise.catch(() => {});
+        }
+      } catch (e) {}
+    }
 
     // In online mode, spectate only if server says inMatch is false
     if (this.net && this.net.isConnected && this.phase === 'live' && this.net.inMatch === false) {

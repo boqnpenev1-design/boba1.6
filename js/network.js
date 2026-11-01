@@ -871,7 +871,7 @@ class CS2NetworkManager {
             m.side = THREE.FrontSide;
             if (m.map) {
               m.map.encoding = THREE.sRGBEncoding;
-              m.map.needsUpdate = true;
+              if (m.map.image) m.map.needsUpdate = true;
             }
           });
         }

@@ -419,22 +419,26 @@ class CS2Player {
     // Load authentic texture with flipY=false: models/ first (converted PNGs), fallback to textures/
     const tex = loader.load('models/' + filename, (loaded) => {
       loaded.flipY = false;
-      loaded.needsUpdate = true;
+      if (loaded.image) loaded.needsUpdate = true;
       this.weaponTextureCache[filename] = loaded;
     }, undefined, () => {
       loader.load('textures/' + filename, (fallback) => {
         fallback.flipY = false;
-        fallback.needsUpdate = true;
+        if (fallback.image) fallback.needsUpdate = true;
         this.weaponTextureCache[filename] = fallback;
-        tex.image = fallback.image;
-        tex.needsUpdate = true;
+        if (fallback.image) {
+          tex.image = fallback.image;
+          tex.needsUpdate = true;
+        }
       }, undefined, () => {
         loader.load('allcssweaponsinonemodel/textures_png/' + filename, (pTex) => {
           pTex.flipY = false;
-          pTex.needsUpdate = true;
+          if (pTex.image) pTex.needsUpdate = true;
           this.weaponTextureCache[filename] = pTex;
-          tex.image = pTex.image;
-          tex.needsUpdate = true;
+          if (pTex.image) {
+            tex.image = pTex.image;
+            tex.needsUpdate = true;
+          }
         });
       });
     });

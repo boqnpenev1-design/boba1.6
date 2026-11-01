@@ -116,7 +116,7 @@ class CS2MapBuilder {
                 mats.forEach(mat => {
                   if (mat.map) {
                     mat.map.encoding = THREE.sRGBEncoding;
-                    mat.map.needsUpdate = true;
+                    if (mat.map.image) mat.map.needsUpdate = true;
                   }
                   if (mat.emissive) mat.emissive.setHex(0x000000);
                   if (mat.specular) mat.specular.setHex(0x000000);
