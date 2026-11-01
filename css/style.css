@@ -1179,6 +1179,14 @@ body, html {
   color: #94a3b8;
   font-weight: 600;
 }
+.round-end-score {
+  font-family: var(--cs-font-display);
+  font-size: 16px;
+  letter-spacing: 2px;
+  color: #ffffff;
+  font-weight: 700;
+  margin-top: 2px;
+}
 .round-end-mvp {
   margin-top: 8px;
   padding-top: 8px;

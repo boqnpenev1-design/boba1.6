@@ -287,14 +287,50 @@ class CS2GameManager {
     }
   }
 
+  resetBombHUD() {
+    this.c4Planted = false;
+    this.c4Timer = 40.0;
+    this.c4PlantPos = null;
+    this.c4Site = null;
+
+    const timerEl = document.getElementById('round-timer');
+    const phaseEl = document.getElementById('round-phase-label');
+    const c4Clock = document.getElementById('c4-planted-clock');
+    const c4Alert = document.getElementById('c4-planted-alert');
+    if (timerEl) timerEl.classList.remove('hidden');
+    if (phaseEl) phaseEl.classList.remove('hidden');
+    if (c4Clock) c4Clock.classList.add('hidden');
+    if (c4Alert) c4Alert.classList.add('hidden');
+
+    if (this.c4Mesh) {
+      this.c4Mesh.visible = false;
+    }
+
+    const actionPrompt = document.getElementById('action-prompt');
+    const actionText = document.getElementById('action-prompt-text');
+    if (actionPrompt && actionText) {
+      const txt = actionText.textContent || '';
+      if (txt.includes('PLANT') || txt.includes('DEFUSE')) {
+        actionPrompt.classList.add('hidden');
+      }
+    }
+    const interactionBar = document.getElementById('interaction-bar-container');
+    if (interactionBar) interactionBar.classList.add('hidden');
+
+    if (this.player) {
+      this.player.isPlanting = false;
+      this.player.isDefusing = false;
+      this.player.plantProgress = 0;
+      this.player.defuseProgress = 0;
+    }
+  }
+
   startRound() {
     this.phase = 'freeze';
     this.phaseEndTime = Date.now() + this.freezeTime * 1000;
     this.phaseTimer = this.freezeTime;
     this.liveRoundStartTime = 0;
-    this.c4Planted = false;
-    this.c4Timer = 40.0;
-    this.c4Mesh.visible = false;
+    this.resetBombHUD();
     this.purchaseHistory = [];
 
     // Clean up dropped weapons from previous round
@@ -309,16 +345,6 @@ class CS2GameManager {
     const roundEndOverlay = document.getElementById('round-end-overlay');
     if (roundEndOverlay) roundEndOverlay.classList.add('hidden');
 
-    const timerEl = document.getElementById('round-timer');
-    const phaseEl = document.getElementById('round-phase-label');
-    const c4Clock = document.getElementById('c4-planted-clock');
-    if (timerEl) timerEl.classList.remove('hidden');
-    if (phaseEl) phaseEl.classList.remove('hidden');
-    if (c4Clock) c4Clock.classList.add('hidden');
-
-    document.getElementById('c4-planted-alert').classList.add('hidden');
-    document.getElementById('action-prompt').classList.add('hidden');
-    document.getElementById('interaction-bar-container').classList.add('hidden');
     document.getElementById('spectator-hud').classList.add('hidden');
 
     window.csAudio.playRoundStart();
@@ -510,40 +536,44 @@ class CS2GameManager {
   }
 
   endRound(winner, reason, mvp = null) {
-    if (this.phase === 'round_over') return;
     this.phase = 'round_over';
     this.phaseTimer = 5;
 
-    // Restore timer UI if bomb had hidden it
-    const timerEl = document.getElementById('round-timer');
-    const phaseEl = document.getElementById('round-phase-label');
-    const c4Clock = document.getElementById('c4-planted-clock');
-    if (timerEl) timerEl.classList.remove('hidden');
-    if (phaseEl) phaseEl.classList.remove('hidden');
-    if (c4Clock) c4Clock.classList.add('hidden');
+    // Reset bomb HUD on round end
+    this.resetBombHUD();
 
-    if (winner === 'CT') {
-      this.ctScore++;
-      this.consecutiveLosses.CT = 0;
-      this.consecutiveLosses.T++;
-    } else {
-      this.tScore++;
-      this.consecutiveLosses.T = 0;
-      this.consecutiveLosses.CT++;
+    if (!this.net || !this.net.isConnected) {
+      if (winner === 'CT') {
+        this.ctScore++;
+        this.consecutiveLosses.CT = 0;
+        this.consecutiveLosses.T++;
+      } else {
+        this.tScore++;
+        this.consecutiveLosses.T = 0;
+        this.consecutiveLosses.CT++;
+      }
     }
 
     // Play triumphant brass fanfare for round victory
     window.csAudio.playRoundEnd(winner);
 
-    // Calculate match & round MVP (player with most eliminations / performance)
-    let mvpName = 'You';
-    let mvpReason = 'for most eliminations';
+    // Format human-readable round end reason
+    let cleanReason = (reason || 'ROUND OVER').toUpperCase();
+    if (cleanReason.includes('DESTROYED') || cleanReason.includes('EXPLODE')) cleanReason = 'BOMB EXPLODED';
+    else if (cleanReason.includes('DEFUSE')) cleanReason = 'BOMB DEFUSED';
+    else if (cleanReason.includes('ELIMINAT') || cleanReason.includes('KILLED')) cleanReason = 'ALL ENEMIES ELIMINATED';
+    else if (cleanReason.includes('PRESERVE') || cleanReason.includes('TIME') || cleanReason.includes('EXPIRE')) cleanReason = 'TIME RAN OUT';
+
+    // Calculate match & round MVP
+    let mvpName = mvp || 'You';
+    let mvpReason = 'for round performance';
     let maxKills = this.player.kills || 0;
-    if (this.net && this.net.remotePlayers) {
+    if (!mvp && this.net && this.net.remotePlayers) {
       Object.values(this.net.remotePlayers).forEach(p => {
         if (p && p.name && (p.kills > maxKills)) {
           maxKills = p.kills;
           mvpName = p.name;
+          mvpReason = `for eliminating ${maxKills} opponents`;
         }
       });
     }
@@ -552,22 +582,26 @@ class CS2GameManager {
     const overlay = document.getElementById('round-end-overlay');
     const winTitle = document.getElementById('round-winner-title');
     const winReason = document.getElementById('round-winner-reason');
+    const winScore = document.getElementById('round-winner-score');
     const mvpBox = document.getElementById('round-mvp-box');
     const mvpNameEl = document.getElementById('round-mvp-name');
     const mvpReasonEl = document.getElementById('round-mvp-reason');
     if (overlay && winTitle && winReason) {
       winTitle.textContent = (winner === 'CT') ? 'COUNTER-TERRORISTS WIN' : 'TERRORISTS WIN';
       winTitle.className = `round-end-title ${winner === 'CT' ? 'ct-win' : 't-win'}`;
-      winReason.textContent = reason;
-      if (maxKills > 0) {
-        if (mvpBox) mvpBox.classList.remove('hidden');
-        if (mvpNameEl) mvpNameEl.textContent = mvpName;
-        if (mvpReasonEl) mvpReasonEl.textContent = `for eliminating ${maxKills} opponents`;
-      } else {
-        if (mvpBox) mvpBox.classList.add('hidden');
+      winReason.textContent = cleanReason;
+      if (winScore) {
+        winScore.textContent = `SCORE: CT ${this.ctScore} — ${this.tScore} T`;
+      }
+      if (mvpBox && mvpNameEl) {
+        mvpNameEl.textContent = mvpName;
+        if (mvpReasonEl) mvpReasonEl.textContent = mvpReason;
+        mvpBox.classList.remove('hidden');
       }
       overlay.classList.remove('hidden');
     }
+
+    this.updateHUD();
 
     const winBonus = 3250;
     const lossBonusBase = 1400;

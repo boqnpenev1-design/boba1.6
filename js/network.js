@@ -324,6 +324,8 @@ class CS2NetworkManager {
           this.gm.c4Planted = true;
           this.gm.c4Pos = packet.c4Pos;
           this.gm.c4Site = packet.c4Site;
+        } else {
+          this.gm.resetBombHUD();
         }
 
         if (packet.c4CarrierId === this.playerId && this.gm.player) {
@@ -362,7 +364,9 @@ class CS2NetworkManager {
         if (!this.gm.score) this.gm.score = { CT: 0, T: 0 };
         this.gm.score.CT = this.gm.ctScore;
         this.gm.score.T = this.gm.tScore;
-        this.gm.c4Planted = false;
+        this.gm.resetBombHUD();
+        const roundEndOverlay = document.getElementById('round-end-overlay');
+        if (roundEndOverlay) roundEndOverlay.classList.add('hidden');
         this.inMatch = true;
 
         // Reset player round state
@@ -520,6 +524,19 @@ class CS2NetworkManager {
 
       if (this.gm.hudEls.ctScore) this.gm.hudEls.ctScore.innerText = this.gm.ctScore;
       if (this.gm.hudEls.tScore) this.gm.hudEls.tScore.innerText = this.gm.tScore;
+
+      // Reset stale bomb HUD if snapshot indicates bomb is not planted
+      if (!packet.c4Planted && this.gm.c4Planted) {
+        this.gm.resetBombHUD();
+      }
+
+      // Hide victory banner when round is no longer over
+      if (this.gm.phase !== 'round_over') {
+        const roEl = document.getElementById('round-end-overlay');
+        if (roEl && !roEl.classList.contains('hidden')) {
+          roEl.classList.add('hidden');
+        }
+      }
     }
 
     // Update HUD living player counts from snapshot
