@@ -758,24 +758,6 @@ document.addEventListener('DOMContentLoaded', () => {
     renderBuyItems(currentBuyCategory);
     gameManager.updateHUD();
   }
-        gameManager.player.hasDefuseKit = true;
-      } else if (weapon.slot === 4 || weapon.type === 'grenade' || weapon.id === 'flashbang' || weapon.id === 'hegrenade' || weapon.id === 'smokegrenade' || weapon.id === 'molotov') {
-        gameManager.player.grenades = gameManager.player.grenades || [];
-        gameManager.player.grenades.push(weapon);
-        gameManager.player.inventory[4] = weapon;
-        gameManager.player.switchSlot(4);
-      }
-    } else if (weapon.slot) {
-      gameManager.player.inventory[weapon.slot] = weapon;
-      gameManager.player.switchSlot(weapon.slot);
-    }
-
-    gameManager.purchaseHistory.push(weapon);
-
-    window.csAudio.playRadioTone('buy');
-    renderBuyItems(currentBuyCategory);
-    gameManager.updateHUD();
-  }
 
   // 9. Keybinds
   const defaultKeybinds = {

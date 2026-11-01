@@ -143,21 +143,23 @@ async function run() {
     console.log('[DUAL-WINDOW] Joining Window 1 as PLAYER_T...');
     await w1.evaluate(`
       (function() {
-        const inp = document.getElementById('player-callsign-input');
-        if (inp) inp.value = 'PLAYER_T';
-        window.cs2PlayerCallsign = 'PLAYER_T';
-        if (window.csGameManager) {
-          window.csGameManager.connectToServer('dust2');
+        const inp = document.getElementById('player-nickname-input');
+        if (inp) {
+          inp.value = 'PLAYER_T';
+          inp.dispatchEvent(new Event('input', { bubbles: true }));
         }
+        const btn = document.getElementById('btn-connect-dust2');
+        if (btn && !btn.disabled) btn.click();
+        else if (window.csGameManager) window.csGameManager.connectToServer('dust2');
       })()
     `);
 
-    await sleep(1000);
+    await sleep(1500);
     await w1.evaluate(`
       (function() {
-        if (window.csGameManager) {
-          window.csGameManager.chooseTeam('T');
-        }
+        const btnT = document.getElementById('btn-select-t');
+        if (btnT) btnT.click();
+        else if (window.csGameManager) window.csGameManager.chooseTeam('T');
       })()
     `);
 
@@ -165,23 +167,31 @@ async function run() {
     console.log('[DUAL-WINDOW] Joining Window 2 as PLAYER_CT...');
     await w2.evaluate(`
       (function() {
-        const inp = document.getElementById('player-callsign-input');
-        if (inp) inp.value = 'PLAYER_CT';
-        window.cs2PlayerCallsign = 'PLAYER_CT';
-        if (window.csGameManager) {
-          window.csGameManager.connectToServer('dust2');
+        const inp = document.getElementById('player-nickname-input');
+        if (inp) {
+          inp.value = 'PLAYER_CT';
+          inp.dispatchEvent(new Event('input', { bubbles: true }));
         }
+        const btn = document.getElementById('btn-connect-dust2');
+        if (btn && !btn.disabled) btn.click();
+        else if (window.csGameManager) window.csGameManager.connectToServer('dust2');
       })()
     `);
 
-    await sleep(1000);
+    await sleep(1500);
     await w2.evaluate(`
       (function() {
-        if (window.csGameManager) {
-          window.csGameManager.chooseTeam('CT');
-        }
+        const btnCT = document.getElementById('btn-select-ct');
+        if (btnCT) btnCT.click();
+        else if (window.csGameManager) window.csGameManager.chooseTeam('CT');
       })()
     `);
+
+    // Dispatch real mouse clicks on canvas to activate pointer lock & interaction
+    await w1.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: 480, y: 520, button: 'left', clickCount: 1 });
+    await w1.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: 480, y: 520, button: 'left', clickCount: 1 });
+    await w2.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: 480, y: 520, button: 'left', clickCount: 1 });
+    await w2.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: 480, y: 520, button: 'left', clickCount: 1 });
 
     console.log('[DUAL-WINDOW] Waiting 5s for Dust 2 map & authentic models to finish loading in both windows...');
     await sleep(5000);
