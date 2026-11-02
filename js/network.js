@@ -448,6 +448,18 @@ class CS2NetworkManager {
         this.gm.onBombDefused(packet.defuserName || 'Counter-Terrorist');
         break;
 
+      case 'player_left':
+        if (packet.id) {
+          this.removeRemotePlayer(packet.id);
+        }
+        break;
+
+      case 'player_shot':
+        if (packet.shooterId !== this.playerId && window.csAudio) {
+          window.csAudio.playGunshot(packet.audioType || 'primary', packet.weaponId || 'ak47', packet.isSilenced);
+        }
+        break;
+
       case 'player_damaged':
         if (packet.targetId === this.playerId && this.gm.player) {
           this.gm.player.takeDamage(packet.damage, packet.attackerId, 'bullet', false, this.gm);
@@ -600,6 +612,13 @@ class CS2NetworkManager {
     this.lastSnapshotTime = Date.now();
 
     if (this.gm) {
+      if (this.gm.phase !== packet.phase) {
+        if (packet.phase === 'live') {
+          this.gm.liveRoundStartTime = Date.now();
+        } else if (packet.phase === 'freeze') {
+          this.gm.liveRoundStartTime = 0;
+        }
+      }
       this.gm.phase = packet.phase;
       this.gm.phaseTimer = packet.timer;
       this.gm.roundTime = packet.timer;
@@ -852,9 +871,9 @@ class CS2NetworkManager {
         rp.mesh.updateHitboxes();
       }
 
-      // Sync hitbox wireframe visibility with global toggle or ?debug=1
+      // Sync hitbox wireframe visibility with global toggle only when ?debug=1 is enabled
       const isDebug = (typeof window !== 'undefined' && window.location && new URLSearchParams(window.location.search).get('debug') === '1');
-      const showWire = isDebug || !!window.__showHitboxWireframes;
+      const showWire = isDebug && !!window.__showHitboxWireframes;
       if (rp.mesh.bodyHitbox && rp.mesh.bodyHitbox.material) {
         rp.mesh.bodyHitbox.material.visible = showWire;
       }
@@ -869,7 +888,7 @@ class CS2NetworkManager {
 
     // 1. Authentic Capsule Body Hitbox (Radius ~0.32m, height 1.40m matching authentic human bounds, anchored at ground Y=0)
     const isDebug = (typeof window !== 'undefined' && window.location && new URLSearchParams(window.location.search).get('debug') === '1');
-    const showWire = isDebug || !!window.__showHitboxWireframes;
+    const showWire = isDebug && !!window.__showHitboxWireframes;
     const bodyHitboxGeo = new THREE.CylinderGeometry(0.32, 0.32, 1.40, 12);
     const bodyHitboxMat = new THREE.MeshBasicMaterial({ color: 0x00ff88, wireframe: true, visible: showWire });
     const bodyHitbox = new THREE.Mesh(bodyHitboxGeo, bodyHitboxMat);
@@ -891,30 +910,10 @@ class CS2NetworkManager {
 
     // Hitbox dynamic bone updater
     group.updateHitboxes = function() {
-      let headY = 1.82;
-      const feetY = 0.0;
-      if (group.characterBones && group.characterBones.head) {
-        group.updateMatrixWorld(true);
-        const hPos = new THREE.Vector3();
-        group.characterBones.head.getWorldPosition(hPos);
-        const lPos = group.worldToLocal(hPos);
-        if (!isNaN(lPos.y) && lPos.y > 1.2 && lPos.y < 2.4) {
-          headY = lPos.y;
-        }
-      }
+      const headY = 1.82;
       group.headHitbox.position.set(0, headY, 0);
-
-      const bodyHeight = Math.max(0.8, headY - 0.25);
-      const bodyCenterY = bodyHeight / 2;
-      group.bodyHitbox.position.set(0, bodyCenterY, 0);
-      group.bodyHitbox.scale.set(1, bodyHeight / 1.40, 1);
-
-      group.measuredMetrics = {
-        modelHeight: (headY + 0.18).toFixed(2),
-        hitboxBottomY: (bodyCenterY - bodyHeight / 2).toFixed(2),
-        headSphereY: headY.toFixed(2),
-        feetGroundY: feetY.toFixed(2)
-      };
+      group.bodyHitbox.position.set(0, 0.70, 0);
+      group.bodyHitbox.scale.set(1, 1, 1);
     };
 
     // 3. Nametag Billboard above head
@@ -949,7 +948,11 @@ class CS2NetworkManager {
     const srcModel = (team === 'T') ? this.tModel : this.ctModel;
     if (!srcModel) return false;
 
-    if (group.characterMesh) {
+    if (group.characterWrapper) {
+      group.remove(group.characterWrapper);
+      group.characterWrapper = null;
+      group.characterMesh = null;
+    } else if (group.characterMesh) {
       group.remove(group.characterMesh);
       group.characterMesh = null;
     }
@@ -959,17 +962,27 @@ class CS2NetworkManager {
       : srcModel.clone(true);
 
     const isCT = (team === 'CT');
-    // Height calibration: authentic CS2 human proportions (~2.00m tall, feet grounded at Y=0, head at Y ~1.82m)
-    const normScale = isCT ? 1.03 : 0.0272;
-    const yOffset = isCT ? 0.0 : (-1.29 * normScale);
+    const wrapper = new THREE.Group();
+    wrapper.name = 'characterWrapper';
 
-    clone.scale.set(normScale, normScale, normScale);
-    // Align bottom of model with ground feet (Y=0)
-    clone.position.set(0, yOffset, 0);
-    // Orient model so it faces the exact player view/movement direction (fix 180 deg offset)
-    clone.rotation.y = Math.PI;
+    if (isCT) {
+      // SAS model: X axis is vertical -> rotate Z by PI/2
+      clone.rotation.set(0, 0, Math.PI / 2);
+      const ctScale = 1.05;
+      clone.scale.set(ctScale, ctScale, ctScale);
+      clone.position.set(0, 0, 0);
+    } else {
+      // Phoenix model: Z axis is vertical -> rotate X by PI/2
+      clone.rotation.set(Math.PI / 2, 0, 0);
+      const tScale = 0.0269;
+      clone.scale.set(tScale, tScale, tScale);
+      clone.position.set(0, 0, 0);
+    }
 
-    // FrontSide only (halves character rasterization work and avoids inside-mesh rendering)
+    // Orient character to face player movement/view direction (-Z)
+    wrapper.rotation.y = Math.PI;
+
+    // FrontSide only
     clone.traverse(child => {
       if (child.isMesh) {
         child.visible = true;
@@ -987,6 +1000,8 @@ class CS2NetworkManager {
         }
       }
     });
+
+    wrapper.add(clone);
 
     // Extract named bones for procedural articulation
     const bones = {};
@@ -1021,7 +1036,8 @@ class CS2NetworkManager {
       CS2NetworkManager.loggedBones = true;
     }
 
-    group.add(clone);
+    group.add(wrapper);
+    group.characterWrapper = wrapper;
     group.characterMesh = clone;
     return true;
   }
@@ -1051,6 +1067,13 @@ class CS2NetworkManager {
 
   sendShoot(audioType, weaponId, isSilenced, pos) {
     window.csAudio.playGunshot(audioType, weaponId, isSilenced);
+    this.send({
+      type: 'player_shot',
+      weaponId: weaponId,
+      audioType: audioType,
+      isSilenced: !!isSilenced,
+      pos: pos || (this.gm && this.gm.player ? { x: this.gm.player.position.x, y: this.gm.player.position.y, z: this.gm.player.position.z } : null)
+    });
   }
 
   sendDamage(targetId, amount, weapon = 'gun', isHeadshot = false) {

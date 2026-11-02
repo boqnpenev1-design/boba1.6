@@ -114,8 +114,25 @@ class CS2GameManager {
     if (!w) return;
     const mesh = this.player.createWorldWeaponMesh(item.weaponId);
     if (!mesh) return;
-    mesh.position.set(item.pos.x, item.pos.y, item.pos.z);
+
+    let targetGroundY = (typeof item.pos.y === 'number') ? item.pos.y : 0.0;
+    if (this.mapBuilder && this.mapBuilder.groundMeshes && this.mapBuilder.groundMeshes.length > 0) {
+      const gRay = new THREE.Raycaster(
+        new THREE.Vector3(item.pos.x, item.pos.y + 4.0, item.pos.z),
+        new THREE.Vector3(0, -1, 0),
+        0.1,
+        20.0
+      );
+      const hits = gRay.intersectObjects(this.mapBuilder.groundMeshes, false);
+      if (hits.length > 0) {
+        targetGroundY = hits[0].point.y;
+      }
+    }
+
+    mesh.position.set(item.pos.x, targetGroundY + 0.05, item.pos.z);
+    mesh.rotation.set(Math.PI / 2, 0, Math.random() * Math.PI * 2);
     this.scene.add(mesh);
+
     if (!window._droppedItems) window._droppedItems = [];
     window._droppedItems.push({
       id: item.id,
@@ -123,7 +140,7 @@ class CS2GameManager {
       weapon: w,
       slot: item.slot || 1,
       pos: mesh.position,
-      groundY: item.pos.y,
+      groundY: targetGroundY,
       isResting: true,
       droppedAt: performance.now()
     });
@@ -417,6 +434,7 @@ class CS2GameManager {
 
   // Authentic CS2 Buy Zone & Buy Time Rules (Strict 15s Window in Buy Zone)
   canBuy() {
+    if (!this.player || !this.player.position) return false;
     const inZone = this.mapBuilder.isInBuyZone(this.player.team, this.player.position);
     if (!inZone) return false;
 
@@ -425,8 +443,8 @@ class CS2GameManager {
 
     // 2. Live Round: strictly allowed only within the first 15.0 seconds
     if (this.phase === 'live') {
-      if (typeof this.phaseTimer === 'number' && this.phaseTimer < 100.0) return false;
       if (this.liveRoundStartTime > 0 && (Date.now() - this.liveRoundStartTime) > 15000) return false;
+      if (typeof this.phaseTimer === 'number' && this.phaseTimer < 100.0) return false;
       return true;
     }
     return false;
@@ -1002,23 +1020,23 @@ class CS2GameManager {
       return { x: cx + rx, y: cy + ry };
     };
 
-    // Bombsites A & B
+    // Bombsites A & B (Compact clean tactical badges on radar)
     const bZones = this.mapBuilder.bombZones;
     for (let i = 0; i < bZones.length; i++) {
       const site = bZones[i];
       const pt = toRadar(site.x, site.z);
 
-      ctx.fillStyle = 'rgba(235, 65, 45, 0.45)';
+      ctx.fillStyle = 'rgba(235, 65, 45, 0.90)';
       ctx.beginPath();
-      ctx.arc(pt.x, pt.y, site.radius * cScale * 0.88, 0, Math.PI * 2);
+      ctx.arc(pt.x, pt.y, 8, 0, Math.PI * 2);
       ctx.fill();
 
-      ctx.strokeStyle = '#eb412d';
-      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 1.0;
       ctx.stroke();
 
-      ctx.fillStyle = '#ffcc00';
-      ctx.font = 'bold 12px Chakra Petch, sans-serif';
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 10px Chakra Petch, sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(site.id, pt.x, pt.y);

@@ -542,94 +542,90 @@ class CS2Player {
     const armsGroup = new THREE.Group();
     armsGroup.name = 'viewmodelArms';
 
-    // Sleeve color: CT = dark navy blue (0x182432) with ribbing (0x223344), T = dark tactical olive (0x383226) with ribbing (0x484032)
+    // Authentic tactical sleeve: CT = midnight navy (0x151f2c), T = dark olive drab (0x28261e)
     const isCT = (team === 'CT');
-    const sleeveColor = isCT ? 0x182432 : 0x383226;
-    const ribColor = isCT ? 0x243242 : 0x484032;
+    const sleeveColor = isCT ? 0x151f2c : 0x28261e;
+    const ribColor = isCT ? 0x1f2c3d : 0x363328;
     const sleeveMat = new THREE.MeshLambertMaterial({ color: sleeveColor });
     const ribMat = new THREE.MeshLambertMaterial({ color: ribColor });
-    const gloveMat = new THREE.MeshLambertMaterial({ color: 0x1c1c1c });
-    const knuckleMat = new THREE.MeshLambertMaterial({ color: 0x2a2a2a });
+    const gloveMat = new THREE.MeshLambertMaterial({ color: 0x141414 });
+    const knuckleMat = new THREE.MeshLambertMaterial({ color: 0x222222 });
 
     const isKnife = (weapon && (weapon.id === 'knife' || weapon.category === 'melee'));
     const isPistol = (weapon && (weapon.slot === 2 || weapon.category === 'pistols'));
 
-    // Right Arm Forearm & Sleeve: sleek tactical sleeve angling from bottom-right into grip
-    const rForearmGeo = new THREE.CylinderGeometry(0.024, 0.032, 0.28, 12);
+    // Right Arm Forearm & Sleeve: sleek tactical sleeve entering from bottom-right corner
+    const rForearmGeo = new THREE.CylinderGeometry(0.026, 0.035, 0.32, 12);
     const rForearm = new THREE.Mesh(rForearmGeo, sleeveMat);
-    rForearm.position.set(0.24, -0.32, -0.18);
-    rForearm.rotation.set(-0.85, 0.22, -0.30);
+    rForearm.position.set(0.28, -0.35, -0.16);
+    rForearm.rotation.set(-1.05, 0.28, -0.38);
     armsGroup.add(rForearm);
 
     // Sleeve cuff ring
-    const rCuffGeo = new THREE.CylinderGeometry(0.032, 0.032, 0.025, 12);
+    const rCuffGeo = new THREE.CylinderGeometry(0.033, 0.033, 0.025, 12);
     const rCuff = new THREE.Mesh(rCuffGeo, ribMat);
-    rCuff.position.set(0.19, -0.22, -0.24);
-    rCuff.rotation.set(-0.85, 0.22, -0.30);
+    rCuff.position.set(0.20, -0.23, -0.25);
+    rCuff.rotation.set(-1.05, 0.28, -0.38);
     armsGroup.add(rCuff);
 
     // Right Hand: Tactical composite glove palm wrapping the weapon grip
-    const rGlovePalmGeo = new THREE.BoxGeometry(0.044, 0.038, 0.055);
+    const rGlovePalmGeo = new THREE.BoxGeometry(0.046, 0.040, 0.052);
     const rGlovePalm = new THREE.Mesh(rGlovePalmGeo, gloveMat);
-    rGlovePalm.position.set(0.162, -0.180, -0.285);
+    rGlovePalm.position.set(0.162, -0.165, -0.295);
     rGlovePalm.rotation.set(-0.35, 0.15, -0.12);
     armsGroup.add(rGlovePalm);
 
     // Knuckle protector plate
-    const rKnuckleGeo = new THREE.BoxGeometry(0.046, 0.014, 0.025);
+    const rKnuckleGeo = new THREE.BoxGeometry(0.048, 0.015, 0.026);
     const rKnuckle = new THREE.Mesh(rKnuckleGeo, knuckleMat);
-    rKnuckle.position.set(0.162, -0.165, -0.295);
+    rKnuckle.position.set(0.162, -0.150, -0.305);
     rKnuckle.rotation.set(-0.35, 0.15, -0.12);
     armsGroup.add(rKnuckle);
 
-    // Articulated fingers wrapping the weapon grip
-    // 1. Index finger along frame/trigger
+    // Articulated fingers wrapping weapon grip
     const rIndexGeo = new THREE.BoxGeometry(0.012, 0.012, 0.035);
     const rIndex = new THREE.Mesh(rIndexGeo, gloveMat);
-    rIndex.position.set(0.150, -0.170, -0.315);
+    rIndex.position.set(0.150, -0.155, -0.320);
     rIndex.rotation.set(-0.25, 0.15, -0.10);
     armsGroup.add(rIndex);
 
-    // 2. Middle, ring, pinky fingers curled tightly across handle grip
     for (let f = 0; f < 3; f++) {
       const fingerGeo = new THREE.BoxGeometry(0.034, 0.012, 0.014);
       const finger = new THREE.Mesh(fingerGeo, gloveMat);
-      finger.position.set(0.158, -0.185 - f * 0.013, -0.295 + f * 0.005);
+      finger.position.set(0.158, -0.170 - f * 0.012, -0.305 + f * 0.005);
       finger.rotation.set(-0.25, 0.15, -0.12);
       armsGroup.add(finger);
     }
 
-    // 3. Thumb wrapping left side of grip
     const rThumbGeo = new THREE.BoxGeometry(0.014, 0.014, 0.030);
     const rThumb = new THREE.Mesh(rThumbGeo, gloveMat);
-    rThumb.position.set(0.174, -0.170, -0.290);
+    rThumb.position.set(0.172, -0.155, -0.295);
     rThumb.rotation.set(-0.20, 0.35, 0.10);
     armsGroup.add(rThumb);
 
     // Left Arm & Support Hand: strictly for 2-handed weapons (rifles, smgs, snipers, shotguns, machineguns)
     if (!isKnife && !isPistol) {
-      const lForearmGeo = new THREE.CylinderGeometry(0.024, 0.032, 0.32, 12);
+      const lForearmGeo = new THREE.CylinderGeometry(0.026, 0.035, 0.34, 12);
       const lForearm = new THREE.Mesh(lForearmGeo, sleeveMat);
-      lForearm.position.set(-0.04, -0.28, -0.22);
-      lForearm.rotation.set(-0.55, -0.38, 0.38);
+      lForearm.position.set(-0.16, -0.34, -0.18);
+      lForearm.rotation.set(-0.75, -0.35, 0.42);
       armsGroup.add(lForearm);
 
-      const lCuffGeo = new THREE.CylinderGeometry(0.032, 0.032, 0.025, 12);
+      const lCuffGeo = new THREE.CylinderGeometry(0.033, 0.033, 0.025, 12);
       const lCuff = new THREE.Mesh(lCuffGeo, ribMat);
-      lCuff.position.set(0.01, -0.22, -0.27);
-      lCuff.rotation.set(-0.55, -0.38, 0.38);
+      lCuff.position.set(-0.06, -0.24, -0.26);
+      lCuff.rotation.set(-0.75, -0.35, 0.42);
       armsGroup.add(lCuff);
 
-      const lGloveGeo = new THREE.BoxGeometry(0.044, 0.038, 0.058);
+      const lGloveGeo = new THREE.BoxGeometry(0.045, 0.038, 0.055);
       const lGlove = new THREE.Mesh(lGloveGeo, gloveMat);
-      lGlove.position.set(0.08, -0.170, -0.34);
+      lGlove.position.set(0.05, -0.170, -0.34);
       lGlove.rotation.set(-0.28, -0.25, 0.22);
       armsGroup.add(lGlove);
 
-      // Support hand cupped fingers supporting the underside of handguard
       const lFingersGeo = new THREE.BoxGeometry(0.036, 0.014, 0.028);
       const lFingers = new THREE.Mesh(lFingersGeo, gloveMat);
-      lFingers.position.set(0.08, -0.160, -0.35);
+      lFingers.position.set(0.05, -0.160, -0.35);
       lFingers.rotation.set(-0.22, -0.20, 0.18);
       armsGroup.add(lFingers);
     }
@@ -1270,8 +1266,8 @@ class CS2Player {
       const horizDist = Math.hypot(dx, dz);
       const vertDist = Math.abs(feetY - item.pos.y);
 
-      // Proximity check: Must be close to the dropped weapon (< 2.5m)
-      if (horizDist < 2.5 && vertDist < 2.0) {
+      // Proximity check: Must be close to the dropped weapon (< 2.5m horizontal, < 2.8m vertical)
+      if (horizDist < 2.5 && vertDist < 2.8) {
         // Counter-Terrorists cannot pick up C4 explosive
         if (item.slot === 5 && this.team !== 'T') continue;
 
@@ -1538,9 +1534,17 @@ class CS2Player {
       this.targetRecoilPitch = (pat[0] || 0) * RECOIL_SCALE;
       this.targetRecoilYaw = (pat[1] || 0) * RECOIL_SCALE;
     } else {
-      const kick = this.activeWeapon.recoil || 0.038;
-      this.targetRecoilPitch = (this.targetRecoilPitch || 0) + kick;
-      this.targetRecoilYaw = (this.targetRecoilYaw || 0) + (Math.random() - 0.5) * kick * 0.45;
+      const isPistol = (this.activeWeapon.category === 'pistols' || this.activeSlot === 2);
+      if (isPistol) {
+        // Authentic CS Pistol Recoil: snappy discrete upward kick that quickly settles back to center
+        const kick = this.activeWeapon.recoil || 0.020;
+        this.targetRecoilPitch = Math.min(0.042, (this.targetRecoilPitch || 0) * 0.35 + kick);
+        this.targetRecoilYaw = (Math.random() - 0.5) * kick * 0.30;
+      } else {
+        const kick = this.activeWeapon.recoil || 0.038;
+        this.targetRecoilPitch = (this.targetRecoilPitch || 0) + kick;
+        this.targetRecoilYaw = (this.targetRecoilYaw || 0) + (Math.random() - 0.5) * kick * 0.45;
+      }
     }
 
     // Viewmodel punch: kickback along Z and upward muzzle lift
@@ -1638,7 +1642,8 @@ class CS2Player {
                 window.csAudio.playSound('damage1');
               }
 
-              gameManager.net.sendDamage(id, finalDamage, this.activeWeapon.name, isHeadshot);
+              const wepId = (this.activeWeapon && this.activeWeapon.id) ? this.activeWeapon.id : 'glock';
+              gameManager.net.sendDamage(id, finalDamage, wepId, isHeadshot);
             }
           }
         });
@@ -2427,15 +2432,18 @@ class CS2Player {
     const idleTime = (currentTime / 1000) - this.lastShotTime;
     const fireInterval = (this.activeWeapon && this.activeWeapon.fireRate) ? this.activeWeapon.fireRate : 0.1;
 
-    if (this.isShooting && idleTime <= fireInterval * 1.5) {
+    const isPistol = (this.activeWeapon && (this.activeWeapon.category === 'pistols' || this.activeSlot === 2));
+
+    if (this.isShooting && !isPistol && idleTime <= fireInterval * 1.5) {
       const easeSpeed = 1 - Math.exp(-32.0 * dt);
       this.recoilPitch += ((this.targetRecoilPitch || 0) - this.recoilPitch) * easeSpeed;
       this.recoilYaw += ((this.targetRecoilYaw || 0) - this.recoilYaw) * easeSpeed;
     } else {
-      const recFactor = Math.exp(-9.0 * dt);
+      const recSpeed = isPistol ? -16.0 : -9.0;
+      const recFactor = Math.exp(recSpeed * dt);
       this.recoilPitch *= recFactor;
       this.recoilYaw *= recFactor;
-      if (idleTime > fireInterval * 2.0) {
+      if (idleTime > (isPistol ? 0.22 : fireInterval * 2.0)) {
         this.sprayCount = 0;
         this.targetRecoilPitch = 0;
         this.targetRecoilYaw = 0;

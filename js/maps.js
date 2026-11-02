@@ -344,25 +344,25 @@ class CS2MapBuilder {
     this.addCollider(-50, 12.0, -10, 80, 25, 12);  // Canyon wall ridge above mid
     this.addCollider(-20, 12.0, -60, 40, 25, 25);  // Canyon ridge above double doors
     this.addCollider(55, 12.0, -120, 30, 25, 60);  // Canyon ridge east of A site
-    this.addCollider(-85, 10.0, -90, 25, 25, 50);  // Wall above B site back plateau
-    this.addCollider(-58, 2.0, -98, 14, 25, 12);   // B-window rock cliff face barrier (keeps rocks strictly blocked)
+    this.addCollider(-85, 12.0, -90, 25, 25, 40);  // Wall high above B site back plateau
+    this.addCollider(-58, 8.0, -114, 16, 25, 8);   // Outside rock face behind B window (blocks mountain cliff, B site & ledge 100% free)
 
     // ==========================================================
     // BOMBSITES & BUY ZONES (100% Authentic Dust 2 Geometry)
     // ==========================================================
 
     // Bombsite A: Positioned directly at the platform crates (Matching material_15 floor decal & radar bounds)
-    this.addBombsiteZone('A', 51.85, 4.32, -108.7, 16.0, {
-      minX: 36.0, maxX: 68.0,
-      minZ: -125.0, maxZ: -95.0,
-      minY: 0.5, maxY: 9.0
+    this.addBombsiteZone('A', 51.85, 4.32, -108.7, 8.5, {
+      minX: 42.0, maxX: 62.0,
+      minZ: -118.0, maxZ: -100.0,
+      minY: 1.5, maxY: 8.0
     });
 
     // Bombsite B: Courtyard zone matching material_25 SandRoadTgtB decal and radar orange bounds
-    this.addBombsiteZone('B', -72.0, 0.0, -121.0, 16.0, {
-      minX: -85.0, maxX: -60.0,
-      minZ: -132.0, maxZ: -110.0,
-      minY: -2.0, maxY: 6.0
+    this.addBombsiteZone('B', -72.0, 0.0, -121.0, 8.5, {
+      minX: -80.0, maxX: -64.0,
+      minZ: -128.0, maxZ: -114.0,
+      minY: -1.5, maxY: 4.5
     });
 
     // Authentic Buy Zones matching CT & T Spawns

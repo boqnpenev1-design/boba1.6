@@ -33,6 +33,22 @@
   });
 })();
 
+// Early calibration copy handler (ensures HTML button click never throws before DOM load)
+window.copyWeaponCalibrations = function() {
+  try {
+    if (typeof CS2Player !== 'undefined' && CS2Player.WEAPON_VIEWMODEL) {
+      const str = JSON.stringify(CS2Player.WEAPON_VIEWMODEL, null, 2);
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(str).then(() => {
+          if (typeof showToast === 'function') showToast('Weapon calibrations copied to clipboard!', 'success');
+        }).catch(() => console.log('[CALIB_VALUES]', str));
+      } else {
+        console.log('[CALIB_VALUES]', str);
+      }
+    }
+  } catch(e) {}
+};
+
 document.addEventListener('DOMContentLoaded', () => {
   // 1. High Performance WebGL Renderer (144+ FPS Optimized)
   const container = document.getElementById('game-canvas-container');
@@ -581,7 +597,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const reason = packet.reason || 'Purchase rejected';
     window.__buyTrace = `click -> packet_sent -> buy_error(${reason})`;
     window.__lastReject = { type: 'buy_error', reason: reason, time: new Date().toLocaleTimeString() };
-    console.log('[BUY_REJECT] Server rejection:', reason, packet);
   };
 
   window.__onRefundSuccess = (packet) => {
@@ -616,7 +631,6 @@ document.addEventListener('DOMContentLoaded', () => {
   window.__onRefundError = (packet) => {
     const reason = packet.reason || 'Refund rejected';
     window.__lastReject = { type: 'refund_error', reason: reason, time: new Date().toLocaleTimeString() };
-    console.log('[REFUND_ERROR] Server rejection:', reason);
   };
 
   function refundWeapon(weapon) {
@@ -658,7 +672,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // 1. Guard against buying a second primary without dropping first
     if (weapon.slot === 1 && gameManager.player.inventory[1]) {
       const reason = 'Drop your primary first (press G)';
-      console.log(`[BUY_REJECT] ${reason}`);
       window.__lastReject = { type: 'buy_item', reason: reason, time: new Date().toLocaleTimeString() };
       window.__buyTrace = `click(${weapon.id}) -> rejected(drop primary first)`;
       return;
@@ -667,21 +680,18 @@ document.addEventListener('DOMContentLoaded', () => {
     // 2. Guard against purchasing already owned non-stackable items
     if (weapon.id === 'helmet' && gameManager.player.hasHelmet) {
       const reason = 'Already own helmet';
-      console.log(`[BUY_REJECT] ${reason}`);
       window.__lastReject = { type: 'buy_item', reason: reason, time: new Date().toLocaleTimeString() };
       window.__buyTrace = `click(helmet) -> rejected(already owned)`;
       return;
     }
     if (weapon.id === 'defuser' && gameManager.player.hasDefuseKit) {
       const reason = 'Already own defuse kit';
-      console.log(`[BUY_REJECT] ${reason}`);
       window.__lastReject = { type: 'buy_item', reason: reason, time: new Date().toLocaleTimeString() };
       window.__buyTrace = `click(defuser) -> rejected(already owned)`;
       return;
     }
     if (weapon.slot === 2 && gameManager.player.inventory[2] && gameManager.player.inventory[2].id === weapon.id) {
       const reason = `Already own ${weapon.name}`;
-      console.log(`[BUY_REJECT] ${reason}`);
       window.__lastReject = { type: 'buy_item', reason: `Already own ${weapon.id}`, time: new Date().toLocaleTimeString() };
       window.__buyTrace = `click(${weapon.id}) -> rejected(already owned)`;
       return;
@@ -695,7 +705,6 @@ document.addEventListener('DOMContentLoaded', () => {
       else if (gameManager.phase !== 'freeze' && gameManager.phase !== 'live') reason = 'Round is over';
       else reason = 'Buy period expired (first 15s only)';
 
-      console.log(`[BUY_REJECT] ${reason}`);
       window.__lastReject = { type: 'buy_item', reason: reason, time: new Date().toLocaleTimeString() };
       window.__buyTrace = `click(${weapon.id}) -> rejected(${reason})`;
       return;
@@ -705,7 +714,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const cash = gameManager.player.money.get();
     if (cash < weapon.cost) {
       const reason = `Insufficient funds ($${cash} / $${weapon.cost})`;
-      console.log(`[BUY_REJECT] ${reason}`);
       window.__lastReject = { type: 'buy_item', reason: reason, time: new Date().toLocaleTimeString() };
       window.__buyTrace = `click(${weapon.id}) -> rejected(insufficient funds)`;
       return;

@@ -72,7 +72,7 @@ body, html {
   width: 100vw;
   height: 100vh;
   pointer-events: none;
-  z-index: 6;
+  z-index: 9999;
   background-color: #ffffff;
   opacity: 0;
   transition: opacity 0.08s linear;

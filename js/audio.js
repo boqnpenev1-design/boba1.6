@@ -427,9 +427,9 @@ class CS2AudioSystem {
 
   playRoundEnd(winner = 'CT') {
     if (winner === 'CT') {
-      this.playSound('round_end_ct', 'sfx', 0.85);
+      this.playSound('round_end_ct', 'sfx', 0.32);
     } else {
-      this.playSound('round_end_t', 'sfx', 0.85);
+      this.playSound('round_end_t', 'sfx', 0.32);
     }
   }
 
