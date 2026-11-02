@@ -545,19 +545,21 @@ class CS2Player {
     const isKnife = (weapon && (weapon.id === 'knife' || weapon.category === 'melee'));
     const isPistol = (weapon && (weapon.slot === 2 || weapon.category === 'pistols'));
 
-    // Right Arm: Tactical anatomical forearm entering naturally from bottom-right
-    const rForearmGeo = new THREE.CylinderGeometry(0.026, 0.034, 0.35, 12);
-    const rForearm = new THREE.Mesh(rForearmGeo, sleeveMat);
-    rForearm.position.set(0.24, -0.34, -0.16);
-    rForearm.rotation.set(-0.82, 0.22, -0.16);
-    armsGroup.add(rForearm);
+    // Right Arm Forearm & Sleeve: only for 2-handed weapons so it never obstructs 1-handed pistols and knives
+    if (!isKnife && !isPistol) {
+      const rForearmGeo = new THREE.CylinderGeometry(0.026, 0.034, 0.32, 12);
+      const rForearm = new THREE.Mesh(rForearmGeo, sleeveMat);
+      rForearm.position.set(0.26, -0.38, -0.18);
+      rForearm.rotation.set(-0.95, 0.18, -0.18);
+      armsGroup.add(rForearm);
 
-    // Sleeve cuff ring
-    const rCuffGeo = new THREE.CylinderGeometry(0.034, 0.034, 0.025, 12);
-    const rCuff = new THREE.Mesh(rCuffGeo, ribMat);
-    rCuff.position.set(0.21, -0.25, -0.22);
-    rCuff.rotation.set(-0.82, 0.22, -0.16);
-    armsGroup.add(rCuff);
+      // Sleeve cuff ring
+      const rCuffGeo = new THREE.CylinderGeometry(0.034, 0.034, 0.025, 12);
+      const rCuff = new THREE.Mesh(rCuffGeo, ribMat);
+      rCuff.position.set(0.22, -0.28, -0.24);
+      rCuff.rotation.set(-0.95, 0.18, -0.18);
+      armsGroup.add(rCuff);
+    }
 
     // Right Hand: Tactical composite glove palm & wrist
     const rGlovePalmGeo = new THREE.BoxGeometry(0.046, 0.042, 0.070);
