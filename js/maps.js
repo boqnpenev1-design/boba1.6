@@ -123,17 +123,18 @@ class CS2MapBuilder {
                   if (mat.map) {
                     mat.map.encoding = THREE.sRGBEncoding;
                     const noAniso = (urlParams && urlParams.get('noaniso') === '1');
-                    const targetAniso = (!noAniso && window.__maxAniso) ? window.__maxAniso : 1;
+                    const targetAniso = (!noAniso && window.__maxAniso) ? Math.min(window.__maxAniso, 2) : 1;
                     mat.map.anisotropy = targetAniso;
                     mat.map.minFilter = THREE.LinearMipmapLinearFilter;
                     mat.map.magFilter = THREE.LinearFilter;
                     if (mat.map.image) mat.map.needsUpdate = true;
                   }
-                  if (mat.emissive) mat.emissive.setHex(0x000000);
-                  if (mat.specular) mat.specular.setHex(0x000000);
-                  if (typeof mat.shininess !== 'undefined') mat.shininess = 0;
+                  mat.side = THREE.DoubleSide;
+                  if (mat.emissive) mat.emissive.setHex(0x1a1612);
+                  if (mat.specular) mat.specular.setHex(0x111111);
+                  if (typeof mat.shininess !== 'undefined') mat.shininess = 5;
                   if (mat.isMeshStandardMaterial || mat.isMeshPhysicalMaterial) {
-                    mat.roughness = 0.95;
+                    mat.roughness = 0.85;
                     mat.metalness = 0.0;
                   }
                 });
@@ -243,7 +244,7 @@ class CS2MapBuilder {
               newGeo.computeBoundingBox();
               newGeo.computeBoundingSphere();
               const m = bucket.mat;
-              m.side = THREE.FrontSide;
+              m.side = THREE.DoubleSide;
               const newMesh = new THREE.Mesh(newGeo, m);
               consolidatedMeshes.push(newMesh);
             });

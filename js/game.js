@@ -423,10 +423,10 @@ class CS2GameManager {
     // 1. Freezetime: allowed within Buy Zone
     if (this.phase === 'freeze') return true;
 
-    // 2. Live Round: strictly allowed only within the first 20.0 seconds
+    // 2. Live Round: strictly allowed only within the first 15.0 seconds
     if (this.phase === 'live') {
       const elapsed = this.liveRoundStartTime > 0 ? (Date.now() - this.liveRoundStartTime) / 1000 : (this.roundTime - this.phaseTimer);
-      return elapsed <= 20.0;
+      return elapsed <= 15.0;
     }
     return false;
   }

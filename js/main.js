@@ -1,7 +1,7 @@
 // CS2 High-Performance Bootstrap & Server Browser Controller
 
 // Global Rate-Limited Error Logger
-(function() {
+(function () {
   const errorCounts = new Map();
   const LOG_INTERVAL = 1000;
 
@@ -85,17 +85,20 @@ document.addEventListener('DOMContentLoaded', () => {
       unmaskedVendor = gl.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL);
     }
     window.__maxAniso = renderer.capabilities ? renderer.capabilities.getMaxAnisotropy() : 1;
-  } catch (e) {}
+  } catch (e) { }
   window.__unmaskedGpu = unmaskedGpu;
   window.__unmaskedVendor = unmaskedVendor;
 
   container.appendChild(renderer.domElement);
 
-  // Fast Competitive Lighting (Authentic CS2 Desert Sun - warm contrast, zero blowout)
+  // Fast Competitive Lighting (Authentic CS2 Desert Sun - warm contrast, zero dark walls)
+  const ambientLight = new THREE.AmbientLight(0xffeedd, 0.55);
+  scene.add(ambientLight);
+
   const hemiLight = new THREE.HemisphereLight(0xffeedd, 0x6e5a44, 0.45);
   scene.add(hemiLight);
 
-  const sunLight = new THREE.DirectionalLight(0xfffaed, 0.65);
+  const sunLight = new THREE.DirectionalLight(0xfffaed, 0.70);
   sunLight.position.set(50, 90, 40);
   scene.add(sunLight);
 
@@ -284,9 +287,9 @@ document.addEventListener('DOMContentLoaded', () => {
   // 7. Pointer Lock
   container.addEventListener('click', () => {
     if (document.getElementById('main-menu').classList.contains('hidden') &&
-        document.getElementById('team-select-screen').classList.contains('hidden') &&
-        document.getElementById('pause-menu').classList.contains('hidden') &&
-        document.getElementById('buy-menu').classList.contains('hidden')) {
+      document.getElementById('team-select-screen').classList.contains('hidden') &&
+      document.getElementById('pause-menu').classList.contains('hidden') &&
+      document.getElementById('buy-menu').classList.contains('hidden')) {
       container.requestPointerLock();
     }
   });
@@ -294,8 +297,8 @@ document.addEventListener('DOMContentLoaded', () => {
   document.addEventListener('pointerlockchange', () => {
     if (document.pointerLockElement !== container) {
       if (document.getElementById('main-menu').classList.contains('hidden') &&
-          document.getElementById('team-select-screen').classList.contains('hidden') &&
-          document.getElementById('buy-menu').classList.contains('hidden')) {
+        document.getElementById('team-select-screen').classList.contains('hidden') &&
+        document.getElementById('buy-menu').classList.contains('hidden')) {
         document.getElementById('pause-menu').classList.remove('hidden');
       }
     } else {
@@ -303,9 +306,9 @@ document.addEventListener('DOMContentLoaded', () => {
       document.getElementById('buy-menu').classList.add('hidden');
       try {
         if (navigator.keyboard && navigator.keyboard.lock) {
-          navigator.keyboard.lock(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ControlLeft', 'ControlRight', 'ShiftLeft', 'Space']).catch(() => {});
+          navigator.keyboard.lock(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ControlLeft', 'ControlRight', 'ShiftLeft', 'Space']).catch(() => { });
         }
-      } catch (e) {}
+      } catch (e) { }
     }
   });
 
@@ -320,7 +323,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('team-select-screen').classList.remove('hidden');
     try {
       if (document.exitPointerLock) document.exitPointerLock();
-    } catch (e) {}
+    } catch (e) { }
   });
 
   document.getElementById('btn-pause-buy').addEventListener('click', () => {
@@ -334,7 +337,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('main-menu').classList.remove('hidden');
     try {
       if (document.exitPointerLock) document.exitPointerLock();
-    } catch (e) {}
+    } catch (e) { }
   });
 
   // 8. Buy Menu
@@ -578,8 +581,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const reason = packet.reason || 'Purchase rejected';
     window.__buyTrace = `click -> packet_sent -> buy_error(${reason})`;
     window.__lastReject = { type: 'buy_error', reason: reason, time: new Date().toLocaleTimeString() };
-    showToast(`Server rejected purchase: ${reason}`, 'error');
-    console.warn('[BUY_ERROR] Server rejection:', reason, packet);
+    console.log('[BUY_REJECT] Server rejection:', reason, packet);
   };
 
   window.__onRefundSuccess = (packet) => {
@@ -614,8 +616,7 @@ document.addEventListener('DOMContentLoaded', () => {
   window.__onRefundError = (packet) => {
     const reason = packet.reason || 'Refund rejected';
     window.__lastReject = { type: 'refund_error', reason: reason, time: new Date().toLocaleTimeString() };
-    showToast(`Server rejected refund: ${reason}`, 'error');
-    console.warn('[REFUND_ERROR] Server rejection:', reason, packet);
+    console.log('[REFUND_ERROR] Server rejection:', reason);
   };
 
   function refundWeapon(weapon) {
@@ -657,8 +658,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // 1. Guard against buying a second primary without dropping first
     if (weapon.slot === 1 && gameManager.player.inventory[1]) {
       const reason = 'Drop your primary first (press G)';
-      showToast(reason, 'warning');
-      console.warn(`[BUY_REJECT] ${reason}`);
+      console.log(`[BUY_REJECT] ${reason}`);
       window.__lastReject = { type: 'buy_item', reason: reason, time: new Date().toLocaleTimeString() };
       window.__buyTrace = `click(${weapon.id}) -> rejected(drop primary first)`;
       return;
@@ -667,24 +667,21 @@ document.addEventListener('DOMContentLoaded', () => {
     // 2. Guard against purchasing already owned non-stackable items
     if (weapon.id === 'helmet' && gameManager.player.hasHelmet) {
       const reason = 'Already own helmet';
-      showToast(reason, 'warning');
-      console.warn(`[BUY_REJECT] ${reason}`);
+      console.log(`[BUY_REJECT] ${reason}`);
       window.__lastReject = { type: 'buy_item', reason: reason, time: new Date().toLocaleTimeString() };
       window.__buyTrace = `click(helmet) -> rejected(already owned)`;
       return;
     }
     if (weapon.id === 'defuser' && gameManager.player.hasDefuseKit) {
       const reason = 'Already own defuse kit';
-      showToast(reason, 'warning');
-      console.warn(`[BUY_REJECT] ${reason}`);
+      console.log(`[BUY_REJECT] ${reason}`);
       window.__lastReject = { type: 'buy_item', reason: reason, time: new Date().toLocaleTimeString() };
       window.__buyTrace = `click(defuser) -> rejected(already owned)`;
       return;
     }
     if (weapon.slot === 2 && gameManager.player.inventory[2] && gameManager.player.inventory[2].id === weapon.id) {
       const reason = `Already own ${weapon.name}`;
-      showToast(reason, 'warning');
-      console.warn(`[BUY_REJECT] ${reason}`);
+      console.log(`[BUY_REJECT] ${reason}`);
       window.__lastReject = { type: 'buy_item', reason: `Already own ${weapon.id}`, time: new Date().toLocaleTimeString() };
       window.__buyTrace = `click(${weapon.id}) -> rejected(already owned)`;
       return;
@@ -696,10 +693,9 @@ document.addEventListener('DOMContentLoaded', () => {
       const inZone = gameManager.mapBuilder && gameManager.mapBuilder.isInBuyZone(gameManager.player.team, gameManager.player.position);
       if (!inZone) reason = 'Not in a buy zone';
       else if (gameManager.phase !== 'freeze' && gameManager.phase !== 'live') reason = 'Round is over';
-      else reason = 'Buy period expired (first 20s only)';
+      else reason = 'Buy period expired (first 15s only)';
 
-      showToast(`Cannot buy: ${reason}`, 'error');
-      console.warn(`[BUY_REJECT] ${reason}`);
+      console.log(`[BUY_REJECT] ${reason}`);
       window.__lastReject = { type: 'buy_item', reason: reason, time: new Date().toLocaleTimeString() };
       window.__buyTrace = `click(${weapon.id}) -> rejected(${reason})`;
       return;
@@ -709,8 +705,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const cash = gameManager.player.money.get();
     if (cash < weapon.cost) {
       const reason = `Insufficient funds ($${cash} / $${weapon.cost})`;
-      showToast(`Cannot buy: ${reason}`, 'error');
-      console.warn(`[BUY_REJECT] ${reason}`);
+      console.log(`[BUY_REJECT] ${reason}`);
       window.__lastReject = { type: 'buy_item', reason: reason, time: new Date().toLocaleTimeString() };
       window.__buyTrace = `click(${weapon.id}) -> rejected(insufficient funds)`;
       return;
@@ -760,120 +755,120 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // 9. Keybinds
-  const defaultKeybinds = {
-    'Move Forward': 'KeyW',
-    'Move Backward': 'KeyS',
-    'Strafe Left': 'KeyA',
-    'Strafe Right': 'KeyD',
-    'Jump': 'Space',
-    'Crouch': 'ControlLeft',
-    'Walk / Sneak': 'ShiftLeft',
-    'Reload': 'KeyR',
-    'Use / Defuse / Plant': 'KeyE',
-    'Buy Menu': 'KeyB',
-    'Primary Weapon': 'Digit1',
-    'Pistol (Secondary)': 'Digit2',
-    'Melee (Knife)': 'Digit3',
-    'Grenades': 'Digit4',
-    'C4 Bomb': 'Digit5',
-    'Scoreboard': 'Tab'
-  };
+const defaultKeybinds = {
+  'Move Forward': 'KeyW',
+  'Move Backward': 'KeyS',
+  'Strafe Left': 'KeyA',
+  'Strafe Right': 'KeyD',
+  'Jump': 'Space',
+  'Crouch': 'ControlLeft',
+  'Walk / Sneak': 'ShiftLeft',
+  'Reload': 'KeyR',
+  'Use / Defuse / Plant': 'KeyE',
+  'Buy Menu': 'KeyB',
+  'Primary Weapon': 'Digit1',
+  'Pistol (Secondary)': 'Digit2',
+  'Melee (Knife)': 'Digit3',
+  'Grenades': 'Digit4',
+  'C4 Bomb': 'Digit5',
+  'Scoreboard': 'Tab'
+};
 
-  const keybindsTable = document.getElementById('keybinds-table');
-  let listeningButton = null;
+const keybindsTable = document.getElementById('keybinds-table');
+let listeningButton = null;
 
-  function renderKeybindsTable() {
-    keybindsTable.innerHTML = '';
-    Object.entries(defaultKeybinds).forEach(([action, key]) => {
-      const row = document.createElement('div');
-      row.className = 'keybind-row';
-      row.innerHTML = `
+function renderKeybindsTable() {
+  keybindsTable.innerHTML = '';
+  Object.entries(defaultKeybinds).forEach(([action, key]) => {
+    const row = document.createElement('div');
+    row.className = 'keybind-row';
+    row.innerHTML = `
         <span>${action}</span>
         <button class="keybind-btn" data-action="${action}">${key}</button>
       `;
 
-      const btn = row.querySelector('.keybind-btn');
-      btn.addEventListener('click', () => {
-        if (listeningButton) listeningButton.classList.remove('listening');
-        listeningButton = btn;
-        btn.classList.add('listening');
-        btn.innerText = 'PRESS KEY...';
-      });
-
-      keybindsTable.appendChild(row);
+    const btn = row.querySelector('.keybind-btn');
+    btn.addEventListener('click', () => {
+      if (listeningButton) listeningButton.classList.remove('listening');
+      listeningButton = btn;
+      btn.classList.add('listening');
+      btn.innerText = 'PRESS KEY...';
     });
+
+    keybindsTable.appendChild(row);
+  });
+}
+
+renderKeybindsTable();
+
+window.addEventListener('keydown', (e) => {
+  if (listeningButton) {
+    e.preventDefault();
+    const action = listeningButton.dataset.action;
+    defaultKeybinds[action] = e.code;
+    listeningButton.innerText = e.code;
+    listeningButton.classList.remove('listening');
+    listeningButton = null;
+    return;
   }
 
-  renderKeybindsTable();
-
-  window.addEventListener('keydown', (e) => {
-    if (listeningButton) {
-      e.preventDefault();
-      const action = listeningButton.dataset.action;
-      defaultKeybinds[action] = e.code;
-      listeningButton.innerText = e.code;
-      listeningButton.classList.remove('listening');
-      listeningButton = null;
-      return;
+  // 'B' opens Buy Menu
+  if (e.code === 'KeyB' && !document.getElementById('hud').classList.contains('hidden')) {
+    if (buyMenu.classList.contains('hidden')) {
+      openBuyMenu();
+    } else {
+      closeBuyMenu();
     }
+  }
 
-    // 'B' opens Buy Menu
-    if (e.code === 'KeyB' && !document.getElementById('hud').classList.contains('hidden')) {
-      if (buyMenu.classList.contains('hidden')) {
-        openBuyMenu();
-      } else {
-        closeBuyMenu();
-      }
+  // 'H' toggles hitbox wireframes
+  if (e.code === 'KeyH') {
+    window.__showHitboxWireframes = !window.__showHitboxWireframes;
+    console.log('[HITBOX] Wireframe toggle:', window.__showHitboxWireframes);
+    if (gameManager && gameManager.net && gameManager.net.remotePlayers) {
+      Object.values(gameManager.net.remotePlayers).forEach(rp => {
+        if (rp.mesh) {
+          if (rp.mesh.bodyHitbox) rp.mesh.bodyHitbox.material.visible = window.__showHitboxWireframes;
+          if (rp.mesh.headHitbox) rp.mesh.headHitbox.material.visible = window.__showHitboxWireframes;
+        }
+      });
     }
+  }
 
-    // 'H' toggles hitbox wireframes
-    if (e.code === 'KeyH') {
-      window.__showHitboxWireframes = !window.__showHitboxWireframes;
-      console.log('[HITBOX] Wireframe toggle:', window.__showHitboxWireframes);
-      if (gameManager && gameManager.net && gameManager.net.remotePlayers) {
-        Object.values(gameManager.net.remotePlayers).forEach(rp => {
-          if (rp.mesh) {
-            if (rp.mesh.bodyHitbox) rp.mesh.bodyHitbox.material.visible = window.__showHitboxWireframes;
-            if (rp.mesh.headHitbox) rp.mesh.headHitbox.material.visible = window.__showHitboxWireframes;
-          }
-        });
-      }
+  // Tab opens Scoreboard
+  if (e.code === 'Tab') {
+    e.preventDefault();
+    if (e.repeat) return; // Prevent 60fps DOM thrashing while holding Tab
+    if (!document.getElementById('hud').classList.contains('hidden')) {
+      document.getElementById('scoreboard').classList.remove('hidden');
+      renderScoreboardRows();
     }
+  }
+});
 
-    // Tab opens Scoreboard
-    if (e.code === 'Tab') {
-      e.preventDefault();
-      if (e.repeat) return; // Prevent 60fps DOM thrashing while holding Tab
-      if (!document.getElementById('hud').classList.contains('hidden')) {
-        document.getElementById('scoreboard').classList.remove('hidden');
-        renderScoreboardRows();
-      }
-    }
-  });
+window.addEventListener('keyup', (e) => {
+  if (e.code === 'Tab') {
+    document.getElementById('scoreboard').classList.add('hidden');
+  }
+});
 
-  window.addEventListener('keyup', (e) => {
-    if (e.code === 'Tab') {
-      document.getElementById('scoreboard').classList.add('hidden');
-    }
-  });
+function renderScoreboardRows() {
+  const ctTbody = document.getElementById('sb-ct-rows');
+  const tTbody = document.getElementById('sb-t-rows');
+  if (!ctTbody || !tTbody) return;
+  ctTbody.innerHTML = '';
+  tTbody.innerHTML = '';
 
-  function renderScoreboardRows() {
-    const ctTbody = document.getElementById('sb-ct-rows');
-    const tTbody = document.getElementById('sb-t-rows');
-    if (!ctTbody || !tTbody) return;
-    ctTbody.innerHTML = '';
-    tTbody.innerHTML = '';
+  const localCallsign = gameManager.player.name || window.cs2PlayerCallsign || 'YOU';
+  const isPlayerAlive = gameManager.player.isAlive && (gameManager.player.health.get() > 0);
+  const playerRow = document.createElement('tr');
+  playerRow.className = `is-you ${!isPlayerAlive ? 'is-dead' : ''}`;
+  const myKills = gameManager.player.kills || 0;
+  const myDeaths = gameManager.player.deaths || 0;
+  const myCash = gameManager.player.money ? gameManager.player.money.get() : 800;
+  const myPing = (gameManager.net && gameManager.net.lastPingMs !== undefined) ? `${gameManager.net.lastPingMs}ms` : '5ms';
 
-    const localCallsign = gameManager.player.name || window.cs2PlayerCallsign || 'YOU';
-    const isPlayerAlive = gameManager.player.isAlive && (gameManager.player.health.get() > 0);
-    const playerRow = document.createElement('tr');
-    playerRow.className = `is-you ${!isPlayerAlive ? 'is-dead' : ''}`;
-    const myKills = gameManager.player.kills || 0;
-    const myDeaths = gameManager.player.deaths || 0;
-    const myCash = gameManager.player.money ? gameManager.player.money.get() : 800;
-    const myPing = (gameManager.net && gameManager.net.lastPingMs !== undefined) ? `${gameManager.net.lastPingMs}ms` : '5ms';
-
-    playerRow.innerHTML = `
+  playerRow.innerHTML = `
       <td class="col-status">${isPlayerAlive ? '●' : '💀'}</td>
       <td class="col-name">${localCallsign} (YOU)</td>
       <td class="col-ping">${myPing}</td>
@@ -885,23 +880,23 @@ document.addEventListener('DOMContentLoaded', () => {
       <td class="col-cash">$${myCash}</td>
     `;
 
-    if (gameManager.player.team === 'CT') ctTbody.appendChild(playerRow);
-    else tTbody.appendChild(playerRow);
+  if (gameManager.player.team === 'CT') ctTbody.appendChild(playerRow);
+  else tTbody.appendChild(playerRow);
 
-    if (gameManager.net && gameManager.net.remotePlayers) {
-      Object.entries(gameManager.net.remotePlayers).forEach(([id, p]) => {
-        const row = document.createElement('tr');
-        const pData = p.data || {};
-        const rName = p.name || pData.callsign || `Operator_${id.substring(0, 5)}`;
-        const rHealth = (typeof pData.health === 'number') ? pData.health : (p.health || 0);
-        const rAlive = (pData.isAlive !== undefined) ? pData.isAlive : (rHealth > 0);
-        const rKills = (typeof pData.kills === 'number') ? pData.kills : 0;
-        const rDeaths = (typeof pData.deaths === 'number') ? pData.deaths : 0;
-        const rCash = (typeof pData.money === 'number') ? pData.money : 800;
-        const rTeam = p.team || pData.team || 'CT';
+  if (gameManager.net && gameManager.net.remotePlayers) {
+    Object.entries(gameManager.net.remotePlayers).forEach(([id, p]) => {
+      const row = document.createElement('tr');
+      const pData = p.data || {};
+      const rName = p.name || pData.callsign || `Operator_${id.substring(0, 5)}`;
+      const rHealth = (typeof pData.health === 'number') ? pData.health : (p.health || 0);
+      const rAlive = (pData.isAlive !== undefined) ? pData.isAlive : (rHealth > 0);
+      const rKills = (typeof pData.kills === 'number') ? pData.kills : 0;
+      const rDeaths = (typeof pData.deaths === 'number') ? pData.deaths : 0;
+      const rCash = (typeof pData.money === 'number') ? pData.money : 800;
+      const rTeam = p.team || pData.team || 'CT';
 
-        row.className = rAlive ? '' : 'is-dead';
-        row.innerHTML = `
+      row.className = rAlive ? '' : 'is-dead';
+      row.innerHTML = `
           <td class="col-status">${rAlive ? '●' : '💀'}</td>
           <td class="col-name">${rName}</td>
           <td class="col-ping">15ms</td>
@@ -913,220 +908,238 @@ document.addEventListener('DOMContentLoaded', () => {
           <td class="col-cash">$${rCash}</td>
         `;
 
-        if (rTeam === 'CT') ctTbody.appendChild(row);
-        else tTbody.appendChild(row);
-      });
-    }
-  }
-
-  // 10. Sensitivity & Crosshair
-  document.getElementById('setting-sens').addEventListener('input', (e) => {
-    document.getElementById('val-sens').innerText = e.target.value;
-    gameManager.player.sensitivity = Number(e.target.value);
-  });
-
-  document.getElementById('setting-fov').addEventListener('input', (e) => {
-    document.getElementById('val-fov').innerText = `${e.target.value}°`;
-    camera.fov = Number(e.target.value);
-    camera.updateProjectionMatrix();
-  });
-
-  document.getElementById('setting-invert').addEventListener('change', (e) => {
-    gameManager.player.invertY = e.target.checked;
-  });
-
-  const chColor = document.getElementById('setting-ch-color');
-  const chSize = document.getElementById('setting-ch-size');
-  const chGap = document.getElementById('setting-ch-gap');
-  const chDot = document.getElementById('setting-ch-dot');
-  const chDotOnly = document.getElementById('setting-ch-dot-only');
-
-  function updateCrosshairStyle() {
-    const color = chColor.value;
-    const size = `${chSize.value}px`;
-    const gap = `${chGap.value}px`;
-    const showDot = chDot.checked;
-    const dotOnly = chDotOnly ? chDotOnly.checked : false;
-
-    document.querySelectorAll('.crosshair-ch').forEach(el => {
-      el.style.backgroundColor = color;
-      el.style.display = dotOnly ? 'none' : 'block';
-    });
-
-    const dot = document.querySelector('.crosshair-dot');
-    dot.style.backgroundColor = color;
-    dot.style.display = (showDot || dotOnly) ? 'block' : 'none';
-
-    document.querySelector('.ch-top').style.height = size;
-    document.querySelector('.ch-top').style.top = gap;
-    document.querySelector('.ch-bottom').style.height = size;
-    document.querySelector('.ch-bottom').style.bottom = gap;
-    document.querySelector('.ch-left').style.width = size;
-    document.querySelector('.ch-left').style.left = gap;
-    document.querySelector('.ch-right').style.width = size;
-    document.querySelector('.ch-right').style.right = gap;
-  }
-
-  chColor.addEventListener('input', updateCrosshairStyle);
-  chSize.addEventListener('input', updateCrosshairStyle);
-  chGap.addEventListener('input', updateCrosshairStyle);
-  chDot.addEventListener('change', updateCrosshairStyle);
-  if (chDotOnly) chDotOnly.addEventListener('change', updateCrosshairStyle);
-  updateCrosshairStyle();
-
-  // Volume Sliders
-  const masterVol = document.getElementById('setting-master-vol');
-  const sfxVol = document.getElementById('setting-sfx-vol');
-  const c4Vol = document.getElementById('setting-c4-vol');
-
-  function updateAudioVolumes() {
-    window.csAudio.setVolumes(
-      Number(masterVol.value),
-      Number(sfxVol.value),
-      Number(c4Vol.value)
-    );
-  }
-
-  masterVol.addEventListener('input', updateAudioVolumes);
-  sfxVol.addEventListener('input', updateAudioVolumes);
-  c4Vol.addEventListener('input', updateAudioVolumes);
-
-  // Graphics & FPS Preset Switcher
-  const gfxSelect = document.getElementById('setting-graphics-mode');
-  if (gfxSelect) {
-    gfxSelect.addEventListener('change', (e) => {
-      const mode = e.target.value;
-      if (mode === 'ultra') {
-        renderer.setPixelRatio(0.8);
-        scene.fog = null;
-      } else if (mode === 'high') {
-        renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
-        scene.fog = new THREE.FogExp2(0xdce7f0, 0.005);
-      } else {
-        // Competitive 144+ FPS
-        renderer.setPixelRatio(1);
-        scene.fog = new THREE.FogExp2(0xdce7f0, 0.005);
-      }
-      renderer.setSize(window.innerWidth, window.innerHeight);
+      if (rTeam === 'CT') ctTbody.appendChild(row);
+      else tTbody.appendChild(row);
     });
   }
+}
 
-  // 11. High Performance Animation Loop
-  let lastTime = performance.now();
-  let lastFrameTime = performance.now();
-  let frameToFrameMs = 16.6;
-  const hudElement = document.getElementById('hud');
-  const specHudElement = document.getElementById('spectator-hud');
+// 10. Sensitivity & Crosshair
+document.getElementById('setting-sens').addEventListener('input', (e) => {
+  document.getElementById('val-sens').innerText = e.target.value;
+  gameManager.player.sensitivity = Number(e.target.value);
+});
 
-  function animate(currentTime) {
-    requestAnimationFrame(animate);
+document.getElementById('setting-fov').addEventListener('input', (e) => {
+  document.getElementById('val-fov').innerText = `${e.target.value}°`;
+  camera.fov = Number(e.target.value);
+  camera.updateProjectionMatrix();
+});
 
-    frameToFrameMs = currentTime - lastFrameTime;
-    lastFrameTime = currentTime;
-    window.__lastFrameToFrameMs = frameToFrameMs;
+document.getElementById('setting-invert').addEventListener('change', (e) => {
+  gameManager.player.invertY = e.target.checked;
+});
 
-    const dt = Math.min((currentTime - lastTime) / 1000, 0.05);
-    lastTime = currentTime;
+const chColor = document.getElementById('setting-ch-color');
+const chSize = document.getElementById('setting-ch-size');
+const chGap = document.getElementById('setting-ch-gap');
+const chDot = document.getElementById('setting-ch-dot');
+const chDotOnly = document.getElementById('setting-ch-dot-only');
 
-    if (window.__noVm && gameManager.player && gameManager.player.viewmodelGroup) {
-      gameManager.player.viewmodelGroup.visible = false;
+function updateCrosshairStyle() {
+  const color = chColor.value;
+  const size = `${chSize.value}px`;
+  const gap = `${chGap.value}px`;
+  const showDot = chDot.checked;
+  const dotOnly = chDotOnly ? chDotOnly.checked : false;
+
+  document.querySelectorAll('.crosshair-ch').forEach(el => {
+    el.style.backgroundColor = color;
+    el.style.display = dotOnly ? 'none' : 'block';
+  });
+
+  const dot = document.querySelector('.crosshair-dot');
+  dot.style.backgroundColor = color;
+  dot.style.display = (showDot || dotOnly) ? 'block' : 'none';
+
+  document.querySelector('.ch-top').style.height = size;
+  document.querySelector('.ch-top').style.top = gap;
+  document.querySelector('.ch-bottom').style.height = size;
+  document.querySelector('.ch-bottom').style.bottom = gap;
+  document.querySelector('.ch-left').style.width = size;
+  document.querySelector('.ch-left').style.left = gap;
+  document.querySelector('.ch-right').style.width = size;
+  document.querySelector('.ch-right').style.right = gap;
+}
+
+chColor.addEventListener('input', updateCrosshairStyle);
+chSize.addEventListener('input', updateCrosshairStyle);
+chGap.addEventListener('input', updateCrosshairStyle);
+chDot.addEventListener('change', updateCrosshairStyle);
+if (chDotOnly) chDotOnly.addEventListener('change', updateCrosshairStyle);
+updateCrosshairStyle();
+
+// Volume Sliders
+const masterVol = document.getElementById('setting-master-vol');
+const sfxVol = document.getElementById('setting-sfx-vol');
+const c4Vol = document.getElementById('setting-c4-vol');
+
+function updateAudioVolumes() {
+  window.csAudio.setVolumes(
+    Number(masterVol.value),
+    Number(sfxVol.value),
+    Number(c4Vol.value)
+  );
+}
+
+masterVol.addEventListener('input', updateAudioVolumes);
+sfxVol.addEventListener('input', updateAudioVolumes);
+c4Vol.addEventListener('input', updateAudioVolumes);
+
+// Graphics & FPS Preset Switcher
+const gfxSelect = document.getElementById('setting-graphics-mode');
+if (gfxSelect) {
+  gfxSelect.addEventListener('change', (e) => {
+    const mode = e.target.value;
+    if (mode === 'ultra') {
+      renderer.setPixelRatio(0.8);
+      scene.fog = null;
+    } else if (mode === 'high') {
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+      scene.fog = new THREE.FogExp2(0xdce7f0, 0.005);
+    } else {
+      // Competitive 144+ FPS
+      renderer.setPixelRatio(1);
+      scene.fog = new THREE.FogExp2(0xdce7f0, 0.005);
     }
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+}
 
-    if ((hudElement && !hudElement.classList.contains('hidden')) ||
-        (specHudElement && !specHudElement.classList.contains('hidden'))) {
-      gameManager.update(dt, currentTime);
-    }
+// 11. High Performance Animation Loop
+let lastTime = performance.now();
+let lastFrameTime = performance.now();
+let frameToFrameMs = 16.6;
+const hudElement = document.getElementById('hud');
+const specHudElement = document.getElementById('spectator-hud');
 
-    renderer.render(scene, camera);
-  }
-
+function animate(currentTime) {
   requestAnimationFrame(animate);
 
-  // CS2 Engine In-Game Debug Overlay (?debug=1)
-  function setupDebugOverlay(gameManager, renderer, scene, camera) {
-    const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.get('debug') !== '1') return;
-    if (urlParams.get('nooverlay') === '1') return;
+  frameToFrameMs = currentTime - lastFrameTime;
+  lastFrameTime = currentTime;
+  window.__lastFrameToFrameMs = frameToFrameMs;
 
-    const overlay = document.createElement('div');
-    overlay.id = 'cs2-debug-overlay';
-    overlay.style.cssText = [
-      'position: fixed',
-      'top: 12px',
-      'left: 12px',
-      'z-index: 999999',
-      'background: rgba(10, 16, 24, 0.92)',
-      'border: 1px solid #00ff88',
-      'border-radius: 4px',
-      'padding: 10px 14px',
-      'font-family: Consolas, "Courier New", monospace',
-      'font-size: 11px',
-      'line-height: 1.45',
-      'color: #00ff88',
-      'pointer-events: none',
-      'box-shadow: 0 4px 16px rgba(0,0,0,0.8)',
-      'white-space: pre'
-    ].join(';');
-    document.body.appendChild(overlay);
+  const dt = Math.min((currentTime - lastTime) / 1000, 0.05);
+  lastTime = currentTime;
 
-    // Interactive On-Screen Calibration Panel (?debug=1)
-    const calibPanel = document.createElement('div');
-    calibPanel.id = 'cs2-calib-panel';
-    calibPanel.style.cssText = [
-      'position: fixed',
-      'bottom: 16px',
-      'left: 12px',
-      'z-index: 999999',
-      'background: rgba(10, 16, 24, 0.95)',
-      'border: 1px solid #00e5ff',
-      'border-radius: 4px',
-      'padding: 8px 12px',
-      'font-family: Consolas, "Courier New", monospace',
-      'font-size: 11px',
-      'color: #00e5ff',
-      'pointer-events: auto',
-      'box-shadow: 0 4px 16px rgba(0,0,0,0.85)'
-    ].join(';');
+  if (window.__noVm && gameManager.player && gameManager.player.viewmodelGroup) {
+    gameManager.player.viewmodelGroup.visible = false;
+  }
 
-    let calibStepRad = Math.PI / 2;
-    let calibPosStep = 0.02;
+  if ((hudElement && !hudElement.classList.contains('hidden')) ||
+    (specHudElement && !specHudElement.classList.contains('hidden'))) {
+    gameManager.update(dt, currentTime);
+  }
 
-    window.__adjustCalib = (type, axis, sign) => {
-      const p = gameManager.player;
-      if (!p || !p.activeWeapon) return;
-      let cat = p.activeWeapon.category || 'rifles';
-      if (p.activeWeapon.id === 'knife' || p.activeWeapon.category === 'melee') cat = 'knife';
-      const vm = CS2Player.WEAPON_VIEWMODEL[cat] || CS2Player.WEAPON_VIEWMODEL['rifles'];
-      if (type === 'rot') {
-        vm.rot[axis] += sign * calibStepRad;
-      } else if (type === 'pos') {
-        vm.pos[axis] += sign * calibPosStep;
-      } else if (type === 'scale') {
-        vm.scale = Math.max(0.001, (vm.scale || 0.016) + sign * 0.001);
-      }
-      if (p.activeWeaponMeshGroup) {
-        p.activeWeaponMeshGroup.position.set(vm.pos[0], vm.pos[1], vm.pos[2]);
-        p.activeWeaponMeshGroup.rotation.set(vm.rot[0], vm.rot[1], vm.rot[2]);
-      }
-      const deg = vm.rot.map(r => ((r * 180 / Math.PI) % 360).toFixed(1));
-      const logStr = `cat=${cat} rot=[${deg.join(', ')}°] pos=[${vm.pos.map(v=>v.toFixed(3)).join(', ')}] scale=${(vm.scale || 0.016).toFixed(3)}`;
-      window.__lastWeaponCalibration = logStr;
-      console.log(`[CALIBRATION] ${logStr}`);
-    };
+  renderer.render(scene, camera);
+}
 
-    window.__toggleCalibStep = () => {
-      if (calibStepRad > 0.5) {
-        calibStepRad = 5 * Math.PI / 180;
-        calibPosStep = 0.005;
-        return '5°';
+requestAnimationFrame(animate);
+
+// CS2 Engine In-Game Debug Overlay (?debug=1)
+function setupDebugOverlay(gameManager, renderer, scene, camera) {
+  const urlParams = new URLSearchParams(window.location.search);
+  if (urlParams.get('debug') !== '1') return;
+  if (urlParams.get('nooverlay') === '1') return;
+
+  const overlay = document.createElement('div');
+  overlay.id = 'cs2-debug-overlay';
+  overlay.style.cssText = [
+    'position: fixed',
+    'top: 12px',
+    'left: 12px',
+    'z-index: 999999',
+    'background: rgba(10, 16, 24, 0.92)',
+    'border: 1px solid #00ff88',
+    'border-radius: 4px',
+    'padding: 10px 14px',
+    'font-family: Consolas, "Courier New", monospace',
+    'font-size: 11px',
+    'line-height: 1.45',
+    'color: #00ff88',
+    'pointer-events: none',
+    'box-shadow: 0 4px 16px rgba(0,0,0,0.8)',
+    'white-space: pre'
+  ].join(';');
+  document.body.appendChild(overlay);
+
+  // Interactive On-Screen Calibration Panel (?debug=1)
+  const calibPanel = document.createElement('div');
+  calibPanel.id = 'cs2-calib-panel';
+  calibPanel.style.cssText = [
+    'position: fixed',
+    'bottom: 16px',
+    'left: 12px',
+    'z-index: 999999',
+    'background: rgba(10, 16, 24, 0.95)',
+    'border: 1px solid #00e5ff',
+    'border-radius: 4px',
+    'padding: 8px 12px',
+    'font-family: Consolas, "Courier New", monospace',
+    'font-size: 11px',
+    'color: #00e5ff',
+    'pointer-events: auto',
+    'box-shadow: 0 4px 16px rgba(0,0,0,0.85)'
+  ].join(';');
+
+  let calibStepRad = Math.PI / 2;
+  let calibPosStep = 0.02;
+
+  window.__adjustCalib = (type, axis, sign) => {
+    const p = gameManager.player;
+    if (!p || !p.activeWeapon) return;
+    let cat = p.activeWeapon.category || 'rifles';
+    if (p.activeWeapon.id === 'knife' || p.activeWeapon.category === 'melee') cat = 'knife';
+    const vm = CS2Player.WEAPON_VIEWMODEL[cat] || CS2Player.WEAPON_VIEWMODEL['rifles'];
+    if (type === 'rot') {
+      vm.rot[axis] += sign * calibStepRad;
+    } else if (type === 'pos') {
+      vm.pos[axis] += sign * calibPosStep;
+    } else if (type === 'scale') {
+      vm.scale = Math.max(0.001, (vm.scale || 0.016) + sign * 0.001);
+    }
+    if (p.activeWeaponMeshGroup) {
+      p.activeWeaponMeshGroup.position.set(vm.pos[0], vm.pos[1], vm.pos[2]);
+      p.activeWeaponMeshGroup.rotation.set(vm.rot[0], vm.rot[1], vm.rot[2]);
+    }
+    const deg = vm.rot.map(r => ((r * 180 / Math.PI) % 360).toFixed(1));
+    const logStr = `cat=${cat} rot=[${deg.join(', ')}°] pos=[${vm.pos.map(v => v.toFixed(3)).join(', ')}] scale=${(vm.scale || 0.016).toFixed(3)}`;
+    window.__lastWeaponCalibration = logStr;
+    console.log(`[CALIBRATION] ${logStr}`);
+  };
+
+  window.__toggleCalibStep = () => {
+    if (calibStepRad > 0.5) {
+      calibStepRad = 5 * Math.PI / 180;
+      calibPosStep = 0.005;
+      return '5°';
+    } else {
+      calibStepRad = Math.PI / 2;
+      calibPosStep = 0.02;
+      return '90°';
+    }
+  };
+
+  window.copyWeaponCalibrations = function() {
+    try {
+      const calib = CS2Player.WEAPON_VIEWMODEL;
+      const str = JSON.stringify(calib, null, 2);
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(str).then(() => {
+          showToast('Weapon calibrations copied to clipboard!', 'success');
+        }).catch(() => {
+          console.log('[CALIB_VALUES]', str);
+        });
       } else {
-        calibStepRad = Math.PI / 2;
-        calibPosStep = 0.02;
-        return '90°';
+        console.log('[CALIB_VALUES]', str);
       }
-    };
+    } catch (err) {
+      console.log('[CALIB_COPY_ERR]', err);
+    }
+  };
 
-    calibPanel.innerHTML = `
+  calibPanel.innerHTML = `
       <div style="font-weight:bold;margin-bottom:6px;color:#fff;display:flex;justify-content:space-between;align-items:center;">
         <span>WEAPON CALIBRATION [<span id="calib-active-cat" style="color:#00e5ff;">rifles</span>]</span>
         <button id="calib-copy-btn" style="cursor:pointer;padding:2px 8px;background:#00e5ff;color:#000;border:none;border-radius:3px;font-weight:bold;font-size:10px;" onclick="window.copyWeaponCalibrations()">COPY VALUES</button>
@@ -1146,255 +1159,255 @@ document.addEventListener('DOMContentLoaded', () => {
         &nbsp;Step: <button id="calib-step-btn" style="cursor:pointer;padding:1px 8px;" onclick="this.innerText = window.__toggleCalibStep();">90°</button>
       </div>
     `;
-    document.body.appendChild(calibPanel);
+  document.body.appendChild(calibPanel);
 
-    const update = () => {
-      try {
-        const buildId = window.BUILD_ID || 'dev-local';
-        const rInfo = renderer.info;
-        const calls = rInfo.render ? rInfo.render.calls : 0;
-        const tris = rInfo.render ? rInfo.render.triangles : 0;
-        const progCount = rInfo.programs ? rInfo.programs.length : 0;
+  const update = () => {
+    try {
+      const buildId = window.BUILD_ID || 'dev-local';
+      const rInfo = renderer.info;
+      const calls = rInfo.render ? rInfo.render.calls : 0;
+      const tris = rInfo.render ? rInfo.render.triangles : 0;
+      const progCount = rInfo.programs ? rInfo.programs.length : 0;
 
-        // Map meshes & BBox (Cached once after loading to eliminate 100ms CPU freeze)
-        let mapLoaded = false;
-        let meshCount = 0;
-        let mapTriangles = 0;
-        let bboxStr = 'no-map';
-        if (gameManager.mapBuilder) {
-          mapLoaded = !!gameManager.mapBuilder.mapLoaded;
-          const gMeshes = gameManager.mapBuilder.groundMeshes || [];
-          meshCount = gMeshes.length;
-          if (gameManager.mapBuilder.cachedBBoxStr) {
-            bboxStr = gameManager.mapBuilder.cachedBBoxStr;
-            mapTriangles = gameManager.mapBuilder.cachedTriangles || 0;
-          } else if (mapLoaded && gMeshes.length > 0) {
-            const realBox = new THREE.Box3();
-            for (let i = 0; i < gMeshes.length; i++) {
-              const gm = gMeshes[i];
-              if (gm.geometry && gm.geometry.attributes && gm.geometry.attributes.position) {
-                mapTriangles += (gm.geometry.attributes.position.count / 3);
-              }
-              realBox.expandByObject(gm);
+      // Map meshes & BBox (Cached once after loading to eliminate 100ms CPU freeze)
+      let mapLoaded = false;
+      let meshCount = 0;
+      let mapTriangles = 0;
+      let bboxStr = 'no-map';
+      if (gameManager.mapBuilder) {
+        mapLoaded = !!gameManager.mapBuilder.mapLoaded;
+        const gMeshes = gameManager.mapBuilder.groundMeshes || [];
+        meshCount = gMeshes.length;
+        if (gameManager.mapBuilder.cachedBBoxStr) {
+          bboxStr = gameManager.mapBuilder.cachedBBoxStr;
+          mapTriangles = gameManager.mapBuilder.cachedTriangles || 0;
+        } else if (mapLoaded && gMeshes.length > 0) {
+          const realBox = new THREE.Box3();
+          for (let i = 0; i < gMeshes.length; i++) {
+            const gm = gMeshes[i];
+            if (gm.geometry && gm.geometry.attributes && gm.geometry.attributes.position) {
+              mapTriangles += (gm.geometry.attributes.position.count / 3);
             }
-            if (!realBox.isEmpty() && isFinite(realBox.min.x)) {
-              bboxStr = `min(${realBox.min.x.toFixed(1)}, ${realBox.min.y.toFixed(1)}, ${realBox.min.z.toFixed(1)}) max(${realBox.max.x.toFixed(1)}, ${realBox.max.y.toFixed(1)}, ${realBox.max.z.toFixed(1)})`;
-              gameManager.mapBuilder.cachedBBoxStr = bboxStr;
-              gameManager.mapBuilder.cachedTriangles = mapTriangles;
-            }
+            realBox.expandByObject(gm);
+          }
+          if (!realBox.isEmpty() && isFinite(realBox.min.x)) {
+            bboxStr = `min(${realBox.min.x.toFixed(1)}, ${realBox.min.y.toFixed(1)}, ${realBox.min.z.toFixed(1)}) max(${realBox.max.x.toFixed(1)}, ${realBox.max.y.toFixed(1)}, ${realBox.max.z.toFixed(1)})`;
+            gameManager.mapBuilder.cachedBBoxStr = bboxStr;
+            gameManager.mapBuilder.cachedTriangles = mapTriangles;
           }
         }
+      }
 
-        // Camera & Fog
-        const cPos = camera.position;
-        const rollDeg = (camera.rotation.z * 180 / Math.PI).toFixed(1);
-        const camStr = `pos(${cPos.x.toFixed(1)}, ${cPos.y.toFixed(1)}, ${cPos.z.toFixed(1)}) | roll: ${rollDeg}° | far: ${camera.far}`;
-        const fogStr = scene.fog ? `ON (#${scene.fog.color.getHexString()})` : 'OFF';
+      // Camera & Fog
+      const cPos = camera.position;
+      const rollDeg = (camera.rotation.z * 180 / Math.PI).toFixed(1);
+      const camStr = `pos(${cPos.x.toFixed(1)}, ${cPos.y.toFixed(1)}, ${cPos.z.toFixed(1)}) | roll: ${rollDeg}° | far: ${camera.far}`;
+      const fogStr = scene.fog ? `ON (#${scene.fog.color.getHexString()})` : 'OFF';
 
-        // Player pos & feetY
-        let pPosStr = 'none';
-        let feetYStr = 'none';
-        if (gameManager.player && gameManager.player.position) {
-          const p = gameManager.player.position;
-          pPosStr = `(${p.x.toFixed(2)}, ${p.y.toFixed(2)}, ${p.z.toFixed(2)})`;
-          feetYStr = (p.y - gameManager.player.playerHeight).toFixed(2);
+      // Player pos & feetY
+      let pPosStr = 'none';
+      let feetYStr = 'none';
+      if (gameManager.player && gameManager.player.position) {
+        const p = gameManager.player.position;
+        pPosStr = `(${p.x.toFixed(2)}, ${p.y.toFixed(2)}, ${p.z.toFixed(2)})`;
+        feetYStr = (p.y - gameManager.player.playerHeight).toFixed(2);
+      }
+
+      // Weapon Inspection
+      let wpnStr = 'none';
+      if (window.__heldWeaponDiagnostics) {
+        const d = window.__heldWeaponDiagnostics;
+        wpnStr = `${d.weaponId} | mesh: ${d.meshName} | mat: ${d.matType} | tex: ${d.mapLoaded ? d.mapDimensions : 'LOADING'} | vm-lights: ${d.vmLightCount}`;
+      } else if (gameManager.player && gameManager.player.activeWeapon) {
+        wpnStr = gameManager.player.activeWeapon.id || 'unknown';
+      }
+      const calibStr = window.__lastWeaponCalibration ? `\nCALIB:         ${window.__lastWeaponCalibration}` : '';
+
+      const recoilClimbDeg = (gameManager.player && typeof gameManager.player.currentRecoilPitchDeg === 'number')
+        ? gameManager.player.currentRecoilPitchDeg : 0;
+
+      // Network state
+      const net = gameManager.net;
+      const isOnline = !!(net && net.isConnected);
+      const wsState = (net && net.ws) ? ['CONNECTING', 'OPEN', 'CLOSING', 'CLOSED'][net.ws.readyState] : 'NONE';
+      const pingVal = (net && typeof net.lastPingMs === 'number') ? `${net.lastPingMs}ms` : 'n/a';
+      const timerSource = (isOnline && net && net.lastSnapshotTime) ? 'SERVER' : 'LOCAL';
+
+      // Scores, alive, players, snapshot age
+      let ctAlive = 0;
+      let tAlive = 0;
+      let playerCount = 0;
+      if (gameManager.player) {
+        playerCount = 1;
+        if (gameManager.player.isAlive) {
+          if (gameManager.player.team === 'CT') ctAlive++;
+          else tAlive++;
         }
-
-        // Weapon Inspection
-        let wpnStr = 'none';
-        if (window.__heldWeaponDiagnostics) {
-          const d = window.__heldWeaponDiagnostics;
-          wpnStr = `${d.weaponId} | mesh: ${d.meshName} | mat: ${d.matType} | tex: ${d.mapLoaded ? d.mapDimensions : 'LOADING'} | vm-lights: ${d.vmLightCount}`;
-        } else if (gameManager.player && gameManager.player.activeWeapon) {
-          wpnStr = gameManager.player.activeWeapon.id || 'unknown';
-        }
-        const calibStr = window.__lastWeaponCalibration ? `\nCALIB:         ${window.__lastWeaponCalibration}` : '';
-
-        const recoilClimbDeg = (gameManager.player && typeof gameManager.player.currentRecoilPitchDeg === 'number')
-          ? gameManager.player.currentRecoilPitchDeg : 0;
-
-        // Network state
-        const net = gameManager.net;
-        const isOnline = !!(net && net.isConnected);
-        const wsState = (net && net.ws) ? ['CONNECTING', 'OPEN', 'CLOSING', 'CLOSED'][net.ws.readyState] : 'NONE';
-        const pingVal = (net && typeof net.lastPingMs === 'number') ? `${net.lastPingMs}ms` : 'n/a';
-        const timerSource = (isOnline && net && net.lastSnapshotTime) ? 'SERVER' : 'LOCAL';
-
-        // Scores, alive, players, snapshot age
-        let ctAlive = 0;
-        let tAlive = 0;
-        let playerCount = 0;
-        if (gameManager.player) {
-          playerCount = 1;
-          if (gameManager.player.isAlive) {
-            if (gameManager.player.team === 'CT') ctAlive++;
+      }
+      if (net && net.remotePlayers) {
+        Object.values(net.remotePlayers).forEach(rp => {
+          playerCount++;
+          const alive = rp.data ? rp.data.isAlive : true;
+          if (alive) {
+            const team = rp.team || (rp.data ? rp.data.team : 'T');
+            if (team === 'CT') ctAlive++;
             else tAlive++;
           }
-        }
-        if (net && net.remotePlayers) {
-          Object.values(net.remotePlayers).forEach(rp => {
-            playerCount++;
-            const alive = rp.data ? rp.data.isAlive : true;
-            if (alive) {
-              const team = rp.team || (rp.data ? rp.data.team : 'T');
-              if (team === 'CT') ctAlive++;
-              else tAlive++;
-            }
+        });
+      }
+      const snapAge = (net && net.lastSnapshotTime) ? `${Date.now() - net.lastSnapshotTime}ms` : 'never';
+
+      let spawnStr = 'team: none | idx: 0';
+      if (gameManager.player) {
+        const sIdx = (typeof gameManager.player.spawnIndex !== 'undefined') ? gameManager.player.spawnIndex : 0;
+        spawnStr = `team: ${gameManager.player.team} | idx: ${sIdx}`;
+      }
+
+      const clientTeam = gameManager.player ? gameManager.player.team : 'none';
+      const serverTeam = (net && net.serverTeam) ? net.serverTeam : clientTeam;
+      const netTeam = (net && net.serverTeam) || clientTeam;
+      const gmTeam = gameManager.selectedTeam || netTeam;
+      const playerTeam = clientTeam;
+      const loadoutTeam = (gameManager.player && gameManager.player.activeWeapon) ? (gameManager.player.activeWeapon.team === 'ANY' ? netTeam : gameManager.player.activeWeapon.team) : netTeam;
+      const buyMenuTeam = netTeam;
+      const plantTeam = netTeam;
+      const teamSourcesStr = `net=${netTeam}, gm=${gmTeam}, player=${playerTeam}, loadout=${loadoutTeam}, buyMenu=${buyMenuTeam}, plant=${plantTeam}`;
+      let playerListStr = `Local(${clientTeam}:${gameManager.player?.isAlive ? 'ALIVE' : 'DEAD'})`;
+      if (net && net.remotePlayers) {
+        Object.entries(net.remotePlayers).forEach(([id, rp]) => {
+          const rTeam = rp.team || 'T';
+          const rAlive = rp.isAlive ? 'ALIVE' : 'DEAD';
+          const rName = rp.name || id.substring(0, 5);
+          playerListStr += `, ${rName}(${rTeam}:${rAlive})`;
+        });
+      }
+
+      let bombStr = 'planted: NO';
+      if (gameManager.c4Planted) {
+        const bPos = gameManager.c4Pos || gameManager.c4Mesh?.position;
+        const posText = bPos ? `pos(${bPos.x.toFixed(1)}, ${bPos.y.toFixed(1)}, ${bPos.z.toFixed(1)})` : 'pos(unknown)';
+        bombStr = `planted: YES | time: ${gameManager.c4Timer.toFixed(1)}s | ${posText} | site: ${gameManager.c4Site || 'A'}`;
+      }
+
+      let remotesStr = '0 (none)';
+      if (net && net.remotePlayers) {
+        const rKeys = Object.keys(net.remotePlayers);
+        if (rKeys.length === 0) {
+          remotesStr = '0 (none)';
+        } else {
+          const parts = rKeys.map(id => {
+            const rp = net.remotePlayers[id];
+            const rPos = rp.mesh ? rp.mesh.position : (rp.pos || { x: 0, y: 0, z: 0 });
+            const rVis = (rp.mesh && rp.mesh.visible) ? 'YES' : 'NO';
+            const mLoaded = rp.mesh && rp.mesh.characterMesh ? '3D' : 'BOX';
+            return `${rp.name || id.substring(0, 5)}[${rp.team || '?'}:${mLoaded}]: pos(${rPos.x.toFixed(1)}, ${rPos.y.toFixed(1)}, ${rPos.z.toFixed(1)}) vis:${rVis}`;
           });
+          remotesStr = `${rKeys.length} | ${parts.join('; ')}`;
         }
-        const snapAge = (net && net.lastSnapshotTime) ? `${Date.now() - net.lastSnapshotTime}ms` : 'never';
+      }
 
-        let spawnStr = 'team: none | idx: 0';
-        if (gameManager.player) {
-          const sIdx = (typeof gameManager.player.spawnIndex !== 'undefined') ? gameManager.player.spawnIndex : 0;
-          spawnStr = `team: ${gameManager.player.team} | idx: ${sIdx}`;
-        }
+      let remoteModelStr = 'none';
+      if (net && net.remotePlayers && Object.keys(net.remotePlayers).length > 0) {
+        const rp = Object.values(net.remotePlayers)[0];
+        const modelType = (rp.team === 'CT') ? 'SAS' : 'Phoenix';
+        const scale = rp.mesh?.characterMesh?.scale?.x?.toFixed(2) || '1.20';
+        const rootY = rp.mesh?.position?.y?.toFixed(2) || '0.00';
+        const bones = rp.mesh?.boneCount || 169;
+        const state = rp.activeState || 'IDLE';
+        remoteModelStr = `${modelType} | scale: ${scale} | root Y: ${rootY} | bones: ${bones} | procedural: ${state} | hitbox: capsule (r=0.38, h=1.50) + sphere (r=0.18)`;
+      }
 
-        const clientTeam = gameManager.player ? gameManager.player.team : 'none';
-        const serverTeam = (net && net.serverTeam) ? net.serverTeam : clientTeam;
-        const netTeam = (net && net.serverTeam) || clientTeam;
-        const gmTeam = gameManager.selectedTeam || netTeam;
-        const playerTeam = clientTeam;
-        const loadoutTeam = (gameManager.player && gameManager.player.activeWeapon) ? (gameManager.player.activeWeapon.team === 'ANY' ? netTeam : gameManager.player.activeWeapon.team) : netTeam;
-        const buyMenuTeam = netTeam;
-        const plantTeam = netTeam;
-        const teamSourcesStr = `net=${netTeam}, gm=${gmTeam}, player=${playerTeam}, loadout=${loadoutTeam}, buyMenu=${buyMenuTeam}, plant=${plantTeam}`;
-        let playerListStr = `Local(${clientTeam}:${gameManager.player?.isAlive ? 'ALIVE' : 'DEAD'})`;
-        if (net && net.remotePlayers) {
-          Object.entries(net.remotePlayers).forEach(([id, rp]) => {
-            const rTeam = rp.team || 'T';
-            const rAlive = rp.isAlive ? 'ALIVE' : 'DEAD';
-            const rName = rp.name || id.substring(0, 5);
-            playerListStr += `, ${rName}(${rTeam}:${rAlive})`;
-          });
-        }
-
-        let bombStr = 'planted: NO';
-        if (gameManager.c4Planted) {
-          const bPos = gameManager.c4Pos || gameManager.c4Mesh?.position;
-          const posText = bPos ? `pos(${bPos.x.toFixed(1)}, ${bPos.y.toFixed(1)}, ${bPos.z.toFixed(1)})` : 'pos(unknown)';
-          bombStr = `planted: YES | time: ${gameManager.c4Timer.toFixed(1)}s | ${posText} | site: ${gameManager.c4Site || 'A'}`;
-        }
-
-        let remotesStr = '0 (none)';
-        if (net && net.remotePlayers) {
-          const rKeys = Object.keys(net.remotePlayers);
-          if (rKeys.length === 0) {
-            remotesStr = '0 (none)';
-          } else {
-            const parts = rKeys.map(id => {
-              const rp = net.remotePlayers[id];
-              const rPos = rp.mesh ? rp.mesh.position : (rp.pos || { x: 0, y: 0, z: 0 });
-              const rVis = (rp.mesh && rp.mesh.visible) ? 'YES' : 'NO';
-              const mLoaded = rp.mesh && rp.mesh.characterMesh ? '3D' : 'BOX';
-              return `${rp.name || id.substring(0, 5)}[${rp.team || '?'}:${mLoaded}]: pos(${rPos.x.toFixed(1)}, ${rPos.y.toFixed(1)}, ${rPos.z.toFixed(1)}) vis:${rVis}`;
+      let vmBoxStr = 'none';
+      if (gameManager.player && gameManager.player.activeWeaponMeshGroup && camera) {
+        try {
+          const meshGroup = gameManager.player.activeWeaponMeshGroup;
+          const bbox = new THREE.Box3().setFromObject(meshGroup);
+          if (!bbox.isEmpty()) {
+            const pts = [
+              new THREE.Vector3(bbox.min.x, bbox.min.y, bbox.min.z),
+              new THREE.Vector3(bbox.min.x, bbox.min.y, bbox.max.z),
+              new THREE.Vector3(bbox.min.x, bbox.max.y, bbox.min.z),
+              new THREE.Vector3(bbox.min.x, bbox.max.y, bbox.max.z),
+              new THREE.Vector3(bbox.max.x, bbox.min.y, bbox.min.z),
+              new THREE.Vector3(bbox.max.x, bbox.min.y, bbox.max.z),
+              new THREE.Vector3(bbox.max.x, bbox.max.y, bbox.min.z),
+              new THREE.Vector3(bbox.max.x, bbox.max.y, bbox.max.z)
+            ];
+            let minX = 100, maxX = 0, minY = 100, maxY = 0;
+            pts.forEach(p => {
+              const pr = p.clone().project(camera);
+              const sx = (pr.x * 0.5 + 0.5) * 100;
+              const sy = (-pr.y * 0.5 + 0.5) * 100;
+              if (sx < minX) minX = sx;
+              if (sx > maxX) maxX = sx;
+              if (sy < minY) minY = sy;
+              if (sy > maxY) maxY = sy;
             });
-            remotesStr = `${rKeys.length} | ${parts.join('; ')}`;
+            minX = Math.max(0, Math.min(100, minX));
+            maxX = Math.max(0, Math.min(100, maxX));
+            minY = Math.max(0, Math.min(100, minY));
+            maxY = Math.max(0, Math.min(100, maxY));
+            vmBoxStr = `[X: ${minX.toFixed(1)}%-${maxX.toFixed(1)}%, Y: ${minY.toFixed(1)}%-${maxY.toFixed(1)}%]`;
           }
-        }
+        } catch (e) { }
+      }
 
-        let remoteModelStr = 'none';
-        if (net && net.remotePlayers && Object.keys(net.remotePlayers).length > 0) {
-          const rp = Object.values(net.remotePlayers)[0];
-          const modelType = (rp.team === 'CT') ? 'SAS' : 'Phoenix';
-          const scale = rp.mesh?.characterMesh?.scale?.x?.toFixed(2) || '1.20';
-          const rootY = rp.mesh?.position?.y?.toFixed(2) || '0.00';
-          const bones = rp.mesh?.boneCount || 169;
-          const state = rp.activeState || 'IDLE';
-          remoteModelStr = `${modelType} | scale: ${scale} | root Y: ${rootY} | bones: ${bones} | procedural: ${state} | hitbox: capsule (r=0.38, h=1.50) + sphere (r=0.18)`;
-        }
+      let corrStr = 'none';
+      if (gameManager.player && gameManager.player.lastCorrection) {
+        const lc = gameManager.player.lastCorrection;
+        const timeStr = lc.t ? new Date(lc.t).toTimeString().substring(0, 8) : '';
+        corrStr = `${lc.reason} | delta: ${lc.delta} | ${timeStr}`;
+      }
 
-        let vmBoxStr = 'none';
-        if (gameManager.player && gameManager.player.activeWeaponMeshGroup && camera) {
-          try {
-            const meshGroup = gameManager.player.activeWeaponMeshGroup;
-            const bbox = new THREE.Box3().setFromObject(meshGroup);
-            if (!bbox.isEmpty()) {
-              const pts = [
-                new THREE.Vector3(bbox.min.x, bbox.min.y, bbox.min.z),
-                new THREE.Vector3(bbox.min.x, bbox.min.y, bbox.max.z),
-                new THREE.Vector3(bbox.min.x, bbox.max.y, bbox.min.z),
-                new THREE.Vector3(bbox.min.x, bbox.max.y, bbox.max.z),
-                new THREE.Vector3(bbox.max.x, bbox.min.y, bbox.min.z),
-                new THREE.Vector3(bbox.max.x, bbox.min.y, bbox.max.z),
-                new THREE.Vector3(bbox.max.x, bbox.max.y, bbox.min.z),
-                new THREE.Vector3(bbox.max.x, bbox.max.y, bbox.max.z)
-              ];
-              let minX = 100, maxX = 0, minY = 100, maxY = 0;
-              pts.forEach(p => {
-                const pr = p.clone().project(camera);
-                const sx = (pr.x * 0.5 + 0.5) * 100;
-                const sy = (-pr.y * 0.5 + 0.5) * 100;
-                if (sx < minX) minX = sx;
-                if (sx > maxX) maxX = sx;
-                if (sy < minY) minY = sy;
-                if (sy > maxY) maxY = sy;
-              });
-              minX = Math.max(0, Math.min(100, minX));
-              maxX = Math.max(0, Math.min(100, maxX));
-              minY = Math.max(0, Math.min(100, minY));
-              maxY = Math.max(0, Math.min(100, maxY));
-              vmBoxStr = `[X: ${minX.toFixed(1)}%-${maxX.toFixed(1)}%, Y: ${minY.toFixed(1)}%-${maxY.toFixed(1)}%]`;
-            }
-          } catch (e) {}
-        }
+      let dropsStr = '0 (none)';
+      if (window._droppedItems && window._droppedItems.length > 0) {
+        const dParts = window._droppedItems.map(d => {
+          const wId = d.weapon ? d.weapon.id : 'unknown';
+          const p = d.mesh ? d.mesh.position : (d.pos || { x: 0, y: 0, z: 0 });
+          const dId = d.id || 'local';
+          return `${dId}, ${wId}, (${p.x.toFixed(1)}, ${p.y.toFixed(1)}, ${p.z.toFixed(1)})`;
+        });
+        dropsStr = `${window._droppedItems.length} | ${dParts.join('; ')}`;
+      }
 
-        let corrStr = 'none';
-        if (gameManager.player && gameManager.player.lastCorrection) {
-          const lc = gameManager.player.lastCorrection;
-          const timeStr = lc.t ? new Date(lc.t).toTimeString().substring(0, 8) : '';
-          corrStr = `${lc.reason} | delta: ${lc.delta} | ${timeStr}`;
-        }
+      let txStr = 'none';
+      const txList = gameManager.transactions || [];
+      if (txList.length > 0) {
+        txStr = txList.slice(-5).map(t => {
+          const sign = (typeof t.amount === 'number' && t.amount > 0) ? '+' : '';
+          const timeStr = t.t ? new Date(t.t).toTimeString().substring(0, 8) : '';
+          return `[${timeStr}] ${sign}$${t.amount} (${t.reason || t.type})`;
+        }).join('\n               ');
+      }
 
-        let dropsStr = '0 (none)';
-        if (window._droppedItems && window._droppedItems.length > 0) {
-          const dParts = window._droppedItems.map(d => {
-            const wId = d.weapon ? d.weapon.id : 'unknown';
-            const p = d.mesh ? d.mesh.position : (d.pos || { x: 0, y: 0, z: 0 });
-            const dId = d.id || 'local';
-            return `${dId}, ${wId}, (${p.x.toFixed(1)}, ${p.y.toFixed(1)}, ${p.z.toFixed(1)})`;
-          });
-          dropsStr = `${window._droppedItems.length} | ${dParts.join('; ')}`;
-        }
+      let heldTexStr = 'none';
+      if (window.__heldWeaponDiagnostics) {
+        const d = window.__heldWeaponDiagnostics;
+        heldTexStr = `${d.textureFile || 'none'} (${d.mapDimensions || 'none'}) -> ${d.textureUrl || 'none'}`;
+      }
 
-        let txStr = 'none';
-        const txList = gameManager.transactions || [];
-        if (txList.length > 0) {
-          txStr = txList.slice(-5).map(t => {
-            const sign = (typeof t.amount === 'number' && t.amount > 0) ? '+' : '';
-            const timeStr = t.t ? new Date(t.t).toTimeString().substring(0, 8) : '';
-            return `[${timeStr}] ${sign}$${t.amount} (${t.reason || t.type})`;
-          }).join('\n               ');
+      let hitboxStr = 'measured: 2.33m | bottomY: 0.00m | headSphereY: 2.15m | feetGroundY: 0.00m (agree 0.0%)';
+      if (net && net.remotePlayers && Object.keys(net.remotePlayers).length > 0) {
+        const firstRp = Object.values(net.remotePlayers)[0];
+        if (firstRp.mesh && firstRp.mesh.measuredMetrics) {
+          const m = firstRp.mesh.measuredMetrics;
+          hitboxStr = `measured: ${m.modelHeight}m | bottomY: ${m.hitboxBottomY}m | headSphereY: ${m.headSphereY}m | feetGroundY: ${m.feetGroundY}m (agree <1%)`;
         }
+      }
 
-        let heldTexStr = 'none';
-        if (window.__heldWeaponDiagnostics) {
-          const d = window.__heldWeaponDiagnostics;
-          heldTexStr = `${d.textureFile || 'none'} (${d.mapDimensions || 'none'}) -> ${d.textureUrl || 'none'}`;
-        }
+      const catEl = document.getElementById('calib-active-cat');
+      if (catEl && gameManager.player && gameManager.player.activeWeapon) {
+        catEl.innerText = `${gameManager.player.activeWeapon.category || 'rifles'}:${gameManager.player.activeWeapon.id}`;
+      }
 
-        let hitboxStr = 'measured: 2.33m | bottomY: 0.00m | headSphereY: 2.15m | feetGroundY: 0.00m (agree 0.0%)';
-        if (net && net.remotePlayers && Object.keys(net.remotePlayers).length > 0) {
-          const firstRp = Object.values(net.remotePlayers)[0];
-          if (firstRp.mesh && firstRp.mesh.measuredMetrics) {
-            const m = firstRp.mesh.measuredMetrics;
-            hitboxStr = `measured: ${m.modelHeight}m | bottomY: ${m.hitboxBottomY}m | headSphereY: ${m.headSphereY}m | feetGroundY: ${m.feetGroundY}m (agree <1%)`;
-          }
-        }
+      let collDecisionStr = 'stepTested: 0.00 | normal.y: 1.00 | result: CLEAR';
+      if (gameManager.player && gameManager.player.collisionDecision) {
+        const cd = gameManager.player.collisionDecision;
+        collDecisionStr = `stepTested: ${cd.stepTested} | normal.y: ${cd.normalY} | result: ${cd.result}`;
+      }
 
-        const catEl = document.getElementById('calib-active-cat');
-        if (catEl && gameManager.player && gameManager.player.activeWeapon) {
-          catEl.innerText = `${gameManager.player.activeWeapon.category || 'rifles'}:${gameManager.player.activeWeapon.id}`;
-        }
-
-        let collDecisionStr = 'stepTested: 0.00 | normal.y: 1.00 | result: CLEAR';
-        if (gameManager.player && gameManager.player.collisionDecision) {
-          const cd = gameManager.player.collisionDecision;
-          collDecisionStr = `stepTested: ${cd.stepTested} | normal.y: ${cd.normalY} | result: ${cd.result}`;
-        }
-
-        overlay.textContent =
-`[CS2 ENGINE DEBUG] ?debug=1
+      overlay.textContent =
+        `[CS2 ENGINE DEBUG] ?debug=1
 BUILD_ID:      ${buildId}
 GPU:           ${window.__unmaskedGpu || 'unknown'} (${window.__unmaskedVendor || 'unknown'})
 GPU PERF:      frame-to-frame: ${(window.__lastFrameToFrameMs || 16.6).toFixed(1)}ms | JS: ${(gameManager.avgFrameMs || 0).toFixed(1)}ms
@@ -1428,11 +1441,11 @@ BOMB:          ${bombStr}
 MATCH:         CT: ${gameManager.ctScore} | T: ${gameManager.tScore} | alive: CT ${ctAlive} : T ${tAlive}
 PLAYERS:       ${playerListStr} (total: ${playerCount} | snapshot age: ${snapAge})
 TX:            ${txStr}`;
-      } catch (e) {
-        overlay.textContent = `[DEBUG OVERLAY ERROR]: ${e.message}`;
-      }
-    };
+    } catch (e) {
+      overlay.textContent = `[DEBUG OVERLAY ERROR]: ${e.message}`;
+    }
+  };
 
-    setInterval(update, 100);
-  }
+  setInterval(update, 100);
+}
 });

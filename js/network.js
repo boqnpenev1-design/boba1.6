@@ -482,14 +482,12 @@ class CS2NetworkManager {
         break;
 
       case 'drop_error':
-        console.warn('[DROP_ERROR]', packet.reason);
-        if (window.showCS2Toast) window.showCS2Toast(`Drop rejected: ${packet.reason}`, 'warning');
+        console.log('[DROP_REJECT]', packet.reason);
         window.__lastReject = { type: 'drop_error', reason: packet.reason, time: new Date().toLocaleTimeString() };
         break;
 
       case 'pickup_error':
-        console.warn('[PICKUP_ERROR]', packet.reason);
-        if (window.showCS2Toast) window.showCS2Toast(`Pickup rejected: ${packet.reason}`, 'warning');
+        console.log('[PICKUP_REJECT]', packet.reason);
         window.__lastReject = { type: 'pickup_error', reason: packet.reason, time: new Date().toLocaleTimeString() };
         break;
 
@@ -521,7 +519,7 @@ class CS2NetworkManager {
         break;
 
       case 'buy_error':
-        console.warn('[BUY_ERROR]', packet.reason);
+        console.log('[BUY_REJECT]', packet.reason);
         if (window.__onBuyError) {
           window.__onBuyError(packet);
         }
@@ -541,7 +539,7 @@ class CS2NetworkManager {
         break;
 
       case 'refund_error':
-        console.warn('[REFUND_ERROR]', packet.reason);
+        console.log('[REFUND_REJECT]', packet.reason);
         if (window.__onRefundError) {
           window.__onRefundError(packet);
         }
@@ -843,8 +841,9 @@ class CS2NetworkManager {
         rp.mesh.updateHitboxes();
       }
 
-      // Sync hitbox wireframe visibility with global toggle
-      const showWire = !!window.__showHitboxWireframes;
+      // Sync hitbox wireframe visibility with global toggle or ?debug=1
+      const isDebug = (typeof window !== 'undefined' && window.location && new URLSearchParams(window.location.search).get('debug') === '1');
+      const showWire = isDebug || !!window.__showHitboxWireframes;
       if (rp.mesh.bodyHitbox && rp.mesh.bodyHitbox.material) {
         rp.mesh.bodyHitbox.material.visible = showWire;
       }
@@ -857,12 +856,13 @@ class CS2NetworkManager {
   createTacticalCharacterModel(team, callsign = 'OPERATOR') {
     const group = new THREE.Group();
 
-    // 1. Authentic Capsule Body Hitbox (Radius ~0.24m matching 0.2-0.25 of measured height, anchored at ground Y=0)
-    const showWire = !!window.__showHitboxWireframes;
-    const bodyHitboxGeo = new THREE.CylinderGeometry(0.24, 0.24, 1.40, 12);
+    // 1. Authentic Capsule Body Hitbox (Radius ~0.30m matching authentic human bounds, anchored at ground Y=0)
+    const isDebug = (typeof window !== 'undefined' && window.location && new URLSearchParams(window.location.search).get('debug') === '1');
+    const showWire = isDebug || !!window.__showHitboxWireframes;
+    const bodyHitboxGeo = new THREE.CylinderGeometry(0.30, 0.30, 1.25, 12);
     const bodyHitboxMat = new THREE.MeshBasicMaterial({ color: 0x00ff88, wireframe: true, visible: showWire });
     const bodyHitbox = new THREE.Mesh(bodyHitboxGeo, bodyHitboxMat);
-    bodyHitbox.position.y = 0.70;
+    bodyHitbox.position.y = 0.65;
     bodyHitbox.name = 'bodyHitbox';
     bodyHitbox.userData = { isHead: false, isHitbox: true };
     group.add(bodyHitbox);
@@ -872,7 +872,7 @@ class CS2NetworkManager {
     const headHitboxGeo = new THREE.SphereGeometry(0.18, 12, 10);
     const headHitboxMat = new THREE.MeshBasicMaterial({ color: 0xff3344, wireframe: true, visible: showWire });
     const headHitbox = new THREE.Mesh(headHitboxGeo, headHitboxMat);
-    headHitbox.position.y = 2.15;
+    headHitbox.position.y = 1.65;
     headHitbox.name = 'headHitbox';
     headHitbox.userData = { isHead: true, isHitbox: true };
     group.add(headHitbox);
@@ -880,13 +880,14 @@ class CS2NetworkManager {
 
     // Hitbox dynamic bone updater
     group.updateHitboxes = function() {
-      let headY = 2.15;
+      let headY = 1.65;
       const feetY = 0.0;
       if (group.characterBones && group.characterBones.head) {
+        group.updateMatrixWorld(true);
         const hPos = new THREE.Vector3();
         group.characterBones.head.getWorldPosition(hPos);
         const lPos = group.worldToLocal(hPos);
-        if (!isNaN(lPos.y) && lPos.y > 0.6) {
+        if (!isNaN(lPos.y) && lPos.y > 0.8 && lPos.y < 2.3) {
           headY = lPos.y;
         }
       }
@@ -895,7 +896,7 @@ class CS2NetworkManager {
       const bodyHeight = Math.max(0.6, headY - 0.20);
       const bodyCenterY = bodyHeight / 2;
       group.bodyHitbox.position.set(0, bodyCenterY, 0);
-      group.bodyHitbox.scale.set(1, bodyHeight / 1.40, 1);
+      group.bodyHitbox.scale.set(1, bodyHeight / 1.25, 1);
 
       group.measuredMetrics = {
         modelHeight: (headY + 0.18).toFixed(2),
@@ -919,7 +920,7 @@ class CS2NetworkManager {
       new THREE.PlaneGeometry(1.4, 0.35),
       new THREE.MeshBasicMaterial({ map: nameTex, transparent: true, side: THREE.DoubleSide })
     );
-    namePlane.position.set(0, 2.45, 0);
+    namePlane.position.set(0, 1.95, 0);
     group.add(namePlane);
     group.nameTagMesh = namePlane;
     group.nameCanvas = nameCanvas;
@@ -946,13 +947,13 @@ class CS2NetworkManager {
       ? THREE.SkeletonUtils.clone(srcModel)
       : srcModel.clone(true);
 
-    // Height calibration: ~2.4m tall (scale ~1.09 * playerHeight, feet at Y=0, head at Y ~2.2m)
+    // Height calibration: authentic CS2 human proportions (~1.82m tall, feet at Y=0, head at Y ~1.65m)
     const bbox = new THREE.Box3().setFromObject(srcModel);
     const size = new THREE.Vector3();
     bbox.getSize(size);
-    const rawHeight = Math.max(size.y, size.z) || 2.0;
-    const targetHeight = 2.40;
-    const normScale = rawHeight > 0 ? (targetHeight / rawHeight) : 1.20;
+    const rawHeight = Math.max(size.y, size.z) || 1.82;
+    const targetHeight = 1.82;
+    const normScale = rawHeight > 0 ? (targetHeight / rawHeight) : 1.0;
 
     clone.scale.set(normScale, normScale, normScale);
     // Align bottom of model with feet (Y=0)

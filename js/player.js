@@ -179,12 +179,12 @@ class CS2Player {
 
     this.camera.layers.enable(1);
 
-    const vmAmber = new THREE.DirectionalLight(0xfff0dd, 1.4);
+    const vmAmber = new THREE.DirectionalLight(0xfff0dd, 0.55);
     vmAmber.position.set(0.25, 0.45, 0.20);
     vmAmber.layers.set(1);
     this.viewmodelGroup.add(vmAmber);
 
-    const vmFill = new THREE.AmbientLight(0x778899, 1.1);
+    const vmFill = new THREE.AmbientLight(0x8899aa, 0.45);
     vmFill.layers.set(1);
     this.viewmodelGroup.add(vmFill);
 
@@ -330,16 +330,16 @@ class CS2Player {
 
   // Viewmodel positioning per weapon category: authentic forward orientation into crosshair
   static WEAPON_VIEWMODEL = {
-    'pistols':    { pos: [0.16, -0.16, -0.32], scale: 0.018, rot: [0, Math.PI, -Math.PI / 2] },
-    'mid-tier':   { pos: [0.15, -0.16, -0.30], scale: 0.017, rot: [-3 * Math.PI / 2, -Math.PI, 0] },
-    'smgs':       { pos: [0.15, -0.16, -0.30], scale: 0.017, rot: [-3 * Math.PI / 2, -Math.PI, 0] },
-    'rifles':     { pos: [0.15, -0.16, -0.30], scale: 0.016, rot: [-3 * Math.PI / 2, -Math.PI, 0] },
-    'shotguns':   { pos: [0.15, -0.16, -0.30], scale: 0.016, rot: [-3 * Math.PI / 2, -Math.PI, 0] },
-    'machineguns':{ pos: [0.14, -0.16, -0.30], scale: 0.016, rot: [-3 * Math.PI / 2, -Math.PI, 0] },
-    'snipers':    { pos: [0.14, -0.15, -0.28], scale: 0.016, rot: [-3 * Math.PI / 2, -Math.PI, 0] },
-    'equipment':  { pos: [0.15, -0.16, -0.30], scale: 0.020, rot: [-3 * Math.PI / 2, -Math.PI, 0] },
-    'melee':      { pos: [0.17, -0.16, -0.31], scale: 0.016, rot: [-Math.PI / 2, 0, Math.PI / 2] },
-    'knife':      { pos: [0.17, -0.16, -0.31], scale: 0.016, rot: [-Math.PI / 2, 0, Math.PI / 2] }
+    'pistols':    { pos: [0.16, -0.16, -0.32], scale: 0.018, rot: [0, Math.PI, 0] },
+    'mid-tier':   { pos: [0.15, -0.16, -0.30], scale: 0.017, rot: [0, Math.PI, 0] },
+    'smgs':       { pos: [0.15, -0.16, -0.30], scale: 0.017, rot: [0, Math.PI, 0] },
+    'rifles':     { pos: [0.15, -0.16, -0.30], scale: 0.016, rot: [0, Math.PI, 0] },
+    'shotguns':   { pos: [0.15, -0.16, -0.30], scale: 0.016, rot: [0, Math.PI, 0] },
+    'machineguns':{ pos: [0.14, -0.16, -0.30], scale: 0.016, rot: [0, Math.PI, 0] },
+    'snipers':    { pos: [0.14, -0.15, -0.28], scale: 0.016, rot: [0, Math.PI, 0] },
+    'equipment':  { pos: [0.15, -0.16, -0.30], scale: 0.020, rot: [0, 0, 0] },
+    'melee':      { pos: [0.18, -0.16, -0.32], scale: 0.016, rot: [Math.PI / 2, -0.35, 0.25] },
+    'knife':      { pos: [0.18, -0.16, -0.32], scale: 0.016, rot: [Math.PI / 2, -0.35, 0.25] }
   };
 
   // Loads the FBX file containing all CSS weapon meshes
@@ -533,30 +533,30 @@ class CS2Player {
     const armsGroup = new THREE.Group();
     armsGroup.name = 'viewmodelArms';
 
-    // Sleeve color: CT = navy blue (0x1b2838) with ribbing (0x283b54), T = olive drab (0x484131) with ribbing (0x5c533f)
+    // Sleeve color: CT = dark navy blue (0x152230) with ribbing (0x223344), T = dark tactical olive (0x342f24) with ribbing (0x484032)
     const isCT = (team === 'CT');
-    const sleeveColor = isCT ? 0x1b2838 : 0x484131;
-    const ribColor = isCT ? 0x283b54 : 0x5c533f;
+    const sleeveColor = isCT ? 0x152230 : 0x342f24;
+    const ribColor = isCT ? 0x223344 : 0x484032;
     const sleeveMat = new THREE.MeshLambertMaterial({ color: sleeveColor });
     const ribMat = new THREE.MeshLambertMaterial({ color: ribColor });
-    const gloveMat = new THREE.MeshLambertMaterial({ color: 0x1a1a1a });
-    const knuckleMat = new THREE.MeshLambertMaterial({ color: 0x272727 });
+    const gloveMat = new THREE.MeshLambertMaterial({ color: 0x181818 });
+    const knuckleMat = new THREE.MeshLambertMaterial({ color: 0x222222 });
 
     const isKnife = (weapon && (weapon.id === 'knife' || weapon.category === 'melee'));
     const isPistol = (weapon && (weapon.slot === 2 || weapon.category === 'pistols'));
 
-    // Right Arm: Tactical anatomical forearm entering from bottom-right (4-6% screen width)
+    // Right Arm: Tactical anatomical forearm entering naturally from bottom-right
     const rForearmGeo = new THREE.CylinderGeometry(0.026, 0.034, 0.35, 12);
     const rForearm = new THREE.Mesh(rForearmGeo, sleeveMat);
-    rForearm.position.set(0.19, -0.26, -0.16);
-    rForearm.rotation.set(-0.68, 0.22, -0.14);
+    rForearm.position.set(0.24, -0.34, -0.16);
+    rForearm.rotation.set(-0.82, 0.22, -0.16);
     armsGroup.add(rForearm);
 
     // Sleeve cuff ring
     const rCuffGeo = new THREE.CylinderGeometry(0.034, 0.034, 0.025, 12);
     const rCuff = new THREE.Mesh(rCuffGeo, ribMat);
-    rCuff.position.set(0.18, -0.20, -0.23);
-    rCuff.rotation.set(-0.68, 0.22, -0.14);
+    rCuff.position.set(0.21, -0.25, -0.22);
+    rCuff.rotation.set(-0.82, 0.22, -0.16);
     armsGroup.add(rCuff);
 
     // Right Hand: Tactical composite glove palm & wrist
@@ -653,7 +653,7 @@ class CS2Player {
         const mat = origMat ? origMat.clone() : new THREE.MeshPhongMaterial();
         mat.map = tex;
         mat.color.setHex(0xffffff);
-        mat.side = THREE.FrontSide;
+        mat.side = THREE.DoubleSide;
         mat.needsUpdate = true;
         child.material = mat;
         matType = mat.type;
@@ -1113,22 +1113,16 @@ class CS2Player {
     const origZ = this.weaponRig.position.z;
     const origRotX = this.weaponRig.rotation.x;
     const startTime = performance.now();
-    const duration = 110;
+    const duration = 200; // 200ms authentic forward toss arc
 
     const step = (t) => {
       const elapsed = t - startTime;
       const progress = Math.min(1.0, elapsed / duration);
-      if (progress < 0.5) {
-        const p = progress / 0.5;
-        this.weaponRig.position.y = origY - 0.08 * p;
-        this.weaponRig.position.z = origZ + 0.12 * p;
-        this.weaponRig.rotation.x = origRotX - 0.30 * p;
-      } else {
-        const p = (progress - 0.5) / 0.5;
-        this.weaponRig.position.y = origY - 0.08 * (1 - p);
-        this.weaponRig.position.z = origZ + 0.12 * (1 - p);
-        this.weaponRig.rotation.x = origRotX - 0.30 * (1 - p);
-      }
+      // Fast forward toss arc down and away
+      this.weaponRig.position.y = origY - 0.25 * Math.sin(progress * Math.PI * 0.7);
+      this.weaponRig.position.z = origZ - 0.16 * progress;
+      this.weaponRig.rotation.x = origRotX - 0.55 * progress;
+
       if (progress < 1.0) {
         requestAnimationFrame(step);
       } else {
@@ -1144,20 +1138,29 @@ class CS2Player {
   dropWeaponBySlot(dropSlot) {
     // Cannot drop knife (Slot 3)
     if (dropSlot === 3) {
-      if (window.showCS2Toast) window.showCS2Toast('Cannot drop knife', 'warning');
       window.__lastReject = { type: 'drop_weapon', reason: 'Cannot drop knife', time: new Date().toLocaleTimeString() };
       return;
     }
     if (!this.inventory[dropSlot]) return;
 
-    this.playViewmodelToss();
-
     const droppedWeapon = this.inventory[dropSlot];
+    const isDroppingActive = (this.activeSlot === dropSlot);
+
+    // Remove from player inventory
+    this.inventory[dropSlot] = null;
+    if (dropSlot === 4) {
+      const idx = this.grenades.findIndex(g => g && g.id === droppedWeapon.id);
+      if (idx !== -1) this.grenades.splice(idx, 1);
+      if (this.grenades.length > 0) {
+        this.inventory[4] = this.grenades[0];
+      }
+    }
+
     const dropGroup = this.createWorldWeaponMesh(droppedWeapon.id);
 
     // Position weapon in front of player with launch velocity and spin
     const fwd = new THREE.Vector3(-Math.sin(this.yaw), 0, -Math.cos(this.yaw));
-    const dropPos = this.position.clone().addScaledVector(fwd, 0.55);
+    const dropPos = this.position.clone().addScaledVector(fwd, 0.60);
     dropPos.y = this.position.y - 0.35; // Chest/hands height
     dropGroup.position.copy(dropPos);
     dropGroup.rotation.y = this.yaw;
@@ -1182,36 +1185,12 @@ class CS2Player {
       weapon: droppedWeapon,
       slot: dropSlot,
       pos: dropGroup.position,
-      velocity: new THREE.Vector3(fwd.x * 2.8, 2.2, fwd.z * 2.8),
-      angularVelocity: new THREE.Vector3(3.5, 4.0, 1.5),
+      velocity: new THREE.Vector3(fwd.x * 4.2, 2.0, fwd.z * 4.2),
+      angularVelocity: new THREE.Vector3(4.5, 5.0, 2.0),
       groundY: finalGroundY,
       isResting: false,
       droppedAt: performance.now()
     });
-
-    // Remove from player inventory
-    this.inventory[dropSlot] = null;
-    if (dropSlot === 4) {
-      const idx = this.grenades.findIndex(g => g && g.id === droppedWeapon.id);
-      if (idx !== -1) this.grenades.splice(idx, 1);
-      if (this.grenades.length > 0) {
-        this.inventory[4] = this.grenades[0];
-      }
-    }
-
-    // If we dropped the active weapon, switch to next available slot
-    if (this.activeSlot === dropSlot) {
-      const priorities = [1, 2, 3, 4, 5];
-      let switched = false;
-      for (const s of priorities) {
-        if (s !== dropSlot && this.inventory[s]) {
-          this.switchSlot(s);
-          switched = true;
-          break;
-        }
-      }
-      if (!switched) this.switchSlot(3);
-    }
 
     if (window.csGameManager && window.csGameManager.net) {
       window.csGameManager.net.send({
@@ -1223,7 +1202,27 @@ class CS2Player {
       });
     }
 
-    window.csAudio.playWeaponEquip('knife');
+    const nextSwitch = () => {
+      if (isDroppingActive) {
+        const priorities = [1, 2, 3, 4, 5];
+        let switched = false;
+        for (const s of priorities) {
+          if (s !== dropSlot && this.inventory[s]) {
+            this.switchSlot(s);
+            switched = true;
+            break;
+          }
+        }
+        if (!switched) this.switchSlot(3);
+      }
+      this.updateSlotHUD();
+    };
+
+    if (isDroppingActive) {
+      this.playViewmodelToss(nextSwitch);
+    } else {
+      nextSwitch();
+    }
   }
 
   // Pick up dropped weapon (proximity < 2.5m or pressing [E])
@@ -1564,10 +1563,15 @@ class CS2Player {
         Object.entries(gameManager.net.remotePlayers).forEach(([id, p]) => {
           if (p.team === this.team) return;
           if (!p.mesh || !p.mesh.visible) return;
-          // Raycast authentic body & head hitboxes only, never the skinned mesh
+          // Raycast authentic body & head hitboxes and character mesh
           const hitboxTargets = [];
           if (p.mesh.headHitbox) hitboxTargets.push(p.mesh.headHitbox);
           if (p.mesh.bodyHitbox) hitboxTargets.push(p.mesh.bodyHitbox);
+          if (p.mesh.characterMesh) {
+            p.mesh.characterMesh.traverse(c => {
+              if (c.isMesh) hitboxTargets.push(c);
+            });
+          }
           if (hitboxTargets.length === 0) {
             const fallbackHb = p.mesh.getObjectByName('hitbox') || p.mesh;
             hitboxTargets.push(fallbackHb);
@@ -1599,7 +1603,13 @@ class CS2Player {
 
             if (canHit) {
               const hitObj = playerHits[0].object;
-              const isHeadshot = (hitObj === p.mesh.headHitbox || (hitObj.userData && hitObj.userData.isHead === true));
+              const hitPoint = playerHits[0].point;
+              // Headshot if hit head hitbox OR hit point Y is in the head region (top 25cm of model)
+              let isHeadshot = (hitObj === p.mesh.headHitbox || (hitObj.userData && hitObj.userData.isHead === true));
+              if (!isHeadshot && p.mesh) {
+                const localHit = p.mesh.worldToLocal(hitPoint.clone());
+                if (localHit.y >= 1.50) isHeadshot = true;
+              }
               const dmgMult = (isHeadshot ? 4.0 : 1.0) * penetrationPenalty;
               const finalDamage = Math.max(1, Math.round(pelletDmg * dmgMult));
 
