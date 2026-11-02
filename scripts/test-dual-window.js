@@ -5,8 +5,9 @@ const path = require('path');
 const chromePath = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
 const targetUrl = 'https://boqnpenev1-design.github.io/boba1.6/?debug=1';
 
-const dir1 = path.join(process.env.TEMP || 'C:\\Temp', 'cs2_dual_w1');
-const dir2 = path.join(process.env.TEMP || 'C:\\Temp', 'cs2_dual_w2');
+const runId = Date.now();
+const dir1 = path.join(process.env.TEMP || 'C:\\Temp', 'cs2_dual_w1_' + runId);
+const dir2 = path.join(process.env.TEMP || 'C:\\Temp', 'cs2_dual_w2_' + runId);
 
 if (!fs.existsSync(dir1)) fs.mkdirSync(dir1, { recursive: true });
 if (!fs.existsSync(dir2)) fs.mkdirSync(dir2, { recursive: true });
@@ -114,6 +115,8 @@ async function connectCDP(port, name) {
   await send('Runtime.enable');
   await send('Log.enable');
   await send('Page.enable');
+  await send('Network.enable');
+  await send('Network.setCacheDisabled', { cacheDisabled: true });
 
   async function evaluate(expr) {
     const res = await send('Runtime.evaluate', { expression: expr, returnByValue: true });
@@ -135,9 +138,10 @@ async function run() {
     console.log('[DUAL-WINDOW] Connecting to CDP sessions...');
     const w1 = await connectCDP(9222, 'WIN1_T');
     const w2 = await connectCDP(9223, 'WIN2_CT');
-    console.log('[DUAL-WINDOW] Connected to both windows!');
-
-    await sleep(2500);
+    console.log('[DUAL-WINDOW] Connected to both windows! Hard reloading with cache disabled...');
+    await w1.send('Page.reload', { ignoreCache: true });
+    await w2.send('Page.reload', { ignoreCache: true });
+    await sleep(3500);
 
     // Join Window 1
     console.log('[DUAL-WINDOW] Joining Window 1 as PLAYER_T...');
