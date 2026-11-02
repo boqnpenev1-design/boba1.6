@@ -812,10 +812,12 @@ window.addEventListener('keydown', (e) => {
     return;
   }
 
-  // 'B' opens Buy Menu
+  // 'B' opens Buy Menu (strictly locked if buy time expired or outside buy zone)
   if (e.code === 'KeyB' && !document.getElementById('hud').classList.contains('hidden')) {
     if (buyMenu.classList.contains('hidden')) {
-      openBuyMenu();
+      if (gameManager && gameManager.canBuy()) {
+        openBuyMenu();
+      }
     } else {
       closeBuyMenu();
     }

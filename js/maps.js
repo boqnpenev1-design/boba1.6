@@ -352,17 +352,17 @@ class CS2MapBuilder {
     // ==========================================================
 
     // Bombsite A: Positioned directly at the platform crates (Matching material_15 floor decal & radar bounds)
-    this.addBombsiteZone('A', 51.85, 4.32, -108.7, 10.5, {
-      minX: 46.0, maxX: 58.0,
-      minZ: -114.0, maxZ: -104.0,
-      minY: 2.5, maxY: 6.8
+    this.addBombsiteZone('A', 51.85, 4.32, -108.7, 16.0, {
+      minX: 36.0, maxX: 68.0,
+      minZ: -125.0, maxZ: -95.0,
+      minY: 0.5, maxY: 9.0
     });
 
     // Bombsite B: Courtyard zone matching material_25 SandRoadTgtB decal and radar orange bounds
-    this.addBombsiteZone('B', -72.0, 0.0, -121.0, 11.5, {
-      minX: -79.0, maxX: -65.0,
-      minZ: -128.0, maxZ: -114.0,
-      minY: -1.0, maxY: 4.0
+    this.addBombsiteZone('B', -72.0, 0.0, -121.0, 16.0, {
+      minX: -85.0, maxX: -60.0,
+      minZ: -132.0, maxZ: -110.0,
+      minY: -2.0, maxY: 6.0
     });
 
     // Authentic Buy Zones matching CT & T Spawns

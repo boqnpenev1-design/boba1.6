@@ -458,6 +458,17 @@ class CS2NetworkManager {
         this.gm.addKillFeed(packet.attackerName, packet.victimName, packet.weapon, packet.isHeadshot);
         if (packet.victimId === this.playerId && this.gm.player) {
           this.gm.player.takeDamage(500, packet.attackerName, packet.weapon, packet.isHeadshot, this.gm);
+        } else if (this.remotePlayers[packet.victimId]) {
+          const rp = this.remotePlayers[packet.victimId];
+          rp.isAlive = false;
+          if (rp.mesh) {
+            rp.mesh.rotation.z = -Math.PI / 2;
+            setTimeout(() => {
+              if (rp && rp.mesh && !rp.isAlive) {
+                rp.mesh.visible = false;
+              }
+            }, 1000);
+          }
         }
         break;
 
@@ -856,23 +867,23 @@ class CS2NetworkManager {
   createTacticalCharacterModel(team, callsign = 'OPERATOR') {
     const group = new THREE.Group();
 
-    // 1. Authentic Capsule Body Hitbox (Radius ~0.30m matching authentic human bounds, anchored at ground Y=0)
+    // 1. Authentic Capsule Body Hitbox (Radius ~0.32m, height 1.40m matching authentic human bounds, anchored at ground Y=0)
     const isDebug = (typeof window !== 'undefined' && window.location && new URLSearchParams(window.location.search).get('debug') === '1');
     const showWire = isDebug || !!window.__showHitboxWireframes;
-    const bodyHitboxGeo = new THREE.CylinderGeometry(0.30, 0.30, 1.25, 12);
+    const bodyHitboxGeo = new THREE.CylinderGeometry(0.32, 0.32, 1.40, 12);
     const bodyHitboxMat = new THREE.MeshBasicMaterial({ color: 0x00ff88, wireframe: true, visible: showWire });
     const bodyHitbox = new THREE.Mesh(bodyHitboxGeo, bodyHitboxMat);
-    bodyHitbox.position.y = 0.65;
+    bodyHitbox.position.y = 0.70;
     bodyHitbox.name = 'bodyHitbox';
     bodyHitbox.userData = { isHead: false, isHitbox: true };
     group.add(bodyHitbox);
     group.bodyHitbox = bodyHitbox;
 
-    // 2. Authentic Sphere Head Hitbox (Radius 0.18m, positioned at head bone)
-    const headHitboxGeo = new THREE.SphereGeometry(0.18, 12, 10);
+    // 2. Authentic Sphere Head Hitbox (Radius 0.20m, positioned at head bone ~1.82m)
+    const headHitboxGeo = new THREE.SphereGeometry(0.20, 12, 10);
     const headHitboxMat = new THREE.MeshBasicMaterial({ color: 0xff3344, wireframe: true, visible: showWire });
     const headHitbox = new THREE.Mesh(headHitboxGeo, headHitboxMat);
-    headHitbox.position.y = 1.65;
+    headHitbox.position.y = 1.82;
     headHitbox.name = 'headHitbox';
     headHitbox.userData = { isHead: true, isHitbox: true };
     group.add(headHitbox);
@@ -880,23 +891,23 @@ class CS2NetworkManager {
 
     // Hitbox dynamic bone updater
     group.updateHitboxes = function() {
-      let headY = 1.65;
+      let headY = 1.82;
       const feetY = 0.0;
       if (group.characterBones && group.characterBones.head) {
         group.updateMatrixWorld(true);
         const hPos = new THREE.Vector3();
         group.characterBones.head.getWorldPosition(hPos);
         const lPos = group.worldToLocal(hPos);
-        if (!isNaN(lPos.y) && lPos.y > 0.8 && lPos.y < 2.3) {
+        if (!isNaN(lPos.y) && lPos.y > 1.2 && lPos.y < 2.4) {
           headY = lPos.y;
         }
       }
       group.headHitbox.position.set(0, headY, 0);
 
-      const bodyHeight = Math.max(0.6, headY - 0.20);
+      const bodyHeight = Math.max(0.8, headY - 0.25);
       const bodyCenterY = bodyHeight / 2;
       group.bodyHitbox.position.set(0, bodyCenterY, 0);
-      group.bodyHitbox.scale.set(1, bodyHeight / 1.25, 1);
+      group.bodyHitbox.scale.set(1, bodyHeight / 1.40, 1);
 
       group.measuredMetrics = {
         modelHeight: (headY + 0.18).toFixed(2),
@@ -920,7 +931,7 @@ class CS2NetworkManager {
       new THREE.PlaneGeometry(1.4, 0.35),
       new THREE.MeshBasicMaterial({ map: nameTex, transparent: true, side: THREE.DoubleSide })
     );
-    namePlane.position.set(0, 1.95, 0);
+    namePlane.position.set(0, 2.15, 0);
     group.add(namePlane);
     group.nameTagMesh = namePlane;
     group.nameCanvas = nameCanvas;
@@ -947,17 +958,14 @@ class CS2NetworkManager {
       ? THREE.SkeletonUtils.clone(srcModel)
       : srcModel.clone(true);
 
-    // Height calibration: authentic CS2 human proportions (~1.82m tall, feet at Y=0, head at Y ~1.65m)
-    const bbox = new THREE.Box3().setFromObject(srcModel);
-    const size = new THREE.Vector3();
-    bbox.getSize(size);
-    const rawHeight = Math.max(size.y, size.z) || 1.82;
-    const targetHeight = 1.82;
-    const normScale = rawHeight > 0 ? (targetHeight / rawHeight) : 1.0;
+    const isCT = (team === 'CT');
+    // Height calibration: authentic CS2 human proportions (~2.00m tall, feet grounded at Y=0, head at Y ~1.82m)
+    const normScale = isCT ? 1.03 : 0.0272;
+    const yOffset = isCT ? 0.0 : (-1.29 * normScale);
 
     clone.scale.set(normScale, normScale, normScale);
-    // Align bottom of model with feet (Y=0)
-    clone.position.set(0, -bbox.min.y * normScale, 0);
+    // Align bottom of model with ground feet (Y=0)
+    clone.position.set(0, yOffset, 0);
     // Orient model so it faces the exact player view/movement direction (fix 180 deg offset)
     clone.rotation.y = Math.PI;
 

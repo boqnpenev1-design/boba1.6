@@ -244,7 +244,7 @@ class CS2GameManager {
 
     try {
       if (document.exitPointerLock) document.exitPointerLock();
-    } catch (e) {}
+    } catch (e) { }
 
     // Open team selection split-screen
     document.getElementById('main-menu').classList.add('hidden');
@@ -279,23 +279,23 @@ class CS2GameManager {
     if (hasUserGesture) {
       try {
         const el = document.documentElement;
-        if (el.requestFullscreen) el.requestFullscreen().catch(() => {});
+        if (el.requestFullscreen) el.requestFullscreen().catch(() => { });
         else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
-      } catch (e) {}
+      } catch (e) { }
       try {
         if (navigator.keyboard && navigator.keyboard.lock) {
-          navigator.keyboard.lock(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ControlLeft', 'ControlRight', 'ShiftLeft', 'Space']).catch(() => {});
+          navigator.keyboard.lock(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ControlLeft', 'ControlRight', 'ShiftLeft', 'Space']).catch(() => { });
         }
-      } catch (e) {}
+      } catch (e) { }
     }
     document.getElementById('hud').classList.remove('hidden');
     if (hasUserGesture) {
       try {
         const lockPromise = document.getElementById('game-canvas-container').requestPointerLock();
         if (lockPromise && typeof lockPromise.catch === 'function') {
-          lockPromise.catch(() => {});
+          lockPromise.catch(() => { });
         }
-      } catch (e) {}
+      } catch (e) { }
     }
 
     // In online mode, spectate only if server says inMatch is false
@@ -415,7 +415,7 @@ class CS2GameManager {
     this.player.money.set(800);
   }
 
-  // Authentic CS2 Buy Zone & Buy Time Rules (Strict 20s Window in Buy Zone)
+  // Authentic CS2 Buy Zone & Buy Time Rules (Strict 15s Window in Buy Zone)
   canBuy() {
     const inZone = this.mapBuilder.isInBuyZone(this.player.team, this.player.position);
     if (!inZone) return false;
@@ -425,8 +425,9 @@ class CS2GameManager {
 
     // 2. Live Round: strictly allowed only within the first 15.0 seconds
     if (this.phase === 'live') {
-      const elapsed = this.liveRoundStartTime > 0 ? (Date.now() - this.liveRoundStartTime) / 1000 : (this.roundTime - this.phaseTimer);
-      return elapsed <= 15.0;
+      if (typeof this.phaseTimer === 'number' && this.phaseTimer < 100.0) return false;
+      if (this.liveRoundStartTime > 0 && (Date.now() - this.liveRoundStartTime) > 15000) return false;
+      return true;
     }
     return false;
   }
@@ -794,14 +795,15 @@ class CS2GameManager {
         if (site.bounds) {
           const b = site.bounds;
           if (this.player.position.x >= b.minX && this.player.position.x <= b.maxX &&
-              this.player.position.z >= b.minZ && this.player.position.z <= b.maxZ &&
-              playerFeetY >= b.minY && playerFeetY <= b.maxY) {
+            this.player.position.z >= b.minZ && this.player.position.z <= b.maxZ &&
+            playerFeetY >= b.minY && playerFeetY <= b.maxY) {
             inside = true;
           }
-        } else {
+        }
+        if (!inside && site.radius) {
           const dist = Math.hypot(this.player.position.x - site.x, this.player.position.z - site.z);
-          const dy = Math.abs(playerFeetY - (site.y || 0));
-          if (dist <= site.radius && dy < 2.5) {
+          const dy = Math.abs(playerFeetY - (site.y || 4.32));
+          if (dist <= site.radius && dy < 4.5) {
             inside = true;
           }
         }
@@ -852,7 +854,7 @@ class CS2GameManager {
               for (let i = 0; i < this.mapBuilder.colliders.length; i++) {
                 const c = this.mapBuilder.colliders[i];
                 if (c.box && this.player.position.x >= c.box.min.x && this.player.position.x <= c.box.max.x &&
-                    this.player.position.z >= c.box.min.z && this.player.position.z <= c.box.max.z) {
+                  this.player.position.z >= c.box.min.z && this.player.position.z <= c.box.max.z) {
                   if (c.topY !== undefined && Math.abs((this.player.position.y - this.player.playerHeight) - c.topY) < 0.6) {
                     plantY = c.topY;
                     break;
@@ -1317,13 +1319,23 @@ class CS2GameManager {
       }
     }
 
-    // Buyzone active state
+    // Buyzone active state & 15s window enforcement
     const inBuy = this.canBuy();
     if (c.buyzoneActive !== inBuy) {
       c.buyzoneActive = inBuy;
       if (h.buyzoneBox) {
         if (inBuy) h.buyzoneBox.classList.remove('inactive');
         else h.buyzoneBox.classList.add('inactive');
+      }
+      if (!inBuy) {
+        const buyMenu = document.getElementById('buy-menu');
+        if (buyMenu && !buyMenu.classList.contains('hidden')) {
+          buyMenu.classList.add('hidden');
+          const container = document.getElementById('game-canvas-container');
+          if (container && document.getElementById('main-menu').classList.contains('hidden')) {
+            try { container.requestPointerLock(); } catch(e){}
+          }
+        }
       }
     }
 
