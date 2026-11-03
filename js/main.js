@@ -88,7 +88,7 @@ document.addEventListener('DOMContentLoaded', () => {
   renderer.setPixelRatio(defaultPR);
   renderer.shadowMap.enabled = !noShadow && false; // Off by default for competitive 60+ FPS
   renderer.toneMapping = noPost ? THREE.LinearToneMapping : THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.0;
+  renderer.toneMappingExposure = 0.85; // Desert sunlight exposure (rich contrast, 0 washed-out stone)
   renderer.outputEncoding = THREE.sRGBEncoding;
   renderer.autoClear = false; // Enabled for multi-pass viewmodel rendering (zero world light bleeding)
   renderer.info.autoReset = false; // Manual reset per frame so multi-pass draw calls accumulate correctly
@@ -109,14 +109,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
   container.appendChild(renderer.domElement);
 
-  // Fast Competitive Lighting (Authentic CS2 Desert Sun - warm contrast, zero dark walls)
-  const ambientLight = new THREE.AmbientLight(0xffeedd, 0.28);
+  // Fast Competitive Lighting (Authentic CS 1.6 / CS2 Desert Sun - warm contrast, zero dark walls)
+  const ambientLight = new THREE.AmbientLight(0xddeeff, 0.14);
   scene.add(ambientLight);
 
-  const hemiLight = new THREE.HemisphereLight(0xffeedd, 0x6e5a44, 0.45);
+  const hemiLight = new THREE.HemisphereLight(0xffeedd, 0x443a2c, 0.28);
   scene.add(hemiLight);
 
-  const sunLight = new THREE.DirectionalLight(0xfffaed, 0.65);
+  const sunLight = new THREE.DirectionalLight(0xfff4e6, 0.52);
   sunLight.position.set(50, 90, 40);
   scene.add(sunLight);
 
@@ -1051,29 +1051,11 @@ function animate(currentTime) {
   renderer.clear();
   renderer.render(scene, camera);
 
-  // Sample mean world brightness from WebGL buffer once per second (center 16x16 readback)
-  if (!window.__lastBrightSample || currentTime - window.__lastBrightSample > 1000) {
-    window.__lastBrightSample = currentTime;
-    try {
-      const gl = renderer.getContext();
-      if (gl) {
-        const w = renderer.domElement.width;
-        const h = renderer.domElement.height;
-        const cx = Math.max(0, Math.floor(w / 2) - 8);
-        const cy = Math.max(0, Math.floor(h / 2) - 8);
-        const pixels = new Uint8Array(16 * 16 * 4);
-        gl.readPixels(cx, cy, 16, 16, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
-        let sumLum = 0;
-        for (let i = 0; i < pixels.length; i += 4) {
-          sumLum += (0.2126 * pixels[i] + 0.7152 * pixels[i + 1] + 0.0722 * pixels[i + 2]) / 255;
-        }
-        window.__meanWorldBrightness = (sumLum / (16 * 16)).toFixed(3);
-      }
-    } catch (e) {}
-  }
-
   // Pass 2: Render Viewmodel in isolated scene & camera with dedicated viewmodel lights
   if (!window.__noVm && gameManager && gameManager.player && gameManager.player.viewmodelScene && gameManager.player.viewmodelCamera && gameManager.player.viewmodelGroup && gameManager.player.viewmodelGroup.visible) {
+    if (renderer.state && renderer.state.buffers && renderer.state.buffers.depth) {
+      renderer.state.buffers.depth.setMask(true);
+    }
     renderer.clearDepth();
     const vp = gameManager.player;
     vp.viewmodelCamera.aspect = camera.aspect;

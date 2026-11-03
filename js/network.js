@@ -489,6 +489,12 @@ class CS2NetworkManager {
         }
         break;
 
+      case 'flash_detonated':
+        if (this.gm && this.gm.player && packet.pos) {
+          this.gm.player.applyFlashbangEffect(new THREE.Vector3(packet.pos.x, packet.pos.y, packet.pos.z));
+        }
+        break;
+
       case 'player_damaged':
         if (packet.targetId === this.playerId && this.gm.player) {
           this.gm.player.takeDamage(packet.damage, packet.attackerId, 'bullet', false, this.gm);
@@ -509,10 +515,27 @@ class CS2NetworkManager {
             if (rp.mesh.headHitbox) rp.mesh.headHitbox.visible = false;
             if (rp.mesh.nameTagMesh) rp.mesh.nameTagMesh.visible = false;
 
-            // Lay flat on floor
+            // Lay flat on floor with relaxed natural limbs
+            if (rp.mesh.characterBones) {
+              const b = rp.mesh.characterBones;
+              if (b.armUpperL) b.armUpperL.rotation.set(0.1, 0.1, 0.25);
+              if (b.armUpperR) b.armUpperR.rotation.set(0.1, -0.1, -0.25);
+              if (b.armLowerL) b.armLowerL.rotation.set(0, 0, 0);
+              if (b.armLowerR) b.armLowerR.rotation.set(0, 0, 0);
+              if (b.legUpperL) b.legUpperL.rotation.set(0, 0, 0);
+              if (b.legUpperR) b.legUpperR.rotation.set(0, 0, 0);
+              if (b.legLowerL) b.legLowerL.rotation.set(0, 0, 0);
+              if (b.legLowerR) b.legLowerR.rotation.set(0, 0, 0);
+            }
             if (rp.mesh.characterWrapper) {
-              rp.mesh.characterWrapper.rotation.x = -Math.PI / 2;
-              rp.mesh.characterWrapper.position.y = 0.22;
+              const wrap = rp.mesh.characterWrapper;
+              if (rp.team === 'CT') {
+                wrap.rotation.set(-Math.PI / 2, 0, -Math.PI / 2);
+                wrap.position.y = 0.35;
+              } else {
+                wrap.rotation.set(-Math.PI / 2, Math.PI, 0);
+                wrap.position.y = 0.25;
+              }
             }
           }
         }
@@ -909,11 +932,27 @@ class CS2NetworkManager {
         if (rp.mesh.headHitbox) rp.mesh.headHitbox.visible = false;
         if (rp.mesh.nameTagMesh) rp.mesh.nameTagMesh.visible = false;
 
-        // Realistic death fall: rotate wrapper backward onto floor
+        // Realistic death fall: rotate wrapper backward onto floor with relaxed limbs
+        if (rp.mesh.characterBones) {
+          const b = rp.mesh.characterBones;
+          if (b.armUpperL) b.armUpperL.rotation.set(0.1, 0.1, 0.25);
+          if (b.armUpperR) b.armUpperR.rotation.set(0.1, -0.1, -0.25);
+          if (b.armLowerL) b.armLowerL.rotation.set(0, 0, 0);
+          if (b.armLowerR) b.armLowerR.rotation.set(0, 0, 0);
+          if (b.legUpperL) b.legUpperL.rotation.set(0, 0, 0);
+          if (b.legUpperR) b.legUpperR.rotation.set(0, 0, 0);
+          if (b.legLowerL) b.legLowerL.rotation.set(0, 0, 0);
+          if (b.legLowerR) b.legLowerR.rotation.set(0, 0, 0);
+        }
         if (rp.mesh.characterWrapper) {
           const wrap = rp.mesh.characterWrapper;
-          wrap.rotation.x = -Math.PI / 2;
-          wrap.position.y = 0.22; // Elevate so back/hips rest flat ON floor (never sunk)
+          if (rp.team === 'CT') {
+            wrap.rotation.set(-Math.PI / 2, 0, -Math.PI / 2);
+            wrap.position.y = 0.35;
+          } else {
+            wrap.rotation.set(-Math.PI / 2, Math.PI, 0);
+            wrap.position.y = 0.25;
+          }
         }
 
         const elapsed = (now - rp.diedAt) / 1000;
@@ -931,7 +970,7 @@ class CS2NetworkManager {
       } else {
         rp.diedAt = null;
         if (rp.mesh.characterWrapper) {
-          rp.mesh.characterWrapper.rotation.x = 0;
+          rp.mesh.characterWrapper.rotation.set(0, Math.PI, 0);
           rp.mesh.characterWrapper.position.y = 0;
         }
         if (rp.mesh.nameTagMesh) rp.mesh.nameTagMesh.visible = true;

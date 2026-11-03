@@ -177,6 +177,8 @@ class CS2Player {
       ? window.innerWidth / window.innerHeight
       : (16 / 9);
     this.viewmodelCamera = new THREE.PerspectiveCamera(60, aspect, 0.05, 10.0);
+    this.viewmodelCamera.layers.enable(0);
+    this.viewmodelCamera.layers.enable(1);
     this.viewmodelScene.add(this.viewmodelCamera);
 
     this.viewmodelGroup = new THREE.Group();
@@ -187,9 +189,13 @@ class CS2Player {
     // Dedicated Viewmodel Studio Lighting (lives strictly inside viewmodelScene, 0% map impact)
     const vmAmber = new THREE.DirectionalLight(0xfff0dd, 0.85);
     vmAmber.position.set(0.35, 0.65, 0.25);
+    vmAmber.layers.enable(0);
+    vmAmber.layers.enable(1);
     this.viewmodelScene.add(vmAmber);
 
     const vmFill = new THREE.AmbientLight(0x99aabb, 0.60);
+    vmFill.layers.enable(0);
+    vmFill.layers.enable(1);
     this.viewmodelScene.add(vmFill);
 
     // Muzzle Flash (Subtle realistic muzzle spark, zero screen-blocking circle)
@@ -532,10 +538,11 @@ class CS2Player {
     const arms = this.buildFirstPersonArms(this.team, w);
     if (arms) group.add(arms);
 
-    // 3. Set Layer 1 on viewmodel so dedicated lights illuminate it without leaking to map or being bleached by sun
+    // 3. Set Layer 0 & 1 on viewmodel so dedicated studio lights illuminate it cleanly
     group.traverse(c => {
       if (c.isMesh) {
-        c.layers.set(1);
+        c.layers.enable(0);
+        c.layers.enable(1);
       }
     });
 
@@ -584,21 +591,21 @@ class CS2Player {
     rHandGroup.position.set(sock.grip[0], sock.grip[1], sock.grip[2]);
     if (sock.gripRot) rHandGroup.rotation.set(sock.gripRot[0], sock.gripRot[1], sock.gripRot[2]);
 
-    const rPalm = new THREE.Mesh(new THREE.BoxGeometry(0.046, 0.040, 0.052), gloveMat);
+    const rPalm = new THREE.Mesh(new THREE.BoxGeometry(0.038, 0.032, 0.044), gloveMat);
     rHandGroup.add(rPalm);
 
-    const rKnuckle = new THREE.Mesh(new THREE.BoxGeometry(0.048, 0.015, 0.026), knuckleMat);
-    rKnuckle.position.set(0, 0.018, -0.01);
+    const rKnuckle = new THREE.Mesh(new THREE.BoxGeometry(0.040, 0.014, 0.024), knuckleMat);
+    rKnuckle.position.set(0, 0.015, -0.01);
     rHandGroup.add(rKnuckle);
 
-    const rThumb = new THREE.Mesh(new THREE.BoxGeometry(0.015, 0.015, 0.032), gloveMat);
-    rThumb.position.set(0.024, 0.005, 0.01);
+    const rThumb = new THREE.Mesh(new THREE.BoxGeometry(0.014, 0.014, 0.028), gloveMat);
+    rThumb.position.set(0.020, 0.005, 0.01);
     rThumb.rotation.set(-0.2, 0.35, 0.1);
     rHandGroup.add(rThumb);
 
     for (let f = 0; f < 3; f++) {
-      const finger = new THREE.Mesh(new THREE.BoxGeometry(0.034, 0.012, 0.014), gloveMat);
-      finger.position.set(-0.005, -0.012 - f * 0.011, -0.018 + f * 0.004);
+      const finger = new THREE.Mesh(new THREE.BoxGeometry(0.030, 0.011, 0.013), gloveMat);
+      finger.position.set(-0.005, -0.010 - f * 0.010, -0.016 + f * 0.004);
       finger.rotation.set(-0.25, 0.15, -0.12);
       rHandGroup.add(finger);
     }
@@ -608,14 +615,18 @@ class CS2Player {
     rWristMarker.position.set(0, -0.02, 0.03);
     rHandGroup.add(rWristMarker);
 
-    armsGroup.add(rHandGroup);
+    if (this.activeWeaponMeshGroup) {
+      this.activeWeaponMeshGroup.add(rHandGroup);
+    } else {
+      armsGroup.add(rHandGroup);
+    }
     this.rightHandGlove = rHandGroup;
     this.rightWristMarker = rWristMarker;
 
     // Right Forearm & Cuff: Anchored at fixed off-screen base
-    const rForearmGeo = new THREE.CylinderGeometry(0.026, 0.038, 1.0, 12);
+    const rForearmGeo = new THREE.CylinderGeometry(0.022, 0.032, 1.0, 12);
     const rForearm = new THREE.Mesh(rForearmGeo, sleeveMat);
-    const rCuff = new THREE.Mesh(new THREE.CylinderGeometry(0.033, 0.033, 0.035, 12), ribMat);
+    const rCuff = new THREE.Mesh(new THREE.CylinderGeometry(0.027, 0.027, 0.028, 12), ribMat);
     armsGroup.add(rForearm);
     armsGroup.add(rCuff);
     this.rForearmMesh = rForearm;
@@ -638,7 +649,11 @@ class CS2Player {
       lWristMarker.position.set(0, -0.02, 0.03);
       lHandGroup.add(lWristMarker);
 
-      armsGroup.add(lHandGroup);
+      if (this.activeWeaponMeshGroup) {
+        this.activeWeaponMeshGroup.add(lHandGroup);
+      } else {
+        armsGroup.add(lHandGroup);
+      }
       this.leftHandGlove = lHandGroup;
       this.leftWristMarker = lWristMarker;
 
@@ -663,7 +678,7 @@ class CS2Player {
   updateConnectedArms() {
     if (!this.armsGroup || !this.rForearmMesh || !this.rightWristMarker) return;
 
-    const anchorR = new THREE.Vector3(0.28, -0.40, -0.08);
+    const anchorR = new THREE.Vector3(0.34, -0.38, -0.05);
     const wristRWorld = new THREE.Vector3();
     this.rightWristMarker.getWorldPosition(wristRWorld);
     const wristR = this.viewmodelGroup.worldToLocal(wristRWorld);
@@ -684,7 +699,7 @@ class CS2Player {
     }
 
     if (this.lForearmMesh && this.leftWristMarker) {
-      const anchorL = new THREE.Vector3(-0.28, -0.40, -0.08);
+      const anchorL = new THREE.Vector3(-0.34, -0.38, -0.05);
       const wristLWorld = new THREE.Vector3();
       this.leftWristMarker.getWorldPosition(wristLWorld);
       const wristL = this.viewmodelGroup.worldToLocal(wristLWorld);
@@ -742,7 +757,8 @@ class CS2Player {
         }
         child.material = mat;
         matType = mat.type;
-        child.layers.set(1);
+        child.layers.enable(0);
+        child.layers.enable(1);
       }
     });
 
@@ -1884,21 +1900,12 @@ class CS2Player {
         this.activeGrenades.splice(i, 1);
 
         if (g.type === 'flashbang') {
-          window.csAudio.playFlashbangExplode();
-          const flashEl = document.getElementById('flash-overlay');
-          if (flashEl) {
-            flashEl.style.backgroundColor = '#ffffff';
-            flashEl.style.opacity = '1';
-            let op = 1.0;
-            const fadeInterval = setInterval(() => {
-              op -= 0.04;
-              if (op <= 0) {
-                flashEl.style.opacity = '0';
-                clearInterval(fadeInterval);
-              } else {
-                flashEl.style.opacity = String(op);
-              }
-            }, 60);
+          this.applyFlashbangEffect(pos);
+          if (window.csGameManager && window.csGameManager.net) {
+            window.csGameManager.net.send({
+              type: 'flash_detonated',
+              pos: { x: pos.x, y: pos.y, z: pos.z }
+            });
           }
         } else if (g.type === 'hegrenade') {
           window.csAudio.playHEDetonate();
@@ -2038,6 +2045,76 @@ class CS2Player {
     }
   }
 
+  applyFlashbangEffect(pos) {
+    if (window.csAudio) window.csAudio.playFlashbangExplode();
+
+    const dist = this.position.distanceTo(pos);
+    if (dist > 35.0) return; // Outside flashbang effect radius
+
+    // Eye position
+    const eyePos = this.position.clone();
+    eyePos.y += (this.isCrouched ? 0.95 : 1.45);
+    const dirToFlash = pos.clone().sub(eyePos);
+    const distToFlash = dirToFlash.length();
+    if (distToFlash > 0.001) dirToFlash.normalize();
+
+    // Camera view direction
+    const viewDir = new THREE.Vector3();
+    this.camera.getWorldDirection(viewDir);
+
+    // Dot product: 1.0 = looking directly at flash, 0 = 90 deg sideways, < 0 = looking away
+    const dot = viewDir.dot(dirToFlash);
+
+    // Line of sight occlusion check against map geometry
+    let occluded = false;
+    if (this.map && this.map.groundMeshes && distToFlash > 1.0) {
+      const losRay = new THREE.Raycaster(eyePos, dirToFlash, 0.2, distToFlash - 0.3);
+      const hits = losRay.intersectObjects(this.map.groundMeshes, true);
+      if (hits.length > 0) occluded = true;
+    }
+    if (occluded) return;
+
+    // Flash intensity & duration:
+    // Looking directly at it (dot > 0.5): full blinding whiteout
+    // Peripheral (0 < dot <= 0.5): partial flash
+    // Turned away (dot <= 0): subtle 0.1s flicker only if very close
+    let maxOpacity = 0;
+    let fadeRate = 0.035;
+
+    if (dot > 0.5) {
+      maxOpacity = Math.min(1.0, 1.2 - (distToFlash / 35.0) * 0.6);
+      fadeRate = 0.015;
+    } else if (dot > 0.0) {
+      maxOpacity = Math.max(0.15, (0.75 - (distToFlash / 35.0) * 0.5) * (dot / 0.5));
+      fadeRate = 0.04;
+    } else {
+      if (distToFlash <= 12.0) {
+        maxOpacity = 0.20 * (1.0 - distToFlash / 12.0);
+        fadeRate = 0.08;
+      }
+    }
+
+    if (maxOpacity <= 0.03) return;
+
+    const flashEl = document.getElementById('flash-overlay');
+    if (flashEl) {
+      if (this._flashTimer) clearInterval(this._flashTimer);
+      flashEl.style.backgroundColor = '#ffffff';
+      flashEl.style.opacity = String(maxOpacity);
+      let op = maxOpacity;
+      this._flashTimer = setInterval(() => {
+        op -= fadeRate;
+        if (op <= 0) {
+          flashEl.style.opacity = '0';
+          clearInterval(this._flashTimer);
+          this._flashTimer = null;
+        } else {
+          flashEl.style.opacity = String(op);
+        }
+      }, 50);
+    }
+  }
+
   onDeath(attackerName, weaponName) {
     window.csAudio.playSound('death');
     if (this.isScoped) this.toggleScope();
@@ -2164,6 +2241,9 @@ class CS2Player {
   update(dt, currentTime, gameManager) {
     this.updateGrenades(dt);
     this.checkPickupItems();
+    if (this.viewmodelGroup) {
+      this.viewmodelGroup.updateMatrixWorld(true);
+    }
     this.updateConnectedArms();
 
     // Smooth Third-Person Spectator Chase Camera
@@ -2448,14 +2528,13 @@ class CS2Player {
     if (groundCandidates.length > 0) {
       this.downOrigin.set(this.position.x, this.position.y + 0.5, this.position.z);
       this.downRaycaster.set(this.downOrigin, this.downDir);
-      this.downRaycaster.far = 12.0;
+      this.downRaycaster.far = 14.0;
       const hits = this.downRaycaster.intersectObjects(groundCandidates, false);
-      let foundGround = false;
-      let highestGroundY = -999;
+      let highestWalkableY = -999;
+      let highestSupportY = -999;
+
       for (let i = 0; i < hits.length; i++) {
         const hit = hits[i];
-        // Enforce walkable slope: hit surface normal must have world Y >= 0.70 (walkable angle <= 45 deg)
-        // Rejects steep canyon cliff faces (e.g. B-window rock face) and prevents climbing unwalkable surfaces
         let worldNormalY = 1.0;
         if (hit.face && hit.face.normal) {
           if (hit.object && hit.object.matrixWorld) {
@@ -2465,18 +2544,23 @@ class CS2Player {
             worldNormalY = hit.face.normal.y;
           }
         }
-        if (worldNormalY < 0.70) {
-          continue;
-        }
         const ptY = hit.point.y;
-        if (ptY <= (this.position.y - this.playerHeight + 0.8) && ptY > highestGroundY && ptY <= 16.0) {
-          highestGroundY = ptY;
-          foundGround = true;
+        if (ptY <= (this.position.y - this.playerHeight + 0.8) && ptY <= 16.0) {
+          if (worldNormalY >= 0.65 && ptY > highestWalkableY) {
+            highestWalkableY = ptY;
+          }
+          if (worldNormalY >= 0.15 && ptY > highestSupportY) {
+            highestSupportY = ptY;
+          }
         }
       }
-      if (foundGround) {
-        targetGroundY = highestGroundY;
-        this.lastGroundY = highestGroundY;
+      if (highestWalkableY > -900) {
+        targetGroundY = highestWalkableY;
+        this.lastGroundY = highestWalkableY;
+      } else if (highestSupportY > -900) {
+        // Mountain rock / canyon ledge support: guarantees player never falls through terrain into void
+        targetGroundY = highestSupportY;
+        this.lastGroundY = highestSupportY;
       }
     }
 
@@ -2503,44 +2587,34 @@ class CS2Player {
       window.csAudio.playLand();
     }
 
-    // 4. Climbable site platforms & crates (solid footing on top, blocks walking through sides)
+    // 4. Climbable site platforms & crates (100% solid tops, edges, corners & sides)
     const currentFeetY = this.position.y - this.playerHeight;
     for (let i = 0; i < colliders.length; i++) {
       const c = colliders[i];
       if (!c.isClimbable) continue;
       const box = c.box;
-      if (
-        this.position.x + playerRadius > box.min.x &&
-        this.position.x - playerRadius < box.max.x &&
-        oldZ + playerRadius > box.min.z &&
-        oldZ - playerRadius < box.max.z
-      ) {
-        if (currentFeetY >= c.topY - 0.20 && this.velocity.y <= 0) {
+      const inBoxX = (this.position.x + playerRadius > box.min.x && this.position.x - playerRadius < box.max.x);
+      const inBoxZ = (this.position.z + playerRadius > box.min.z && this.position.z - playerRadius < box.max.z);
+
+      if (inBoxX && inBoxZ) {
+        // Landing or standing on crate top (full footprint support for corners and edges)
+        if (currentFeetY >= c.topY - 0.40 && this.velocity.y <= 0.1) {
           this.position.y = c.topY + this.playerHeight;
           this.velocity.y = 0;
           this.isGrounded = true;
           this.lastGroundY = c.topY;
-        } else {
-          // Push back from crate sides & corners (100% solid, prevents jumping through)
-          this.position.x = oldX;
-          this.velocity.x = 0;
-        }
-      }
-      if (
-        oldX + playerRadius > box.min.x &&
-        oldX - playerRadius < box.max.x &&
-        this.position.z + playerRadius > box.min.z &&
-        this.position.z - playerRadius < box.max.z
-      ) {
-        if (currentFeetY >= c.topY - 0.20 && this.velocity.y <= 0) {
-          this.position.y = c.topY + this.playerHeight;
-          this.velocity.y = 0;
-          this.isGrounded = true;
-          this.lastGroundY = c.topY;
-        } else {
-          // Push back from crate sides & corners (100% solid, prevents jumping through)
-          this.position.z = oldZ;
-          this.velocity.z = 0;
+        } else if (currentFeetY < c.topY - 0.40) {
+          // Push horizontally away from crate walls along shallowest penetration axis
+          const penMinX = Math.abs((box.min.x - playerRadius) - this.position.x);
+          const penMaxX = Math.abs((box.max.x + playerRadius) - this.position.x);
+          const penMinZ = Math.abs((box.min.z - playerRadius) - this.position.z);
+          const penMaxZ = Math.abs((box.max.z + playerRadius) - this.position.z);
+          const minPen = Math.min(penMinX, penMaxX, penMinZ, penMaxZ);
+
+          if (minPen === penMinX) { this.position.x = box.min.x - playerRadius; this.velocity.x = 0; }
+          else if (minPen === penMaxX) { this.position.x = box.max.x + playerRadius; this.velocity.x = 0; }
+          else if (minPen === penMinZ) { this.position.z = box.min.z - playerRadius; this.velocity.z = 0; }
+          else if (minPen === penMaxZ) { this.position.z = box.max.z + playerRadius; this.velocity.z = 0; }
         }
       }
     }
@@ -2548,9 +2622,9 @@ class CS2Player {
     // 5. Hard World Limits (Ceiling at max walkable height + margin, Map bounding limits)
     const curFeetY = this.position.y - this.playerHeight;
     const isOOB = (
-      this.position.x < -94.0 || this.position.x > 66.0 ||
-      this.position.z < -134.0 || this.position.z > 45.0 ||
-      curFeetY < -8.0 || curFeetY > 12.0
+      this.position.x < -105.0 || this.position.x > 78.0 ||
+      this.position.z < -148.0 || this.position.z > 56.0 ||
+      curFeetY < -10.0 || curFeetY > 16.0
     );
 
     if (isOOB) {
