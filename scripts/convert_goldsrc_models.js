@@ -199,7 +199,8 @@ function parseMdl(filePath, outputModelId, isPlayerModel = false) {
   let min_ty = 99999;
   let max_ty = -99999;
   let min_tz = 99999;
-  let bestWeaponY = -99999;
+  let max_tz = -99999;
+  let max_tx_weapon = -99999;
   let bestWeaponVert = null;
 
   for (let bp = 0; bp < numbodyparts; bp++) {
@@ -227,9 +228,10 @@ function parseMdl(filePath, outputModelId, isPlayerModel = false) {
         if (ty < min_ty) min_ty = ty;
         if (ty > max_ty) max_ty = ty;
         if (tz < min_tz) min_tz = tz;
+        if (tz > max_tz) max_tz = tz;
 
         if (bpName !== 'rhand' && bpName !== 'lhand') {
-          if (ty > bestWeaponY) {
+          if (tx > max_tx_weapon) { max_tx_weapon = tx;
             bestWeaponY = ty;
             bestWeaponVert = [tx, ty, tz];
           }
@@ -273,15 +275,16 @@ function parseMdl(filePath, outputModelId, isPlayerModel = false) {
         if (isPlayerModel) {
           // Player model: feet normalized to floor (Y=0.00), standing upright facing forward (-Z in Three.js)
           // Scale 0.045 exactly matches Dust 2 map scale (72 units * 0.045 = 3.24m height, taller than standard 2.88m crates)
-          const py = (tz - min_tz) * 0.045;
-          const px = -ty * 0.045;
-          const pz = -tx * 0.045;
+          const pScale = 3.20 / Math.max(1, max_tz - min_tz);
+          const py = (tz - min_tz) * pScale;
+          const px = -ty * pScale;
+          const pz = -tx * pScale;
           transformedVerts.push([px, py, pz]);
         } else {
           // Viewmodel: pointing downrange (-Z), hands situated canonically in lower-right quadrant (+0.52 offset)
-          const x3 = (-tx * 0.025) + 0.52;
-          const y3 = (tz * 0.025) - 0.22;
-          const z3 = -((ty - min_ty) * 0.025) - 0.16;
+          const x3 = (-ty * 0.025) + 0.35;
+          const y3 = (tz * 0.025) + 0.08;
+          const z3 = (-tx * 0.025) - 0.15;
           transformedVerts.push([x3, y3, z3]);
         }
       }
@@ -298,7 +301,7 @@ function parseMdl(filePath, outputModelId, isPlayerModel = false) {
         if (isPlayerModel) {
           transformedNorms.push([-tny, tnz, -tnx]);
         } else {
-          transformedNorms.push([-tnx, tnz, -tny]);
+          transformedNorms.push([-tny, tnz, -tnx]);
         }
       }
 
@@ -369,9 +372,9 @@ function parseMdl(filePath, outputModelId, isPlayerModel = false) {
   if (bestWeaponVert) {
     const [bx, by, bz] = bestWeaponVert;
     barrelTip = [
-      (-bx * 0.025) + 0.52,
-      (bz * 0.025) - 0.22,
-      -((by - min_ty) * 0.025) - 0.18
+      (-by * 0.025) + 0.35,
+      (bz * 0.025) + 0.08,
+      (-bx * 0.025) - 0.15
     ];
   }
 

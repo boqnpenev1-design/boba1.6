@@ -124,14 +124,14 @@ class CS2MapBuilder {
                   if (mat.map) {
                     mat.map.encoding = THREE.sRGBEncoding;
                     const noAniso = (urlParams && urlParams.get('noaniso') === '1');
-                    const targetAniso = (!noAniso && window.__maxAniso) ? Math.min(window.__maxAniso, 16) : 1;
+                    const targetAniso = (!noAniso && window.__maxAniso) ? Math.min(window.__maxAniso, 4) : 1;
                     mat.map.anisotropy = targetAniso;
                     mat.map.minFilter = THREE.LinearMipmapLinearFilter;
                     mat.map.magFilter = THREE.LinearFilter;
                     mat.map.generateMipmaps = true;
                     if (mat.map.image) mat.map.needsUpdate = true;
                   }
-                  mat.side = THREE.FrontSide; // Authentic hardware backface culling for 144+ FPS
+                  mat.side = THREE.DoubleSide; // Authentic hardware backface culling for 144+ FPS
                   if (mat.emissive) mat.emissive.setHex(0x000000); // 0 self-illumination preserves authentic desert contrast
                   if (mat.specular) mat.specular.setHex(0x111111);
                   if (typeof mat.shininess !== 'undefined') mat.shininess = 5;
@@ -246,7 +246,7 @@ class CS2MapBuilder {
               newGeo.computeBoundingBox();
               newGeo.computeBoundingSphere();
               const m = bucket.mat;
-              m.side = THREE.FrontSide;
+              m.side = THREE.DoubleSide;
               const newMesh = new THREE.Mesh(newGeo, m);
               consolidatedMeshes.push(newMesh);
             });
@@ -347,6 +347,8 @@ class CS2MapBuilder {
     this.addCollider(-20, 12.0, -60, 40, 25, 25);  // Canyon ridge above double doors
     this.addCollider(55, 12.0, -120, 30, 25, 60);  // Canyon ridge east of A site
     this.addCollider(-85, 12.0, -90, 25, 25, 40);  // Wall high above B site back plateau
+    this.addCollider(-60, 5.0, 42.0, 60, 30, 8); // T spawn south mountain wall barrier (prevents falling through mountain)
+    this.addCollider(-85, 5.0, 35.0, 10, 30, 40); // T spawn west canyon barrier
     // Outside rock face behind B window removed: B window hole & ledge crates 100% free and open
 
     // ==========================================================

@@ -411,6 +411,7 @@ class CS2GameManager {
       }
       if (!remoteTHasC4) {
         this.player.inventory[5] = CS2_WEAPONS.c4;
+        this.player.hasC4 = true;
       }
     } else {
       this.player.inventory[5] = null;
@@ -814,7 +815,8 @@ class CS2GameManager {
 
     // T planting C4: strictly living Terrorist C4 carrier only
     const plantTeam = this.player.team;
-    if (plantTeam === 'T' && !this.c4Planted && this.player.inventory[5] && this.player.hasC4) {
+    const hasC4Item = (this.player.inventory[5] && this.player.inventory[5].id === 'c4') || this.player.hasC4;
+    if (plantTeam === 'T' && !this.c4Planted && hasC4Item) {
       let inSite = null;
       let siteY = 0.1;
       const playerFeetY = this.player.position.y - this.player.playerHeight;

@@ -87,8 +87,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const defaultPR = forcePR1 ? 1.0 : Math.min(window.devicePixelRatio || 1, 1.0);
   renderer.setPixelRatio(defaultPR);
   renderer.shadowMap.enabled = !noShadow && false; // Off by default for competitive 60+ FPS
-  renderer.toneMapping = noPost ? THREE.LinearToneMapping : THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 0.76; // Authentic CS 1.6 / CS2 warm desert contrast, 0 washed-out stone
+  renderer.toneMapping = THREE.LinearToneMapping;
+  renderer.toneMappingExposure = 1.0; // Authentic CS 1.6 / CS2 warm desert contrast, 0 washed-out stone
   renderer.outputEncoding = THREE.sRGBEncoding;
   renderer.autoClear = false; // Enabled for multi-pass viewmodel rendering (zero world light bleeding)
   renderer.info.autoReset = false; // Manual reset per frame so multi-pass draw calls accumulate correctly

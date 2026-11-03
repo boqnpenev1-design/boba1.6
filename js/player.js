@@ -53,7 +53,7 @@ class CS2Player {
     this.lastGroundY = -5.8;
     this.isCrouched = false;
     this.isScoped = false;
-    this.playerHeight = 2.68;
+    this.playerHeight = 2.88;
 
     // Jump Input State (Strictly single-press: prevents auto bunny-hop)
     this.jumpRequested = false;
@@ -2425,7 +2425,7 @@ class CS2Player {
     this.velocity.y -= 18.0 * dt;
 
     this.isCrouched = !!(this.keys[this.keybinds.crouch] || this.keys['KeyC']);
-    const targetHeight = this.isCrouched ? 1.45 : 2.68;
+    const targetHeight = this.isCrouched ? 1.55 : 2.88;
     const hLerp = 1 - Math.exp(-14.0 * dt);
     const prevHeight = this.playerHeight;
     this.playerHeight += (targetHeight - this.playerHeight) * hLerp;
