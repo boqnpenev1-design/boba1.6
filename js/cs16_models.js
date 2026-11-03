@@ -78,7 +78,7 @@ class CS16ModelManager {
       return this.loadingPromises.get(modelId);
     }
 
-    const p = fetch(`models/cs16/${modelId}.json?v=b11j0a1`)
+    const p = fetch(`models/cs16/${modelId}.json?v=b11k0a1`)
       .then(res => {
         if (!res.ok) throw new Error(`HTTP ${res.status} loading ${modelId}`);
         return res.json();
@@ -118,7 +118,7 @@ class CS16ModelManager {
       const tex = this.getTexture(sub.texture);
       const mat = new THREE.MeshLambertMaterial({
         map: tex,
-        side: THREE.FrontSide,
+        side: THREE.DoubleSide,
         depthWrite: true,
         depthTest: true
       });

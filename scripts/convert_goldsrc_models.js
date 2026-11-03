@@ -66,7 +66,7 @@ function angleQuaternion(angles) {
     sr*cp*cy - cr*sp*sy,
     cr*sp*cy + sr*cp*sy,
     cr*cp*sy - sr*sp*cy,
-    cr*cp*cy - sr*sp*sy
+    cr*cp*cy + sr*sp*sy
   ];
 }
 
@@ -164,7 +164,7 @@ function parseMdl(filePath, outputModelId, isPlayerModel = false) {
   const numseq = buf.readInt32LE(164);
   const seqindex = buf.readInt32LE(168);
   let animindex = 0;
-  if (outputModelId === 'knife' && numseq > 0 && seqindex > 0 && seqindex < buf.length) {
+  if (!isPlayerModel && numseq > 0 && seqindex > 0 && seqindex < buf.length) {
     animindex = buf.readInt32LE(seqindex + 124);
   }
 
