@@ -91,6 +91,7 @@ document.addEventListener('DOMContentLoaded', () => {
   renderer.toneMappingExposure = 1.0;
   renderer.outputEncoding = THREE.sRGBEncoding;
   renderer.autoClear = false; // Enabled for multi-pass viewmodel rendering (zero world light bleeding)
+  renderer.info.autoReset = false; // Manual reset per frame so multi-pass draw calls accumulate correctly
 
   let unmaskedGpu = 'unknown';
   let unmaskedVendor = 'unknown';
@@ -1043,6 +1044,9 @@ function animate(currentTime) {
     gameManager.update(dt, currentTime);
   }
 
+  // Reset renderer stats once at frame start (autoReset = false)
+  if (renderer.info) renderer.info.reset();
+
   // Pass 1: Render World / Map Scene with zero viewmodel lights
   renderer.clear();
   renderer.render(scene, camera);
@@ -1075,6 +1079,11 @@ function animate(currentTime) {
     vp.viewmodelCamera.aspect = camera.aspect;
     vp.viewmodelCamera.updateProjectionMatrix();
     renderer.render(vp.viewmodelScene, vp.viewmodelCamera);
+  }
+
+  if (renderer.info && renderer.info.render) {
+    window.__lastTotalCalls = renderer.info.render.calls;
+    window.__lastTotalTris = renderer.info.render.triangles;
   }
 }
 
@@ -1208,8 +1217,8 @@ function setupDebugOverlay(gameManager, renderer, scene, camera) {
     try {
       const buildId = window.BUILD_ID || 'dev-local';
       const rInfo = renderer.info;
-      const calls = rInfo.render ? rInfo.render.calls : 0;
-      const tris = rInfo.render ? rInfo.render.triangles : 0;
+      const calls = (typeof window.__lastTotalCalls === 'number') ? window.__lastTotalCalls : (rInfo.render ? rInfo.render.calls : 0);
+      const tris = (typeof window.__lastTotalTris === 'number') ? window.__lastTotalTris : (rInfo.render ? rInfo.render.triangles : 0);
       const progCount = rInfo.programs ? rInfo.programs.length : 0;
 
       // Map meshes & BBox (Cached once after loading to eliminate 100ms CPU freeze)
@@ -1353,17 +1362,21 @@ function setupDebugOverlay(gameManager, renderer, scene, camera) {
       if (net && net.remotePlayers && Object.keys(net.remotePlayers).length > 0) {
         const rp = Object.values(net.remotePlayers)[0];
         const modelType = (rp.team === 'CT') ? 'SAS' : 'Phoenix';
-        const scale = rp.mesh?.characterMesh?.scale?.x?.toFixed(2) || '1.20';
+        const scale = rp.mesh?.characterMesh?.scale?.x?.toFixed(2) || (rp.team === 'CT' ? '1.05' : '0.03');
         const rootY = rp.mesh?.position?.y?.toFixed(2) || '0.00';
         const bones = rp.mesh?.boneCount || 169;
         const state = rp.activeState || 'IDLE';
-        remoteModelStr = `${modelType} | scale: ${scale} | root Y: ${rootY} | bones: ${bones} | procedural: ${state} | hitbox: capsule (r=0.38, h=1.50) + sphere (r=0.18)`;
+        const m = rp.mesh?.measuredMetrics;
+        const hbDesc = m ? `hitbox: cylinder (r=${m.bodyRadius}, h=${m.bodyCylinderH}) + sphere (r=${m.headRadius}, y=${m.headSphereY})` : 'hitbox: cylinder (r=0.32, h=1.40) + sphere (r=0.20)';
+        remoteModelStr = `${modelType} | scale: ${scale} | root Y: ${rootY} | bones: ${bones} | procedural: ${state} | ${hbDesc}`;
       }
 
       let vmBoxStr = 'none';
-      if (gameManager.player && gameManager.player.activeWeaponMeshGroup && camera) {
+      if (gameManager.player && gameManager.player.activeWeaponMeshGroup) {
         try {
-          const meshGroup = gameManager.player.activeWeaponMeshGroup;
+          const vp = gameManager.player;
+          const projCam = (vp.viewmodelCamera && vp.viewmodelGroup && vp.viewmodelGroup.visible) ? vp.viewmodelCamera : camera;
+          const meshGroup = vp.activeWeaponMeshGroup;
           const bbox = new THREE.Box3().setFromObject(meshGroup);
           if (!bbox.isEmpty()) {
             const pts = [
@@ -1378,7 +1391,7 @@ function setupDebugOverlay(gameManager, renderer, scene, camera) {
             ];
             let minX = 100, maxX = 0, minY = 100, maxY = 0;
             pts.forEach(p => {
-              const pr = p.clone().project(camera);
+              const pr = p.clone().project(projCam);
               const sx = (pr.x * 0.5 + 0.5) * 100;
               const sy = (-pr.y * 0.5 + 0.5) * 100;
               if (sx < minX) minX = sx;
@@ -1429,12 +1442,12 @@ function setupDebugOverlay(gameManager, renderer, scene, camera) {
         heldTexStr = `${d.textureFile || 'none'} (${d.mapDimensions || 'none'}) -> ${d.textureUrl || 'none'}`;
       }
 
-      let hitboxStr = 'measured: 2.33m | bottomY: 0.00m | headSphereY: 2.15m | feetGroundY: 0.00m (agree 0.0%)';
+      let hitboxStr = 'none';
       if (net && net.remotePlayers && Object.keys(net.remotePlayers).length > 0) {
         const firstRp = Object.values(net.remotePlayers)[0];
         if (firstRp.mesh && firstRp.mesh.measuredMetrics) {
           const m = firstRp.mesh.measuredMetrics;
-          hitboxStr = `measured: ${m.modelHeight}m | bottomY: ${m.hitboxBottomY}m | headSphereY: ${m.headSphereY}m | feetGroundY: ${m.feetGroundY}m (agree <1%)`;
+          hitboxStr = `height: ${m.modelHeight}m (minY:${m.lowestVertexY}m, maxY:${m.highestVertexY}m) | bottomY: ${m.hitboxBottomY}m | headSphereY: ${m.headSphereY}m | footDelta: ${firstRp.footDelta !== undefined ? firstRp.footDelta.toFixed(3) : '0.000'}m`;
         }
       }
 
@@ -1491,6 +1504,7 @@ TEC-9 NOTE:    shared w_pist_elite_single (Provide tec9.fbx or tec9.glb in model
 VM SCREEN BOX: ${vmBoxStr}
 RECOIL:        climb: ${recoilClimbDeg.toFixed(1)}°
 NETWORK:       ${isOnline ? 'ONLINE' : 'OFFLINE'} | ws: ${wsState} | ping: ${pingVal}
+MATCH ID:      ${(net && net.matchId) ? net.matchId : 'none'}
 ROUND:         phase: ${gameManager.phase} | timer: ${gameManager.phaseTimer.toFixed(1)}s [${timerSource}]
 BOMB:          ${bombStr}
 MATCH:         CT: ${gameManager.ctScore} | T: ${gameManager.tScore} | alive: CT ${ctAlive} : T ${tAlive}

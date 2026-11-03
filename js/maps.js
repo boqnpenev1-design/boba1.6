@@ -105,6 +105,7 @@ class CS2MapBuilder {
           obj.rotation.x = -Math.PI / 2;
           obj.scale.set(0.045, 0.045, 0.045);
           obj.position.set(0, 0, 0);
+          obj.updateMatrixWorld(true);
 
           let totalOriginalMeshes = 0;
           let totalOriginalTriangles = 0;
@@ -130,7 +131,7 @@ class CS2MapBuilder {
                     mat.map.generateMipmaps = true;
                     if (mat.map.image) mat.map.needsUpdate = true;
                   }
-                  mat.side = THREE.FrontSide; // FrontSide backface culling (40%+ rasterization speedup)
+                  mat.side = THREE.DoubleSide; // DoubleSide eliminates floor holes / flipped mesh culling
                   if (mat.emissive) mat.emissive.setHex(0x1a1612);
                   if (mat.specular) mat.specular.setHex(0x111111);
                   if (typeof mat.shininess !== 'undefined') mat.shininess = 5;
@@ -362,7 +363,7 @@ class CS2MapBuilder {
     this.addCollider(-63.36, 0.00, -118.08, 5.76, 2.88, 2.88, true);  // B site long crate (model_1)
     this.addCollider(-61.92, 0.00, -120.96, 2.88, 5.76, 2.88, true);  // B double stack crate (model_2)
     this.addCollider(-75.78, 0.00, -127.93, 3.96, 2.88, 3.96, true);  // B back site crate (model_3)
-    this.addCollider(-73.44, 0.00, -114.48, 2.88, 5.76, 2.88, true);  // B doors double crate (model_31)
+    // Removed invisible wall box at -73.44, -114.48 (B doors doorway now 100% clear)
     this.addCollider(-59.04, 6.30, -121.50, 2.52, 3.96, 3.24, true);  // B window / ledge upper crates (model_32/33)
     this.addCollider(-55.50, 5.03, -118.50, 3.50, 1.65, 2.00, true);  // B window ledge step crates (model_34/35)
     this.addCollider(-61.56, 2.88, -118.44, 2.16, 2.16, 2.16, true);  // B stack mid crate (model_36)

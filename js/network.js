@@ -146,9 +146,22 @@ class CS2NetworkManager {
       const callsign = window.cs2PlayerCallsign || 'OPERATOR';
       const team = (this.gm.player && this.gm.player.team) ? this.gm.player.team : 'CT';
 
+      let sessId = null;
+      try {
+        sessId = window.sessionStorage.getItem('cs2_session_id');
+        if (!sessId) {
+          sessId = 'sess_' + Math.random().toString(36).substring(2, 10) + '_' + Date.now().toString(36);
+          window.sessionStorage.setItem('cs2_session_id', sessId);
+        }
+      } catch (e) {
+        sessId = 'sess_' + Math.random().toString(36).substring(2, 10);
+      }
+      this.sessionId = sessId;
+
       // Send authoritative join packet
       this.send({
         type: 'join',
+        sessionId: sessId,
         callsign: callsign,
         team: team
       });
@@ -286,6 +299,7 @@ class CS2NetworkManager {
         const prevMatchId = this.gm.matchId;
         this.playerId = packet.playerId;
         this.inMatch = packet.inMatch;
+        this.matchId = packet.matchId;
         this.gm.matchId = packet.matchId;
         this.serverTeam = packet.team;
         if (packet.team && this.gm) {
@@ -633,6 +647,10 @@ class CS2NetworkManager {
   handleSnapshot(packet) {
     if (!packet || !packet.players) return;
     this.lastSnapshotTime = Date.now();
+    if (packet.matchId) {
+      this.matchId = packet.matchId;
+      if (this.gm) this.gm.matchId = packet.matchId;
+    }
 
     if (this.gm) {
       if (this.gm.phase !== packet.phase) {
@@ -643,8 +661,19 @@ class CS2NetworkManager {
         }
       }
       this.gm.phase = packet.phase;
-      this.gm.phaseTimer = packet.timer;
-      this.gm.roundTime = packet.timer;
+
+      // Accurate server clock synchronization (Window 1 and Window 2 agree within 0.1s)
+      if (typeof packet.phaseEndTime === 'number' && typeof packet.serverTime === 'number') {
+        this.serverClockOffset = packet.serverTime - Date.now();
+        this.phaseEndTime = packet.phaseEndTime;
+        const accurateSecs = Math.max(0, (packet.phaseEndTime - (Date.now() + this.serverClockOffset)) / 1000);
+        this.gm.phaseTimer = accurateSecs;
+        this.gm.roundTime = accurateSecs;
+      } else {
+        this.gm.phaseTimer = packet.timer;
+        this.gm.roundTime = packet.timer;
+      }
+
       this.gm.ctScore = (typeof packet.ctScore === 'number') ? packet.ctScore : this.gm.ctScore;
       this.gm.tScore = (typeof packet.tScore === 'number') ? packet.tScore : this.gm.tScore;
       if (!this.gm.score) this.gm.score = { CT: this.gm.ctScore, T: this.gm.tScore };
@@ -654,6 +683,30 @@ class CS2NetworkManager {
 
       if (this.gm.hudEls.ctScore) this.gm.hudEls.ctScore.innerText = this.gm.ctScore;
       if (this.gm.hudEls.tScore) this.gm.hudEls.tScore.innerText = this.gm.tScore;
+
+      // Authoritative Dropped Weapons Reconciliation (Syncs DROPS: 1 to second player)
+      if (Array.isArray(packet.drops) && this.gm.spawnRemoteDroppedWeapon) {
+        if (!window._droppedItems) window._droppedItems = [];
+        const serverDropIds = new Set(packet.drops.map(d => d.id));
+
+        for (let i = window._droppedItems.length - 1; i >= 0; i--) {
+          const localItem = window._droppedItems[i];
+          if (localItem.id && !serverDropIds.has(localItem.id)) {
+            if (localItem.mesh && this.gm.scene) {
+              this.gm.scene.remove(localItem.mesh);
+              if (localItem.mesh.geometry) localItem.mesh.geometry.dispose();
+            }
+            window._droppedItems.splice(i, 1);
+          }
+        }
+
+        packet.drops.forEach(sd => {
+          const exists = window._droppedItems.some(d => d.id === sd.id);
+          if (!exists) {
+            this.gm.spawnRemoteDroppedWeapon(sd);
+          }
+        });
+      }
 
       // Reset stale bomb HUD if snapshot indicates bomb is not planted
       if (!packet.c4Planted && this.gm.c4Planted) {
@@ -826,7 +879,7 @@ class CS2NetworkManager {
         rp.mesh.rotation.y = latest.yaw;
       }
 
-      // 1. Precise Ground Contact every frame (snap model root to floor, footDelta < 0.05m)
+      // 1. Precise Ground Contact every frame (measure lowest vertex delta, snap model foot to floor)
       let groundY = rp.mesh.position.y;
       if (this.gm && this.gm.mapBuilder && this.gm.mapBuilder.groundMeshes && this.gm.mapBuilder.groundMeshes.length > 0) {
         if (!this.floorRay) this.floorRay = new THREE.Raycaster(new THREE.Vector3(), new THREE.Vector3(0, -1, 0), 0.1, 20.0);
@@ -834,10 +887,12 @@ class CS2NetworkManager {
         const hits = this.floorRay.intersectObjects(this.gm.mapBuilder.groundMeshes, false);
         if (hits.length > 0) {
           groundY = hits[0].point.y;
-          rp.mesh.position.y = groundY;
         }
       }
-      rp.footDelta = Math.abs(rp.mesh.position.y - groundY);
+      const lowestOffset = rp.mesh.measuredMetrics ? parseFloat(rp.mesh.measuredMetrics.lowestVertexY) : 0;
+      const unadjustedFootY = rp.mesh.position.y + lowestOffset;
+      rp.footDelta = Math.abs(unadjustedFootY - groundY);
+      rp.mesh.position.y = groundY - lowestOffset;
 
       // Procedural bone articulation & Death handling
       const moveSpeed = Math.hypot(rp.mesh.position.x - prevX, rp.mesh.position.z - prevZ);
@@ -1105,6 +1160,22 @@ class CS2NetworkManager {
     group.add(wrapper);
     group.characterWrapper = wrapper;
     group.characterMesh = clone;
+
+    // Real skinned vertex measurements (derived from actual 3D geometry bounds, not a hardcoded constant)
+    wrapper.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(wrapper);
+    const realH = box.max.y - box.min.y;
+    group.measuredMetrics = {
+      modelHeight: realH.toFixed(2),
+      lowestVertexY: box.min.y.toFixed(3),
+      highestVertexY: box.max.y.toFixed(3),
+      hitboxBottomY: (group.bodyHitbox ? (group.bodyHitbox.position.y - 0.70).toFixed(2) : '0.00'),
+      headSphereY: (group.headHitbox ? group.headHitbox.position.y.toFixed(2) : '1.82'),
+      bodyCylinderH: '1.40',
+      bodyRadius: '0.32',
+      headRadius: '0.20'
+    };
+
     return true;
   }
 

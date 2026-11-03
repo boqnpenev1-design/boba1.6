@@ -1887,17 +1887,18 @@ class CS2Player {
           window.csAudio.playFlashbangExplode();
           const flashEl = document.getElementById('flash-overlay');
           if (flashEl) {
+            flashEl.style.backgroundColor = '#ffffff';
             flashEl.style.opacity = '1';
             let op = 1.0;
             const fadeInterval = setInterval(() => {
-              op -= 0.05;
+              op -= 0.04;
               if (op <= 0) {
                 flashEl.style.opacity = '0';
                 clearInterval(fadeInterval);
               } else {
                 flashEl.style.opacity = String(op);
               }
-            }, 90);
+            }, 60);
           }
         } else if (g.type === 'hegrenade') {
           window.csAudio.playHEDetonate();
@@ -2430,11 +2431,11 @@ class CS2Player {
       result: decisionResult
     };
 
-    // Perimeter boundary clamp strictly preventing walking out onto exterior cliffs
+    // Perimeter boundary clamp derived from full walkable geometry (spawn back walls & long A corner)
     const preClampX = this.position.x;
     const preClampZ = this.position.z;
-    this.position.x = Math.max(-94.0, Math.min(65.0, this.position.x));
-    this.position.z = Math.max(-134.0, Math.min(45.0, this.position.z));
+    this.position.x = Math.max(-105.0, Math.min(78.0, this.position.x));
+    this.position.z = Math.max(-148.0, Math.min(56.0, this.position.z));
     if (this.position.x !== preClampX || this.position.z !== preClampZ) {
       this.lastCorrection = { reason: 'perimeter_clamp', delta: `dx:${(this.position.x - preClampX).toFixed(2)},dz:${(this.position.z - preClampZ).toFixed(2)}`, t: Date.now() };
     }

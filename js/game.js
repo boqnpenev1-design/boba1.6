@@ -443,8 +443,11 @@ class CS2GameManager {
 
     // 2. Live Round: strictly allowed only within the first 15.0 seconds
     if (this.phase === 'live') {
-      if (this.liveRoundStartTime > 0 && (Date.now() - this.liveRoundStartTime) > 15000) return false;
-      if (typeof this.phaseTimer === 'number' && this.phaseTimer < 100.0) return false;
+      const now = Date.now();
+      const serverOffset = (this.net && typeof this.net.serverClockOffset === 'number') ? this.net.serverClockOffset : 0;
+      const effectiveNow = now + serverOffset;
+      if (this.liveRoundStartTime > 0 && (effectiveNow - this.liveRoundStartTime) > 15500) return false;
+      if (typeof this.phaseTimer === 'number' && this.phaseTimer < 99.0) return false;
       return true;
     }
     return false;
@@ -825,8 +828,7 @@ class CS2GameManager {
             playerFeetY >= b.minY && playerFeetY <= b.maxY) {
             inside = true;
           }
-        }
-        if (!inside && site.radius) {
+        } else if (site.radius) {
           const dist = Math.hypot(this.player.position.x - site.x, this.player.position.z - site.z);
           const dy = Math.abs(playerFeetY - (site.y || 4.32));
           if (dist <= site.radius && dy < 4.5) {
