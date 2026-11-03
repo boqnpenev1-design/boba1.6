@@ -376,6 +376,7 @@ class CS2NetworkManager {
 
         // Reset player round state
         if (this.gm.player) {
+          const wasAlive = this.gm.player.isAlive && (this.gm.player.health.get() > 0);
           this.gm.player.health.set(100);
           this.gm.player.isAlive = true;
           this.gm.player.isSpectating = false;
@@ -389,7 +390,21 @@ class CS2NetworkManager {
             this.serverTeam = packet.team;
           }
           if (this.serverTeam && this.gm) {
-            this.gm.setAuthoritativeTeam(this.serverTeam, isCarrier);
+            this.gm.selectedTeam = this.serverTeam;
+            this.gm.player.team = this.serverTeam;
+            if (!wasAlive) {
+              // Dead players respawn with standard loadout
+              this.gm.player.rebuildLoadout(this.serverTeam, isCarrier);
+            } else {
+              // Surviving players retain all weapons, armor, helmet, defuser!
+              if (isCarrier) {
+                this.gm.player.inventory[5] = CS2_WEAPONS.c4;
+                this.gm.player.hasC4 = true;
+              } else if (this.gm.player.hasC4) {
+                delete this.gm.player.inventory[5];
+                this.gm.player.hasC4 = false;
+              }
+            }
           }
           this.gm.player.updateSlotHUD();
           const spawns = (this.gm.mapBuilder && this.gm.mapBuilder.spawnPoints && this.gm.mapBuilder.spawnPoints[this.gm.player.team]) || [];
@@ -473,13 +488,18 @@ class CS2NetworkManager {
         } else if (this.remotePlayers[packet.victimId]) {
           const rp = this.remotePlayers[packet.victimId];
           rp.isAlive = false;
+          rp.diedAt = Date.now();
           if (rp.mesh) {
-            rp.mesh.rotation.z = -Math.PI / 2;
-            setTimeout(() => {
-              if (rp && rp.mesh && !rp.isAlive) {
-                rp.mesh.visible = false;
-              }
-            }, 1000);
+            // Hide hitboxes and nametag immediately at death
+            if (rp.mesh.bodyHitbox) rp.mesh.bodyHitbox.visible = false;
+            if (rp.mesh.headHitbox) rp.mesh.headHitbox.visible = false;
+            if (rp.mesh.nameTagMesh) rp.mesh.nameTagMesh.visible = false;
+
+            // Lay flat on floor
+            if (rp.mesh.characterWrapper) {
+              rp.mesh.characterWrapper.rotation.x = -Math.PI / 2;
+              rp.mesh.characterWrapper.position.y = 0.22;
+            }
           }
         }
         break;
@@ -491,6 +511,9 @@ class CS2NetworkManager {
             if (localItem) {
               localItem.id = packet.item.id;
               localItem.serverAssignedId = true;
+            } else if (this.gm) {
+              // Server-initiated death drop for local player
+              this.gm.spawnRemoteDroppedWeapon(packet.item);
             }
           } else if (this.gm) {
             this.gm.spawnRemoteDroppedWeapon(packet.item);
@@ -803,18 +826,61 @@ class CS2NetworkManager {
         rp.mesh.rotation.y = latest.yaw;
       }
 
-      // Procedural bone articulation (Idle ready carry, walk, run, crouch, crouch walk, jump/air, death collapse)
+      // 1. Precise Ground Contact every frame (snap model root to floor, footDelta < 0.05m)
+      let groundY = rp.mesh.position.y;
+      if (this.gm && this.gm.mapBuilder && this.gm.mapBuilder.groundMeshes && this.gm.mapBuilder.groundMeshes.length > 0) {
+        if (!this.floorRay) this.floorRay = new THREE.Raycaster(new THREE.Vector3(), new THREE.Vector3(0, -1, 0), 0.1, 20.0);
+        this.floorRay.ray.origin.set(rp.mesh.position.x, rp.mesh.position.y + 1.2, rp.mesh.position.z);
+        const hits = this.floorRay.intersectObjects(this.gm.mapBuilder.groundMeshes, false);
+        if (hits.length > 0) {
+          groundY = hits[0].point.y;
+          rp.mesh.position.y = groundY;
+        }
+      }
+      rp.footDelta = Math.abs(rp.mesh.position.y - groundY);
+
+      // Procedural bone articulation & Death handling
       const moveSpeed = Math.hypot(rp.mesh.position.x - prevX, rp.mesh.position.z - prevZ);
       const isAlive = (rp.isAlive !== false);
       const isCrouched = !!(rp.isCrouched || (latest && latest.crouch));
       const inAir = Math.abs(rp.mesh.position.y - prevY) > 0.04;
 
       if (!isAlive) {
-        rp.mesh.rotation.z = -Math.PI / 2;
-        rp.mesh.position.y = Math.max(0, rp.mesh.position.y - 0.7);
         rp.activeState = 'DEAD';
+        if (!rp.diedAt) rp.diedAt = now;
+
+        // Hide hitboxes and nametag immediately at death
+        if (rp.mesh.bodyHitbox) rp.mesh.bodyHitbox.visible = false;
+        if (rp.mesh.headHitbox) rp.mesh.headHitbox.visible = false;
+        if (rp.mesh.nameTagMesh) rp.mesh.nameTagMesh.visible = false;
+
+        // Realistic death fall: rotate wrapper backward onto floor
+        if (rp.mesh.characterWrapper) {
+          const wrap = rp.mesh.characterWrapper;
+          wrap.rotation.x = -Math.PI / 2;
+          wrap.position.y = 0.22; // Elevate so back/hips rest flat ON floor (never sunk)
+        }
+
+        const elapsed = (now - rp.diedAt) / 1000;
+        if (elapsed > 3.0) {
+          rp.mesh.visible = false;
+        } else if (elapsed > 2.0) {
+          const fade = Math.max(0, 1.0 - (elapsed - 2.0));
+          rp.mesh.traverse(c => {
+            if (c.isMesh && c.material) {
+              const mats = Array.isArray(c.material) ? c.material : [c.material];
+              mats.forEach(m => { m.transparent = true; m.opacity = fade; });
+            }
+          });
+        }
       } else {
-        rp.mesh.rotation.z = 0;
+        rp.diedAt = null;
+        if (rp.mesh.characterWrapper) {
+          rp.mesh.characterWrapper.rotation.x = 0;
+          rp.mesh.characterWrapper.position.y = 0;
+        }
+        if (rp.mesh.nameTagMesh) rp.mesh.nameTagMesh.visible = true;
+
         const b = rp.mesh.characterBones;
         if (b) {
           // Tactical weapon-carry arm stance (living player never in T-pose)

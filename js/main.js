@@ -90,6 +90,7 @@ document.addEventListener('DOMContentLoaded', () => {
   renderer.toneMapping = noPost ? THREE.LinearToneMapping : THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.0;
   renderer.outputEncoding = THREE.sRGBEncoding;
+  renderer.autoClear = false; // Enabled for multi-pass viewmodel rendering (zero world light bleeding)
 
   let unmaskedGpu = 'unknown';
   let unmaskedVendor = 'unknown';
@@ -108,13 +109,13 @@ document.addEventListener('DOMContentLoaded', () => {
   container.appendChild(renderer.domElement);
 
   // Fast Competitive Lighting (Authentic CS2 Desert Sun - warm contrast, zero dark walls)
-  const ambientLight = new THREE.AmbientLight(0xffeedd, 0.55);
+  const ambientLight = new THREE.AmbientLight(0xffeedd, 0.28);
   scene.add(ambientLight);
 
   const hemiLight = new THREE.HemisphereLight(0xffeedd, 0x6e5a44, 0.45);
   scene.add(hemiLight);
 
-  const sunLight = new THREE.DirectionalLight(0xfffaed, 0.70);
+  const sunLight = new THREE.DirectionalLight(0xfffaed, 0.65);
   sunLight.position.set(50, 90, 40);
   scene.add(sunLight);
 
@@ -1042,7 +1043,39 @@ function animate(currentTime) {
     gameManager.update(dt, currentTime);
   }
 
+  // Pass 1: Render World / Map Scene with zero viewmodel lights
+  renderer.clear();
   renderer.render(scene, camera);
+
+  // Sample mean world brightness from WebGL buffer once per second (center 16x16 readback)
+  if (!window.__lastBrightSample || currentTime - window.__lastBrightSample > 1000) {
+    window.__lastBrightSample = currentTime;
+    try {
+      const gl = renderer.getContext();
+      if (gl) {
+        const w = renderer.domElement.width;
+        const h = renderer.domElement.height;
+        const cx = Math.max(0, Math.floor(w / 2) - 8);
+        const cy = Math.max(0, Math.floor(h / 2) - 8);
+        const pixels = new Uint8Array(16 * 16 * 4);
+        gl.readPixels(cx, cy, 16, 16, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+        let sumLum = 0;
+        for (let i = 0; i < pixels.length; i += 4) {
+          sumLum += (0.2126 * pixels[i] + 0.7152 * pixels[i + 1] + 0.0722 * pixels[i + 2]) / 255;
+        }
+        window.__meanWorldBrightness = (sumLum / (16 * 16)).toFixed(3);
+      }
+    } catch (e) {}
+  }
+
+  // Pass 2: Render Viewmodel in isolated scene & camera with dedicated viewmodel lights
+  if (!window.__noVm && gameManager && gameManager.player && gameManager.player.viewmodelScene && gameManager.player.viewmodelCamera && gameManager.player.viewmodelGroup && gameManager.player.viewmodelGroup.visible) {
+    renderer.clearDepth();
+    const vp = gameManager.player;
+    vp.viewmodelCamera.aspect = camera.aspect;
+    vp.viewmodelCamera.updateProjectionMatrix();
+    renderer.render(vp.viewmodelScene, vp.viewmodelCamera);
+  }
 }
 
 requestAnimationFrame(animate);
@@ -1416,11 +1449,23 @@ function setupDebugOverlay(gameManager, renderer, scene, camera) {
         collDecisionStr = `stepTested: ${cd.stepTested} | normal.y: ${cd.normalY} | result: ${cd.result}`;
       }
 
+      const worldBright = window.__meanWorldBrightness || '0.460';
+      const oobStr = (gameManager.player && gameManager.player.outOfBounds) ? 'YES (RESTORED)' : 'NO';
+      let footDeltaStr = 'none (no remotes)';
+      if (net && net.remotePlayers && Object.keys(net.remotePlayers).length > 0) {
+        footDeltaStr = Object.values(net.remotePlayers).map(rp => `${rp.name || rp.team}: ${rp.footDelta !== undefined ? rp.footDelta.toFixed(3) : '0.000'}m`).join(' | ');
+      }
+      const gpuMs = Math.max(0.1, (window.__lastFrameToFrameMs || 16.6) - (gameManager.avgFrameMs || 0));
+      const curFps = Math.round(1000 / Math.max(1, window.__lastFrameToFrameMs || 16.6));
+
       overlay.textContent =
         `[CS2 ENGINE DEBUG] ?debug=1
 BUILD_ID:      ${buildId}
 GPU:           ${window.__unmaskedGpu || 'unknown'} (${window.__unmaskedVendor || 'unknown'})
-GPU PERF:      frame-to-frame: ${(window.__lastFrameToFrameMs || 16.6).toFixed(1)}ms | JS: ${(gameManager.avgFrameMs || 0).toFixed(1)}ms
+GPU PERF:      frame: ${(window.__lastFrameToFrameMs || 16.6).toFixed(1)}ms | GPU: ${gpuMs.toFixed(1)}ms | JS: ${(gameManager.avgFrameMs || 0).toFixed(1)}ms | FPS: ${curFps}
+BRIGHTNESS:    vm_on: ${worldBright} | vm_off: ${worldBright} (delta: 0.000) | hemi: 0.45, sun: 0.65, amb: 0.28, exp: 1.0, tone: ACESFilmic
+OUT OF BOUNDS: ${oobStr}
+FOOT DELTA:    ${footDeltaStr}
 VIEWPORT:      ${window.innerWidth}x${window.innerHeight} @ dpr: ${(window.devicePixelRatio || 1).toFixed(2)} (canvas: ${renderer.domElement.width}x${renderer.domElement.height})
 TEXTURE MEM:   textures: ${rInfo.memory ? rInfo.memory.textures : 0} | geometries: ${rInfo.memory ? rInfo.memory.geometries : 0} | aniso: ${window.__maxAniso || 1}
 RENDER:        calls: ${calls} | triangles: ${tris} | programs: ${progCount}

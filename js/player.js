@@ -171,22 +171,26 @@ class CS2Player {
     this.recoilPitch = 0;
     this.recoilYaw = 0;
 
-    // Viewmodel Rig & Dedicated Lighting (Layer 1 isolated from world map, zero world blowout)
+    // Viewmodel Isolated Scene & Camera Pass (Zero light bleeding into world scene)
+    this.viewmodelScene = new THREE.Scene();
+    const aspect = (typeof window !== 'undefined' && window.innerWidth && window.innerHeight)
+      ? window.innerWidth / window.innerHeight
+      : (16 / 9);
+    this.viewmodelCamera = new THREE.PerspectiveCamera(60, aspect, 0.05, 10.0);
+    this.viewmodelScene.add(this.viewmodelCamera);
+
     this.viewmodelGroup = new THREE.Group();
-    this.camera.add(this.viewmodelGroup);
+    this.viewmodelCamera.add(this.viewmodelGroup);
     this.weaponRig = new THREE.Group();
     this.viewmodelGroup.add(this.weaponRig);
 
-    this.camera.layers.enable(1);
+    // Dedicated Viewmodel Studio Lighting (lives strictly inside viewmodelScene, 0% map impact)
+    const vmAmber = new THREE.DirectionalLight(0xfff0dd, 0.85);
+    vmAmber.position.set(0.35, 0.65, 0.25);
+    this.viewmodelScene.add(vmAmber);
 
-    const vmAmber = new THREE.DirectionalLight(0xfff0dd, 0.55);
-    vmAmber.position.set(0.25, 0.45, 0.20);
-    vmAmber.layers.set(1);
-    this.viewmodelGroup.add(vmAmber);
-
-    const vmFill = new THREE.AmbientLight(0x8899aa, 0.45);
-    vmFill.layers.set(1);
-    this.viewmodelGroup.add(vmFill);
+    const vmFill = new THREE.AmbientLight(0x99aabb, 0.60);
+    this.viewmodelScene.add(vmFill);
 
     // Muzzle Flash (Subtle realistic muzzle spark, zero screen-blocking circle)
     const flashGeo = new THREE.SphereGeometry(0.010, 8, 8);
@@ -538,105 +542,168 @@ class CS2Player {
     this.weaponRig.add(group);
   }
 
+  // Socket offsets per weapon category in weapon-local coordinates
+  static WEAPON_SOCKETS = {
+    'pistols':    { grip: [0.00, -0.04, 0.02], gripRot: [0, 0, 0] },
+    'knife':      { grip: [0.00, -0.05, 0.04], gripRot: [0.10, 0, 0] },
+    'equipment':  { grip: [0.00, -0.03, 0.02], gripRot: [0, 0, 0] },
+    'melee':      { grip: [0.00, -0.05, 0.04], gripRot: [0.10, 0, 0] },
+    'rifles':     { grip: [0.00, -0.05, 0.03], gripRot: [0, 0, 0], foregrip: [-0.02, 0.01, -0.22] },
+    'smgs':       { grip: [0.00, -0.04, 0.02], gripRot: [0, 0, 0], foregrip: [-0.02, 0.01, -0.16] },
+    'snipers':    { grip: [0.00, -0.05, 0.04], gripRot: [0, 0, 0], foregrip: [-0.02, 0.00, -0.26] },
+    'shotguns':   { grip: [0.00, -0.04, 0.03], gripRot: [0, 0, 0], foregrip: [-0.02, 0.01, -0.20] },
+    'machineguns':{ grip: [0.00, -0.05, 0.03], gripRot: [0, 0, 0], foregrip: [-0.02, 0.02, -0.22] }
+  };
+
   buildFirstPersonArms(team, weapon) {
     const armsGroup = new THREE.Group();
     armsGroup.name = 'viewmodelArms';
 
-    // Authentic tactical sleeve: CT = midnight navy (0x151f2c), T = dark olive drab (0x28261e)
     const isCT = (team === 'CT');
-    const sleeveColor = isCT ? 0x151f2c : 0x28261e;
-    const ribColor = isCT ? 0x1f2c3d : 0x363328;
+    const sleeveColor = isCT ? 0x151f2c : 0x2e2c22;
+    const ribColor = isCT ? 0x1f2c3d : 0x3b382c;
     const sleeveMat = new THREE.MeshLambertMaterial({ color: sleeveColor });
     const ribMat = new THREE.MeshLambertMaterial({ color: ribColor });
     const gloveMat = new THREE.MeshLambertMaterial({ color: 0x141414 });
-    const knuckleMat = new THREE.MeshLambertMaterial({ color: 0x222222 });
+    const knuckleMat = new THREE.MeshLambertMaterial({ color: 0x242424 });
 
     const isKnife = (weapon && (weapon.id === 'knife' || weapon.category === 'melee'));
     const isPistol = (weapon && (weapon.slot === 2 || weapon.category === 'pistols'));
+    const isGrenade = (weapon && (weapon.slot === 4 || weapon.category === 'equipment'));
+    const isTwoHanded = (!isKnife && !isPistol && !isGrenade);
 
-    // Right Arm Forearm & Sleeve: sleek tactical sleeve entering from bottom-right corner
-    const rForearmGeo = new THREE.CylinderGeometry(0.026, 0.035, 0.32, 12);
-    const rForearm = new THREE.Mesh(rForearmGeo, sleeveMat);
-    rForearm.position.set(0.28, -0.35, -0.16);
-    rForearm.rotation.set(-1.05, 0.28, -0.38);
-    armsGroup.add(rForearm);
+    let cat = (weapon && weapon.category) || 'rifles';
+    if (isKnife) cat = 'knife';
+    else if (isPistol) cat = 'pistols';
+    else if (isGrenade) cat = 'equipment';
+    const sock = CS2Player.WEAPON_SOCKETS[cat] || CS2Player.WEAPON_SOCKETS['rifles'];
 
-    // Sleeve cuff ring
-    const rCuffGeo = new THREE.CylinderGeometry(0.033, 0.033, 0.025, 12);
-    const rCuff = new THREE.Mesh(rCuffGeo, ribMat);
-    rCuff.position.set(0.20, -0.23, -0.25);
-    rCuff.rotation.set(-1.05, 0.28, -0.38);
-    armsGroup.add(rCuff);
+    // Right Hand Glove Group: Attached snugly at the weapon grip socket
+    const rHandGroup = new THREE.Group();
+    rHandGroup.name = 'rightHandGlove';
+    rHandGroup.position.set(sock.grip[0], sock.grip[1], sock.grip[2]);
+    if (sock.gripRot) rHandGroup.rotation.set(sock.gripRot[0], sock.gripRot[1], sock.gripRot[2]);
 
-    // Right Hand: Tactical composite glove palm wrapping the weapon grip
-    const rGlovePalmGeo = new THREE.BoxGeometry(0.046, 0.040, 0.052);
-    const rGlovePalm = new THREE.Mesh(rGlovePalmGeo, gloveMat);
-    rGlovePalm.position.set(0.162, -0.165, -0.295);
-    rGlovePalm.rotation.set(-0.35, 0.15, -0.12);
-    armsGroup.add(rGlovePalm);
+    const rPalm = new THREE.Mesh(new THREE.BoxGeometry(0.046, 0.040, 0.052), gloveMat);
+    rHandGroup.add(rPalm);
 
-    // Knuckle protector plate
-    const rKnuckleGeo = new THREE.BoxGeometry(0.048, 0.015, 0.026);
-    const rKnuckle = new THREE.Mesh(rKnuckleGeo, knuckleMat);
-    rKnuckle.position.set(0.162, -0.150, -0.305);
-    rKnuckle.rotation.set(-0.35, 0.15, -0.12);
-    armsGroup.add(rKnuckle);
+    const rKnuckle = new THREE.Mesh(new THREE.BoxGeometry(0.048, 0.015, 0.026), knuckleMat);
+    rKnuckle.position.set(0, 0.018, -0.01);
+    rHandGroup.add(rKnuckle);
 
-    // Articulated fingers wrapping weapon grip
-    const rIndexGeo = new THREE.BoxGeometry(0.012, 0.012, 0.035);
-    const rIndex = new THREE.Mesh(rIndexGeo, gloveMat);
-    rIndex.position.set(0.150, -0.155, -0.320);
-    rIndex.rotation.set(-0.25, 0.15, -0.10);
-    armsGroup.add(rIndex);
+    const rThumb = new THREE.Mesh(new THREE.BoxGeometry(0.015, 0.015, 0.032), gloveMat);
+    rThumb.position.set(0.024, 0.005, 0.01);
+    rThumb.rotation.set(-0.2, 0.35, 0.1);
+    rHandGroup.add(rThumb);
 
     for (let f = 0; f < 3; f++) {
-      const fingerGeo = new THREE.BoxGeometry(0.034, 0.012, 0.014);
-      const finger = new THREE.Mesh(fingerGeo, gloveMat);
-      finger.position.set(0.158, -0.170 - f * 0.012, -0.305 + f * 0.005);
+      const finger = new THREE.Mesh(new THREE.BoxGeometry(0.034, 0.012, 0.014), gloveMat);
+      finger.position.set(-0.005, -0.012 - f * 0.011, -0.018 + f * 0.004);
       finger.rotation.set(-0.25, 0.15, -0.12);
-      armsGroup.add(finger);
+      rHandGroup.add(finger);
     }
 
-    const rThumbGeo = new THREE.BoxGeometry(0.014, 0.014, 0.030);
-    const rThumb = new THREE.Mesh(rThumbGeo, gloveMat);
-    rThumb.position.set(0.172, -0.155, -0.295);
-    rThumb.rotation.set(-0.20, 0.35, 0.10);
-    armsGroup.add(rThumb);
+    const rWristMarker = new THREE.Group();
+    rWristMarker.name = 'rWristMarker';
+    rWristMarker.position.set(0, -0.02, 0.03);
+    rHandGroup.add(rWristMarker);
 
-    // Left Arm & Support Hand: strictly for 2-handed weapons (rifles, smgs, snipers, shotguns, machineguns)
-    if (!isKnife && !isPistol) {
-      const lForearmGeo = new THREE.CylinderGeometry(0.026, 0.035, 0.34, 12);
-      const lForearm = new THREE.Mesh(lForearmGeo, sleeveMat);
-      lForearm.position.set(-0.16, -0.34, -0.18);
-      lForearm.rotation.set(-0.75, -0.35, 0.42);
+    armsGroup.add(rHandGroup);
+    this.rightHandGlove = rHandGroup;
+    this.rightWristMarker = rWristMarker;
+
+    // Right Forearm & Cuff: Anchored at fixed off-screen base
+    const rForearmGeo = new THREE.CylinderGeometry(0.026, 0.038, 1.0, 12);
+    const rForearm = new THREE.Mesh(rForearmGeo, sleeveMat);
+    const rCuff = new THREE.Mesh(new THREE.CylinderGeometry(0.033, 0.033, 0.035, 12), ribMat);
+    armsGroup.add(rForearm);
+    armsGroup.add(rCuff);
+    this.rForearmMesh = rForearm;
+    this.rCuffMesh = rCuff;
+
+    // Left Arm (Strictly for 2-handed weapons)
+    if (isTwoHanded && sock.foregrip) {
+      const lHandGroup = new THREE.Group();
+      lHandGroup.name = 'leftHandGlove';
+      lHandGroup.position.set(sock.foregrip[0], sock.foregrip[1], sock.foregrip[2]);
+
+      const lPalm = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.038, 0.055), gloveMat);
+      lHandGroup.add(lPalm);
+
+      const lFingers = new THREE.Mesh(new THREE.BoxGeometry(0.036, 0.014, 0.028), gloveMat);
+      lFingers.position.set(0, 0.015, -0.01);
+      lHandGroup.add(lFingers);
+
+      const lWristMarker = new THREE.Group();
+      lWristMarker.position.set(0, -0.02, 0.03);
+      lHandGroup.add(lWristMarker);
+
+      armsGroup.add(lHandGroup);
+      this.leftHandGlove = lHandGroup;
+      this.leftWristMarker = lWristMarker;
+
+      const lForearm = new THREE.Mesh(new THREE.CylinderGeometry(0.026, 0.038, 1.0, 12), sleeveMat);
+      const lCuff = new THREE.Mesh(new THREE.CylinderGeometry(0.033, 0.033, 0.035, 12), ribMat);
       armsGroup.add(lForearm);
-
-      const lCuffGeo = new THREE.CylinderGeometry(0.033, 0.033, 0.025, 12);
-      const lCuff = new THREE.Mesh(lCuffGeo, ribMat);
-      lCuff.position.set(-0.06, -0.24, -0.26);
-      lCuff.rotation.set(-0.75, -0.35, 0.42);
       armsGroup.add(lCuff);
-
-      const lGloveGeo = new THREE.BoxGeometry(0.045, 0.038, 0.055);
-      const lGlove = new THREE.Mesh(lGloveGeo, gloveMat);
-      lGlove.position.set(0.05, -0.170, -0.34);
-      lGlove.rotation.set(-0.28, -0.25, 0.22);
-      armsGroup.add(lGlove);
-
-      const lFingersGeo = new THREE.BoxGeometry(0.036, 0.014, 0.028);
-      const lFingers = new THREE.Mesh(lFingersGeo, gloveMat);
-      lFingers.position.set(0.05, -0.160, -0.35);
-      lFingers.rotation.set(-0.22, -0.20, 0.18);
-      armsGroup.add(lFingers);
+      this.lForearmMesh = lForearm;
+      this.lCuffMesh = lCuff;
+    } else {
+      this.leftHandGlove = null;
+      this.leftWristMarker = null;
+      this.lForearmMesh = null;
+      this.lCuffMesh = null;
     }
 
-    armsGroup.traverse(c => {
-      if (c.isMesh) {
-        c.layers.set(1);
-      }
-    });
-
+    this.armsGroup = armsGroup;
     return armsGroup;
+  }
+
+  // Stretches forearm capsules continuously between off-screen anchors and glove wrists every frame
+  updateConnectedArms() {
+    if (!this.armsGroup || !this.rForearmMesh || !this.rightWristMarker) return;
+
+    const anchorR = new THREE.Vector3(0.28, -0.40, -0.08);
+    const wristRWorld = new THREE.Vector3();
+    this.rightWristMarker.getWorldPosition(wristRWorld);
+    const wristR = this.viewmodelGroup.worldToLocal(wristRWorld);
+
+    const dirR = wristR.clone().sub(anchorR);
+    const distR = dirR.length();
+    if (distR > 0.05) {
+      const midR = anchorR.clone().add(wristR).multiplyScalar(0.5);
+      this.rForearmMesh.position.copy(midR);
+      this.rForearmMesh.scale.set(1, distR, 1);
+      const unitR = dirR.clone().normalize();
+      this.rForearmMesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), unitR);
+
+      if (this.rCuffMesh) {
+        this.rCuffMesh.position.copy(wristR.clone().sub(unitR.clone().multiplyScalar(0.018)));
+        this.rCuffMesh.quaternion.copy(this.rForearmMesh.quaternion);
+      }
+    }
+
+    if (this.lForearmMesh && this.leftWristMarker) {
+      const anchorL = new THREE.Vector3(-0.28, -0.40, -0.08);
+      const wristLWorld = new THREE.Vector3();
+      this.leftWristMarker.getWorldPosition(wristLWorld);
+      const wristL = this.viewmodelGroup.worldToLocal(wristLWorld);
+
+      const dirL = wristL.clone().sub(anchorL);
+      const distL = dirL.length();
+      if (distL > 0.05) {
+        const midL = anchorL.clone().add(wristL).multiplyScalar(0.5);
+        this.lForearmMesh.position.copy(midL);
+        this.lForearmMesh.scale.set(1, distL, 1);
+        const unitL = dirL.clone().normalize();
+        this.lForearmMesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), unitL);
+
+        if (this.lCuffMesh) {
+          this.lCuffMesh.position.copy(wristL.clone().sub(unitL.clone().multiplyScalar(0.018)));
+          this.lCuffMesh.quaternion.copy(this.lForearmMesh.quaternion);
+        }
+      }
+    }
   }
 
   // Prepares weapon model by centering pivot, applying authentic texture, and normalizing CS dimensions
@@ -1067,6 +1134,7 @@ class CS2Player {
 
   createWorldWeaponMesh(weaponId) {
     const dropGroup = new THREE.Group();
+    dropGroup.name = `world_drop_${weaponId}`;
     if (weaponId === 'c4') {
       const c4Pack = new THREE.Group();
       const bodyMat = new THREE.MeshLambertMaterial({ color: 0x5a523a });
@@ -1092,16 +1160,61 @@ class CS2Player {
         const tex = this.getWeaponTexture(texFile);
         clone.traverse((child) => {
           if (child.isMesh) {
-            child.material = new THREE.MeshBasicMaterial({
+            child.material = new THREE.MeshLambertMaterial({
               map: tex,
+              color: 0xffffff,
               side: THREE.FrontSide
             });
+            if (tex) {
+              tex.encoding = THREE.sRGBEncoding;
+              if (tex.image) child.material.needsUpdate = true;
+            }
           }
         });
-        clone.scale.set(0.016, 0.016, 0.016);
-        // Lie completely flat on ground
-        clone.rotation.set(Math.PI / 2, 0, Math.PI);
-        dropGroup.add(clone);
+
+        // Reset transform to accurately compute geometry center
+        clone.position.set(0, 0, 0);
+        clone.rotation.set(0, 0, 0);
+        clone.scale.set(1, 1, 1);
+        clone.updateMatrixWorld(true);
+
+        // Center FBX mesh pivot perfectly (root cause of distant/invisible drops)
+        const bbox = new THREE.Box3().setFromObject(clone);
+        const center = new THREE.Vector3();
+        bbox.getCenter(center);
+        clone.position.sub(center);
+
+        const inner = new THREE.Group();
+        inner.add(clone);
+        inner.scale.set(0.016, 0.016, 0.016);
+        // Lie completely flat on ground (barrel forward, receiver flat)
+        inner.rotation.set(Math.PI / 2, 0, 0);
+        dropGroup.add(inner);
+
+        // Debug beacon and weapon badge under ?debug=1
+        const isDebug = !!(window.__CS2_DEBUG || (typeof window !== 'undefined' && window.location && window.location.search.includes('debug=1')));
+        if (isDebug) {
+          const beaconMat = new THREE.MeshBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 0.65 });
+          const beaconGeo = new THREE.CylinderGeometry(0.015, 0.015, 1.8, 8);
+          const beacon = new THREE.Mesh(beaconGeo, beaconMat);
+          beacon.position.y = 0.90;
+          dropGroup.add(beacon);
+
+          const cvs = document.createElement('canvas');
+          cvs.width = 128; cvs.height = 32;
+          const ctx = cvs.getContext('2d');
+          ctx.fillStyle = '#00ffff';
+          ctx.font = 'bold 20px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText((weaponId || 'item').toUpperCase(), 64, 24);
+          const sprTex = new THREE.CanvasTexture(cvs);
+          const sprMat = new THREE.SpriteMaterial({ map: sprTex, transparent: true });
+          const sprite = new THREE.Sprite(sprMat);
+          sprite.position.set(0, 1.95, 0);
+          sprite.scale.set(0.8, 0.2, 1);
+          dropGroup.add(sprite);
+        }
+
         return dropGroup;
       }
     }
@@ -2050,6 +2163,7 @@ class CS2Player {
   update(dt, currentTime, gameManager) {
     this.updateGrenades(dt);
     this.checkPickupItems();
+    this.updateConnectedArms();
 
     // Smooth Third-Person Spectator Chase Camera
     if (this.isSpectating) {
@@ -2400,12 +2514,13 @@ class CS2Player {
         oldZ + playerRadius > box.min.z &&
         oldZ - playerRadius < box.max.z
       ) {
-        if (currentFeetY >= c.topY - 0.45 && this.velocity.y <= 0) {
+        if (currentFeetY >= c.topY - 0.20 && this.velocity.y <= 0) {
           this.position.y = c.topY + this.playerHeight;
           this.velocity.y = 0;
           this.isGrounded = true;
           this.lastGroundY = c.topY;
-        } else if (currentFeetY < c.topY - 0.45) {
+        } else {
+          // Push back from crate sides & corners (100% solid, prevents jumping through)
           this.position.x = oldX;
           this.velocity.x = 0;
         }
@@ -2416,16 +2531,38 @@ class CS2Player {
         this.position.z + playerRadius > box.min.z &&
         this.position.z - playerRadius < box.max.z
       ) {
-        if (currentFeetY >= c.topY - 0.45 && this.velocity.y <= 0) {
+        if (currentFeetY >= c.topY - 0.20 && this.velocity.y <= 0) {
           this.position.y = c.topY + this.playerHeight;
           this.velocity.y = 0;
           this.isGrounded = true;
           this.lastGroundY = c.topY;
-        } else if (currentFeetY < c.topY - 0.45) {
+        } else {
+          // Push back from crate sides & corners (100% solid, prevents jumping through)
           this.position.z = oldZ;
           this.velocity.z = 0;
         }
       }
+    }
+
+    // 5. Hard World Limits (Ceiling at max walkable height + margin, Map bounding limits)
+    const curFeetY = this.position.y - this.playerHeight;
+    const isOOB = (
+      this.position.x < -94.0 || this.position.x > 66.0 ||
+      this.position.z < -134.0 || this.position.z > 45.0 ||
+      curFeetY < -8.0 || curFeetY > 12.0
+    );
+
+    if (isOOB) {
+      if (this.lastValidPosition && this.lastValidPosition.lengthSq() > 1.0) {
+        this.position.copy(this.lastValidPosition);
+        this.velocity.set(0, 0, 0);
+        this.lastCorrection = { reason: 'out_of_bounds_hard_limit', pos: `(${this.position.x.toFixed(1)},${this.position.y.toFixed(1)},${this.position.z.toFixed(1)})`, t: Date.now() };
+      }
+      this.outOfBounds = true;
+    } else {
+      if (!this.lastValidPosition) this.lastValidPosition = new THREE.Vector3();
+      this.lastValidPosition.copy(this.position);
+      this.outOfBounds = false;
     }
 
     // Frame-rate independent recoil easing and recovery

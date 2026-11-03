@@ -604,10 +604,17 @@ class CS2GameManager {
     else if (cleanReason.includes('PRESERVE') || cleanReason.includes('TIME') || cleanReason.includes('EXPIRE')) cleanReason = 'TIME RAN OUT';
 
     // Calculate match & round MVP
-    let mvpName = mvp || 'You';
+    let mvpName = 'You';
     let mvpReason = 'for round performance';
-    let maxKills = this.player.kills || 0;
-    if (!mvp && this.net && this.net.remotePlayers) {
+    if (mvp) {
+      if (typeof mvp === 'object') {
+        mvpName = mvp.name || mvp.callsign || 'Operator';
+        if (mvp.reason) mvpReason = mvp.reason;
+      } else {
+        mvpName = mvp;
+      }
+    } else if (this.net && this.net.remotePlayers) {
+      let maxKills = this.player.kills || 0;
       Object.values(this.net.remotePlayers).forEach(p => {
         if (p && p.name && (p.kills > maxKills)) {
           maxKills = p.kills;
@@ -659,7 +666,8 @@ class CS2GameManager {
 
     if (this.ctScore >= this.targetWins || this.tScore >= this.targetWins) {
       setTimeout(() => this.endMatch(), 4000);
-    } else {
+    } else if (!this.net || !this.net.isConnected) {
+      // Offline mode only: when connected, server is authoritative and broadcasts round_start
       setTimeout(() => {
         this.currentRound++;
         this.startRound();
@@ -1361,6 +1369,8 @@ class CS2GameManager {
       if (c.weaponName !== p.activeWeapon.name) {
         c.weaponName = p.activeWeapon.name;
         h.weaponName.innerText = p.activeWeapon.name;
+        c.clip = -1;
+        c.reserve = -1;
       }
       if (p.activeWeapon.clip) {
         const curClip = p.clipAmmo.get();
@@ -1374,8 +1384,9 @@ class CS2GameManager {
           h.ammoReserve.innerText = curRes;
         }
       } else {
-        if (c.clip !== -1) {
+        if (c.clip !== -1 || c.reserve !== -1) {
           c.clip = -1;
+          c.reserve = -1;
           h.ammoClip.innerText = '-';
           h.ammoReserve.innerText = '-';
         }
