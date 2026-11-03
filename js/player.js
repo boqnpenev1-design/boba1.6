@@ -198,11 +198,15 @@ class CS2Player {
     vmFill.layers.enable(1);
     this.viewmodelScene.add(vmFill);
 
-    // Muzzle Flash (Subtle realistic muzzle spark, zero screen-blocking circle)
-    const flashGeo = new THREE.SphereGeometry(0.010, 8, 8);
-    const flashMat = new THREE.MeshBasicMaterial({ color: 0xffcc33 });
-    this.muzzleFlashMesh = new THREE.Mesh(flashGeo, flashMat);
-    this.muzzleFlashMesh.position.set(0.16, -0.12, -0.65);
+    // Authentic CS Muzzle Flash (Cross-plane flash placed at exact weapon barrel tip)
+    const flashMat = new THREE.MeshBasicMaterial({ color: 0xffe680, side: THREE.DoubleSide });
+    const flashPlane1 = new THREE.Mesh(new THREE.PlaneGeometry(0.045, 0.045), flashMat);
+    const flashPlane2 = new THREE.Mesh(new THREE.PlaneGeometry(0.045, 0.045), flashMat);
+    flashPlane2.rotation.y = Math.PI / 2;
+    this.muzzleFlashMesh = new THREE.Group();
+    this.muzzleFlashMesh.add(flashPlane1);
+    this.muzzleFlashMesh.add(flashPlane2);
+    this.muzzleFlashMesh.position.set(0.20, -0.12, -0.75);
     this.muzzleFlashMesh.visible = false;
     this.viewmodelGroup.add(this.muzzleFlashMesh);
 
@@ -520,7 +524,7 @@ class CS2Player {
     this.updateSlotHUD();
   }
 
-  // Builds realistic tactical viewmodel arms, hands and 100% textured 3D weapon models
+  // Builds authentic CS 1.6 viewmodel arms, hands and 100% textured 3D weapon models
   buildCurrentWeaponModel() {
     while (this.weaponRig.children.length > 0) {
       this.weaponRig.remove(this.weaponRig.children[0]);
@@ -530,13 +534,43 @@ class CS2Player {
     if (!w) return;
 
     const group = new THREE.Group();
+    group.name = 'activeWeaponRigGroup';
 
-    // 1. Build authentic 100% Textured 3D Weapon Model using models/ & textures/
-    this.buildTexturedWeaponModel(w, group);
+    // 1. Check if authentic CS 1.6 model is available (includes real Valve hands, sleeves, and weapon)
+    const modelId = (window.cs16Models && window.cs16Models.weaponModelMap[w.id]) || 'knife';
+    let usedCS16 = false;
 
-    // 2. Build tactical first-person arms & sleeves holding the weapon
-    const arms = this.buildFirstPersonArms(this.team, w);
-    if (arms) group.add(arms);
+    if (window.cs16Models) {
+      const cached = window.cs16Models.modelCache.get(modelId);
+      if (cached) {
+        const mesh = window.cs16Models.buildMeshFromData(cached, true);
+        if (mesh) {
+          this.activeWeaponMeshGroup = mesh;
+          group.add(mesh);
+          usedCS16 = true;
+
+          // Position muzzle flash precisely at the front barrel tip
+          if (mesh.userData.barrelTip) {
+            this.muzzleFlashMesh.position.copy(mesh.userData.barrelTip);
+          }
+        }
+      } else {
+        window.cs16Models.loadModelData(modelId).then(data => {
+          if (data && this.activeWeapon && this.activeWeapon.id === w.id) {
+            this.buildCurrentWeaponModel();
+          }
+        });
+      }
+    }
+
+    if (!usedCS16) {
+      this.buildTexturedWeaponModel(w, group);
+    }
+
+    // Clear procedural arm pipes
+    this.armsGroup = null;
+    this.rForearmMesh = null;
+    this.rightWristMarker = null;
 
     // 3. Set Layer 0 & 1 on viewmodel so dedicated studio lights illuminate it cleanly
     group.traverse(c => {
@@ -563,6 +597,10 @@ class CS2Player {
   };
 
   buildFirstPersonArms(team, weapon) {
+    return null; // Permanently disabled: authentic CS 1.6 models include real Valve hands & sleeves
+  }
+
+  _unused_buildFirstPersonArms(team, weapon) {
     const armsGroup = new THREE.Group();
     armsGroup.name = 'viewmodelArms';
 
@@ -1710,6 +1748,14 @@ class CS2Player {
         }
       }
 
+      // Authentic bullet tracer streak originating from the front barrel tip in world space
+      const barrelCamPos = (this.muzzleFlashMesh && this.muzzleFlashMesh.position) ? this.muzzleFlashMesh.position.clone() : new THREE.Vector3(0.20, -0.10, -0.80);
+      const barrelWorld = barrelCamPos.applyMatrix4(this.camera.matrixWorld);
+      const targetPoint = (wallObstacles && wallObstacles.length > 0)
+        ? wallObstacles[0].point
+        : this.camera.position.clone().addScaledVector(pDir, 60.0);
+      this.spawnTracer(barrelWorld, targetPoint);
+
       // Hit players with authentic headshot/body multiplier, hit sound, and strict penetration rules
       if (gameManager && gameManager.net) {
         Object.entries(gameManager.net.remotePlayers).forEach(([id, p]) => {
@@ -2406,6 +2452,8 @@ class CS2Player {
 
     // Feeler obstacle check at chest height (solid crates/walls block walkover)
     const checkMeshWall = (dirX, dirZ, dist) => {
+      // While jumping upwards, allow forward movement onto crates and ledges
+      if (!this.isGrounded && this.velocity.y > 0) return false;
       const candidates = getNearbyMeshes(oldX, oldZ);
       if (candidates.length === 0) return false;
       this.wallDir.set(dirX, 0, dirZ).normalize();
@@ -2415,7 +2463,11 @@ class CS2Player {
       this.wallRaycaster.far = dist;
       const hits = this.wallRaycaster.intersectObjects(candidates, false);
       if (hits.length > 0 && hits[0].distance < dist) {
-        if (hits[0].face && hits[0].face.normal) decisionNormalY = hits[0].face.normal.y;
+        if (hits[0].face && hits[0].face.normal) {
+          decisionNormalY = hits[0].face.normal.y;
+          // Walkable slope or sill: do not block
+          if (Math.abs(hits[0].face.normal.y) > 0.55) return false;
+        }
         return true;
       }
       return false;
@@ -2426,7 +2478,7 @@ class CS2Player {
     const currentFeetY_X = this.position.y - this.playerHeight;
     for (let i = 0; i < colliders.length; i++) {
       const c = colliders[i];
-      if (c.isClimbable) continue;
+      if (c.isClimbable && (currentFeetY_X >= c.topY - 0.25 || (!this.isGrounded && this.velocity.y > 0))) continue;
       const box = c.box;
       if (
         this.position.y > box.min.y && currentFeetY_X < box.max.y &&
@@ -2468,7 +2520,7 @@ class CS2Player {
     const currentFeetY_Z = this.position.y - this.playerHeight;
     for (let i = 0; i < colliders.length; i++) {
       const c = colliders[i];
-      if (c.isClimbable) continue;
+      if (c.isClimbable && (currentFeetY_Z >= c.topY - 0.25 || (!this.isGrounded && this.velocity.y > 0))) continue;
       const box = c.box;
       if (
         this.position.y > box.min.y && currentFeetY_Z < box.max.y &&
@@ -2521,47 +2573,94 @@ class CS2Player {
     }
 
     // 3. Resolve Y movement & Downward 3D Terrain Raycasting
+    const prevFeetY = this.position.y - this.playerHeight;
     this.position.y += this.velocity.y * dt;
+    const curFeet = this.position.y - this.playerHeight;
 
     let targetGroundY = (this.lastGroundY !== undefined) ? this.lastGroundY : -5.8;
-    const groundCandidates = getNearbyMeshes(this.position.x, this.position.z);
-    if (groundCandidates.length > 0) {
-      this.downOrigin.set(this.position.x, this.position.y + 0.5, this.position.z);
-      this.downRaycaster.set(this.downOrigin, this.downDir);
-      this.downRaycaster.far = 14.0;
-      const hits = this.downRaycaster.intersectObjects(groundCandidates, false);
-      let highestWalkableY = -999;
-      let highestSupportY = -999;
 
-      for (let i = 0; i < hits.length; i++) {
-        const hit = hits[i];
-        let worldNormalY = 1.0;
-        if (hit.face && hit.face.normal) {
-          if (hit.object && hit.object.matrixWorld) {
-            const normMat = new THREE.Matrix3().getNormalMatrix(hit.object.matrixWorld);
-            worldNormalY = hit.face.normal.clone().applyMatrix3(normMat).normalize().y;
-          } else {
-            worldNormalY = hit.face.normal.y;
-          }
-        }
-        const ptY = hit.point.y;
-        if (ptY <= (this.position.y - this.playerHeight + 0.8) && ptY <= 16.0) {
-          if (worldNormalY >= 0.65 && ptY > highestWalkableY) {
-            highestWalkableY = ptY;
-          }
-          if (worldNormalY >= 0.15 && ptY > highestSupportY) {
-            highestSupportY = ptY;
+    // Check all climbable crate tops directly (100% solid tops, edges, and corners)
+    let highestCrateY = -999;
+    for (let i = 0; i < colliders.length; i++) {
+      const c = colliders[i];
+      if (!c.isClimbable) continue;
+      const box = c.box;
+      if (
+        this.position.x + playerRadius * 0.7 > box.min.x &&
+        this.position.x - playerRadius * 0.7 < box.max.x &&
+        this.position.z + playerRadius * 0.7 > box.min.z &&
+        this.position.z - playerRadius * 0.7 < box.max.z
+      ) {
+        if (prevFeetY >= c.topY - 0.40 || curFeet >= c.topY - 0.50) {
+          if (c.topY > highestCrateY) {
+            highestCrateY = c.topY;
           }
         }
       }
+    }
+
+    const groundCandidates = getNearbyMeshes(this.position.x, this.position.z);
+    if (groundCandidates.length > 0) {
+      // 5-point raycast sampling (center + 4 cardinal offsets) guarantees no slipping through mountain seams
+      const sampleOffsets = [
+        [0, 0],
+        [0.20, 0],
+        [-0.20, 0],
+        [0, 0.20],
+        [0, -0.20]
+      ];
+      let highestWalkableY = -999;
+      let highestSupportY = -999;
+
+      for (let s = 0; s < sampleOffsets.length; s++) {
+        const [ox, oz] = sampleOffsets[s];
+        this.downOrigin.set(this.position.x + ox, this.position.y + 0.5, this.position.z + oz);
+        this.downRaycaster.set(this.downOrigin, this.downDir);
+        this.downRaycaster.far = 16.0;
+        const hits = this.downRaycaster.intersectObjects(groundCandidates, false);
+        for (let i = 0; i < hits.length; i++) {
+          const hit = hits[i];
+          let worldNormalY = 1.0;
+          if (hit.face && hit.face.normal) {
+            if (hit.object && hit.object.matrixWorld) {
+              const normMat = new THREE.Matrix3().getNormalMatrix(hit.object.matrixWorld);
+              worldNormalY = hit.face.normal.clone().applyMatrix3(normMat).normalize().y;
+            } else {
+              worldNormalY = hit.face.normal.y;
+            }
+          }
+          const ptY = hit.point.y;
+          if (ptY <= (curFeet + 0.85) && ptY <= 16.0) {
+            if (worldNormalY >= 0.55 && ptY > highestWalkableY) {
+              highestWalkableY = ptY;
+            }
+            if (worldNormalY >= 0.10 && ptY > highestSupportY) {
+              highestSupportY = ptY;
+            }
+          }
+        }
+      }
+
       if (highestWalkableY > -900) {
         targetGroundY = highestWalkableY;
         this.lastGroundY = highestWalkableY;
       } else if (highestSupportY > -900) {
-        // Mountain rock / canyon ledge support: guarantees player never falls through terrain into void
         targetGroundY = highestSupportY;
         this.lastGroundY = highestSupportY;
       }
+    }
+
+    if (highestCrateY > -900) {
+      if (highestCrateY >= targetGroundY || (curFeet >= highestCrateY - 0.40)) {
+        targetGroundY = highestCrateY;
+        this.lastGroundY = highestCrateY;
+      }
+    }
+
+    // Safety floor: in Dust 2, minimum playable ground is CT spawn at -3.56m. Never fall below -4.5m.
+    if (targetGroundY < -4.5) {
+      targetGroundY = -3.56;
+      this.lastGroundY = -3.56;
     }
 
     const groundSurfaceY = targetGroundY + this.playerHeight;
@@ -2593,12 +2692,14 @@ class CS2Player {
       const c = colliders[i];
       if (!c.isClimbable) continue;
       const box = c.box;
-      const inBoxX = (this.position.x + playerRadius > box.min.x && this.position.x - playerRadius < box.max.x);
-      const inBoxZ = (this.position.z + playerRadius > box.min.z && this.position.z - playerRadius < box.max.z);
+      const inBoxX = (this.position.x + playerRadius * 0.7 > box.min.x && this.position.x - playerRadius * 0.7 < box.max.x);
+      const inBoxZ = (this.position.z + playerRadius * 0.7 > box.min.z && this.position.z - playerRadius * 0.7 < box.max.z);
 
       if (inBoxX && inBoxZ) {
-        // Landing or standing on crate top (full footprint support for corners and edges)
-        if (currentFeetY >= c.topY - 0.40 && this.velocity.y <= 0.1) {
+        // Landing or stepping on crate top (supports jumping up, edge landing, and corner contact)
+        const crossedTop = (prevFeetY >= c.topY - 0.25 && currentFeetY <= c.topY + 0.40);
+        const nearTop = (currentFeetY >= c.topY - 0.40 && currentFeetY <= c.topY + 0.65);
+        if (crossedTop || nearTop) {
           this.position.y = c.topY + this.playerHeight;
           this.velocity.y = 0;
           this.isGrounded = true;

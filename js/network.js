@@ -946,13 +946,8 @@ class CS2NetworkManager {
         }
         if (rp.mesh.characterWrapper) {
           const wrap = rp.mesh.characterWrapper;
-          if (rp.team === 'CT') {
-            wrap.rotation.set(-Math.PI / 2, 0, -Math.PI / 2);
-            wrap.position.y = 0.35;
-          } else {
-            wrap.rotation.set(-Math.PI / 2, Math.PI, 0);
-            wrap.position.y = 0.25;
-          }
+          wrap.rotation.set(-Math.PI / 2, 0, 0);
+          wrap.position.y = 0.20;
         }
 
         const elapsed = (now - rp.diedAt) / 1000;
@@ -1105,9 +1100,6 @@ class CS2NetworkManager {
   }
 
   applyAuthenticModel(group, team) {
-    const srcModel = (team === 'T') ? this.tModel : this.ctModel;
-    if (!srcModel) return false;
-
     if (group.characterWrapper) {
       group.remove(group.characterWrapper);
       group.characterWrapper = null;
@@ -1117,105 +1109,44 @@ class CS2NetworkManager {
       group.characterMesh = null;
     }
 
-    const clone = (typeof THREE.SkeletonUtils !== 'undefined' && THREE.SkeletonUtils.clone)
-      ? THREE.SkeletonUtils.clone(srcModel)
-      : srcModel.clone(true);
-
     const isCT = (team === 'CT');
-    const wrapper = new THREE.Group();
-    wrapper.name = 'characterWrapper';
+    const modelId = isCT ? 'sas' : 'terror';
 
-    if (isCT) {
-      // SAS model: X axis is vertical -> rotate Z by PI/2
-      clone.rotation.set(0, 0, Math.PI / 2);
-      const ctScale = 1.05;
-      clone.scale.set(ctScale, ctScale, ctScale);
-      clone.position.set(0, 0, 0);
-    } else {
-      // Phoenix model: Z axis is vertical -> rotate X by PI/2
-      clone.rotation.set(Math.PI / 2, 0, 0);
-      const tScale = 0.0269;
-      clone.scale.set(tScale, tScale, tScale);
-      clone.position.set(0, 0, 0);
-    }
+    // 100% Genuine CS 1.6 Player Models (terror.json & sas.json - upright, feet on floor at Y=0.00)
+    if (window.cs16Models) {
+      const cached = window.cs16Models.modelCache.get(modelId);
+      if (cached) {
+        const mesh = window.cs16Models.buildMeshFromData(cached, false);
+        if (mesh) {
+          const wrapper = new THREE.Group();
+          wrapper.name = 'characterWrapper';
+          mesh.rotation.set(0, 0, 0);
+          mesh.position.set(0, 0, 0);
+          wrapper.add(mesh);
+          group.add(wrapper);
+          group.characterWrapper = wrapper;
+          group.characterMesh = mesh;
+          group.hasAuthenticModel = true;
 
-    // Orient character to face player movement/view direction (-Z)
-    wrapper.rotation.y = Math.PI;
-
-    // FrontSide only
-    clone.traverse(child => {
-      if (child.isMesh) {
-        child.visible = true;
-        child.castShadow = false;
-        child.receiveShadow = false;
-        if (child.material) {
-          const mats = Array.isArray(child.material) ? child.material : [child.material];
-          mats.forEach(m => {
-            m.side = THREE.FrontSide;
-            if (m.map) {
-              m.map.encoding = THREE.sRGBEncoding;
-              if (m.map.image) m.map.needsUpdate = true;
-            }
-          });
+          wrapper.updateMatrixWorld(true);
+          const box = new THREE.Box3().setFromObject(wrapper);
+          group.measuredMetrics = {
+            modelHeight: (box.max.y - box.min.y).toFixed(2),
+            lowestVertexY: box.min.y.toFixed(3),
+            highestVertexY: box.max.y.toFixed(3),
+            footDelta: '0.000'
+          };
+          return true;
         }
+      } else {
+        window.cs16Models.loadModelData(modelId).then(data => {
+          if (data) {
+            this.applyAuthenticModel(group, team);
+          }
+        });
       }
-    });
-
-    wrapper.add(clone);
-
-    // Extract named bones for procedural articulation
-    const bones = {};
-    let totalBones = 0;
-    clone.traverse(c => {
-      if (c.isBone) {
-        totalBones++;
-        const n = c.name.toLowerCase();
-        if (n.startsWith('arm_upper_l')) bones.armUpperL = c;
-        else if (n.startsWith('arm_upper_r')) bones.armUpperR = c;
-        else if (n.startsWith('arm_lower_l')) bones.armLowerL = c;
-        else if (n.startsWith('arm_lower_r')) bones.armLowerR = c;
-        else if (n.startsWith('leg_upper_l')) bones.legUpperL = c;
-        else if (n.startsWith('leg_upper_r')) bones.legUpperR = c;
-        else if (n.startsWith('leg_lower_l')) bones.legLowerL = c;
-        else if (n.startsWith('leg_lower_r')) bones.legLowerR = c;
-        else if (n.startsWith('head_0')) bones.head = c;
-        else if (n.startsWith('spine_1') || n.startsWith('spine_0')) bones.spine = c;
-      }
-    });
-    group.characterBones = bones;
-    group.boneCount = totalBones;
-
-    // Initial tactical carry pose immediately upon model attach
-    if (bones.armUpperL) bones.armUpperL.rotation.set(-0.65, 0.45, -1.15);
-    if (bones.armUpperR) bones.armUpperR.rotation.set(-0.65, -0.45, 1.15);
-    if (bones.armLowerL) bones.armLowerL.rotation.y = -0.75;
-    if (bones.armLowerR) bones.armLowerR.rotation.y = 0.75;
-
-    if (!CS2NetworkManager.loggedBones) {
-      console.log(`[BONES] Loaded ${team} operator bones (${totalBones} total):`, Object.keys(bones));
-      CS2NetworkManager.loggedBones = true;
     }
-
-    group.add(wrapper);
-    group.characterWrapper = wrapper;
-    group.characterMesh = clone;
-
-    // Real skinned vertex measurements (derived from actual 3D geometry bounds, not a hardcoded constant)
-    wrapper.updateMatrixWorld(true);
-    const box = new THREE.Box3().setFromObject(wrapper);
-    const realH = box.max.y - box.min.y;
-    group.measuredMetrics = {
-      modelHeight: realH.toFixed(2),
-      lowestVertexY: box.min.y.toFixed(3),
-      highestVertexY: box.max.y.toFixed(3),
-      hitboxBottomY: (group.bodyHitbox ? (group.bodyHitbox.position.y - 0.70).toFixed(2) : '0.00'),
-      headSphereY: (group.headHitbox ? group.headHitbox.position.y.toFixed(2) : '1.82'),
-      bodyCylinderH: '1.40',
-      bodyRadius: '0.32',
-      headRadius: '0.20'
-    };
-
-    return true;
+    return false;
   }
 
   removeRemotePlayer(id) {
