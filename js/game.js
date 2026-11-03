@@ -813,8 +813,8 @@ class CS2GameManager {
     this.player.isDefusing = false;
 
     // T planting C4: strictly living Terrorist C4 carrier only
-    const plantTeam = (this.net && this.net.serverTeam) || this.player.team;
-    if (plantTeam === 'T' && this.player.team === 'T' && !this.c4Planted && this.player.inventory[5] && this.player.hasC4) {
+    const plantTeam = this.player.team;
+    if (plantTeam === 'T' && !this.c4Planted && this.player.inventory[5] && this.player.hasC4) {
       let inSite = null;
       let siteY = 0.1;
       const playerFeetY = this.player.position.y - this.player.playerHeight;
@@ -844,9 +844,10 @@ class CS2GameManager {
 
       if (inSite) {
         actionPrompt.classList.remove('hidden');
-        promptText.innerText = `HOLD [E] TO PLANT C4 ON SITE ${inSite}`;
+        promptText.innerText = `HOLD [E] OR [LEFT CLICK] TO PLANT C4 ON SITE ${inSite}`;
 
-        if (this.player.keys[this.player.keybinds.use]) {
+        const isPlantInput = !!(this.player.keys[this.player.keybinds.use] || (this.player.activeSlot === 5 && this.player.isShooting));
+        if (isPlantInput) {
           this.player.isPlanting = true;
           this.player.plantProgress += dt / 3.2;
           progressTrack.classList.remove('hidden');

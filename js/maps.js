@@ -363,6 +363,7 @@ class CS2MapBuilder {
     this.addCollider(-63.36, 0.00, -118.08, 5.76, 2.88, 2.88, true);  // B site long crate (model_1)
     this.addCollider(-61.92, 0.00, -120.96, 2.88, 5.76, 2.88, true);  // B double stack crate (model_2)
     this.addCollider(-75.78, 0.00, -127.93, 3.96, 2.88, 3.96, true);  // B back site crate (model_3)
+    this.addCollider(-64.50, 0.00, -116.00, 2.40, 1.44, 2.40, true);  // B site jump-assist step pallet (smooth boost onto long crate)
     // B window hole is 100% open and traversable (removed blocking box at -59.04)
     this.addCollider(-58.80, 6.48, -119.80, 2.40, 0.60, 2.40, true);  // B window stone sill step floor (walkable ledge)
     this.addCollider(-55.50, 5.03, -118.50, 3.50, 1.65, 2.00, true);  // B window ledge step crates (model_34/35)
@@ -373,17 +374,17 @@ class CS2MapBuilder {
     // ==========================================================
 
     // Bombsite A: Positioned directly at the platform crates (Matching material_15 floor decal & radar bounds)
-    this.addBombsiteZone('A', 51.85, 4.32, -108.7, 8.5, {
-      minX: 42.0, maxX: 62.0,
-      minZ: -118.0, maxZ: -100.0,
-      minY: 1.5, maxY: 8.0
+    this.addBombsiteZone('A', 51.85, 4.32, -108.7, 9.5, {
+      minX: 40.0, maxX: 66.0,
+      minZ: -122.0, maxZ: -98.0,
+      minY: -5.0, maxY: 12.0
     });
 
     // Bombsite B: Courtyard zone matching material_25 SandRoadTgtB decal and radar orange bounds
-    this.addBombsiteZone('B', -72.0, 0.0, -121.0, 8.5, {
-      minX: -80.0, maxX: -64.0,
-      minZ: -128.0, maxZ: -114.0,
-      minY: -1.5, maxY: 4.5
+    this.addBombsiteZone('B', -72.0, 0.0, -121.0, 9.5, {
+      minX: -85.0, maxX: -58.0,
+      minZ: -136.0, maxZ: -108.0,
+      minY: -5.0, maxY: 12.0
     });
 
     // Authentic Buy Zones matching CT & T Spawns

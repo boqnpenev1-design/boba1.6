@@ -164,7 +164,10 @@ function parseMdl(filePath, outputModelId, isPlayerModel = false) {
   const numseq = buf.readInt32LE(164);
   const seqindex = buf.readInt32LE(168);
   let animindex = 0;
-  if (!isPlayerModel && numseq > 0 && seqindex > 0 && seqindex < buf.length) {
+  if (isPlayerModel && numseq > 1 && seqindex > 0 && (seqindex + 176 + 128) < buf.length) {
+    // Seq 1 is idle1 for player models (arms down, authentic standing combat stance holding gun)
+    animindex = buf.readInt32LE(seqindex + 176 + 124);
+  } else if (!isPlayerModel && numseq > 0 && seqindex > 0 && (seqindex + 128) < buf.length) {
     animindex = buf.readInt32LE(seqindex + 124);
   }
 
@@ -192,9 +195,10 @@ function parseMdl(filePath, outputModelId, isPlayerModel = false) {
   const numbodyparts = buf.readInt32LE(204);
   const bodypartindex = buf.readInt32LE(208);
 
-  // First pass: find min_ty for canonical viewmodel positioning
+  // First pass: find min_ty for canonical viewmodel positioning and min_tz for player feet positioning
   let min_ty = 99999;
   let max_ty = -99999;
+  let min_tz = 99999;
   let bestWeaponY = -99999;
   let bestWeaponVert = null;
 
@@ -222,6 +226,7 @@ function parseMdl(filePath, outputModelId, isPlayerModel = false) {
 
         if (ty < min_ty) min_ty = ty;
         if (ty > max_ty) max_ty = ty;
+        if (tz < min_tz) min_tz = tz;
 
         if (bpName !== 'rhand' && bpName !== 'lhand') {
           if (ty > bestWeaponY) {
@@ -266,11 +271,15 @@ function parseMdl(filePath, outputModelId, isPlayerModel = false) {
         const tz = vx*mat[2][0] + vy*mat[2][1] + vz*mat[2][2] + mat[2][3];
 
         if (isPlayerModel) {
-          // Player model: feet on floor (Z=0), standing upright facing forward (-Z in Three.js)
-          transformedVerts.push([-ty * 0.0254, tz * 0.0254, -tx * 0.0254]);
+          // Player model: feet normalized to floor (Y=0.00), standing upright facing forward (-Z in Three.js)
+          // Scale 0.045 exactly matches Dust 2 map scale (72 units * 0.045 = 3.24m height, taller than standard 2.88m crates)
+          const py = (tz - min_tz) * 0.045;
+          const px = -ty * 0.045;
+          const pz = -tx * 0.045;
+          transformedVerts.push([px, py, pz]);
         } else {
-          // Viewmodel: pointing downrange (-Z), hands in lower-right of viewport
-          const x3 = (-tx * 0.025) + 0.28;
+          // Viewmodel: pointing downrange (-Z), hands situated canonically in lower-right quadrant (+0.52 offset)
+          const x3 = (-tx * 0.025) + 0.52;
           const y3 = (tz * 0.025) - 0.22;
           const z3 = -((ty - min_ty) * 0.025) - 0.16;
           transformedVerts.push([x3, y3, z3]);
@@ -356,11 +365,11 @@ function parseMdl(filePath, outputModelId, isPlayerModel = false) {
     }
   }
 
-  let barrelTip = [0.20, -0.10, -0.85];
+  let barrelTip = [0.35, -0.10, -0.85];
   if (bestWeaponVert) {
     const [bx, by, bz] = bestWeaponVert;
     barrelTip = [
-      (-bx * 0.025) + 0.28,
+      (-bx * 0.025) + 0.52,
       (bz * 0.025) - 0.22,
       -((by - min_ty) * 0.025) - 0.18
     ];

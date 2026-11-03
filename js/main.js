@@ -699,6 +699,46 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
+    // 2b. Grenade Inventory Limits: Max 4 total grenades, max 2 Flashbangs, max 1 Smoke, max 1 HE Grenade, max 1 Molotov/Incendiary
+    const isGrenade = (weapon.slot === 4 || weapon.type === 'grenade' || ['flashbang', 'hegrenade', 'smokegrenade', 'molotov', 'incgrenade'].includes(weapon.id));
+    if (isGrenade) {
+      const gList = gameManager.player.grenades || [];
+      if (gList.length >= 4) {
+        const reason = 'Cannot carry any more grenades (Max 4)';
+        window.__lastReject = { type: 'buy_item', reason, time: new Date().toLocaleTimeString() };
+        showToast(reason, 'warning');
+        return;
+      }
+      const flashCount = gList.filter(g => (g.id || g) === 'flashbang').length;
+      if (weapon.id === 'flashbang' && flashCount >= 2) {
+        const reason = 'Maximum 2 Flashbangs allowed';
+        window.__lastReject = { type: 'buy_item', reason, time: new Date().toLocaleTimeString() };
+        showToast(reason, 'warning');
+        return;
+      }
+      const heCount = gList.filter(g => (g.id || g) === 'hegrenade').length;
+      if (weapon.id === 'hegrenade' && heCount >= 1) {
+        const reason = 'Already carrying HE Grenade (Max 1)';
+        window.__lastReject = { type: 'buy_item', reason, time: new Date().toLocaleTimeString() };
+        showToast(reason, 'warning');
+        return;
+      }
+      const smokeCount = gList.filter(g => (g.id || g) === 'smokegrenade').length;
+      if (weapon.id === 'smokegrenade' && smokeCount >= 1) {
+        const reason = 'Already carrying Smoke Grenade (Max 1)';
+        window.__lastReject = { type: 'buy_item', reason, time: new Date().toLocaleTimeString() };
+        showToast(reason, 'warning');
+        return;
+      }
+      const moloCount = gList.filter(g => (g.id || g) === 'molotov' || (g.id || g) === 'incgrenade').length;
+      if ((weapon.id === 'molotov' || weapon.id === 'incgrenade') && moloCount >= 1) {
+        const reason = 'Already carrying Molotov/Incendiary (Max 1)';
+        window.__lastReject = { type: 'buy_item', reason, time: new Date().toLocaleTimeString() };
+        showToast(reason, 'warning');
+        return;
+      }
+    }
+
     // 3. Buy zone & phase validation
     if (!gameManager.canBuy()) {
       let reason = 'Cannot purchase at this time';

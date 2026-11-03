@@ -53,7 +53,7 @@ class CS2Player {
     this.lastGroundY = -5.8;
     this.isCrouched = false;
     this.isScoped = false;
-    this.playerHeight = 2.2;
+    this.playerHeight = 2.68;
 
     // Jump Input State (Strictly single-press: prevents auto bunny-hop)
     this.jumpRequested = false;
@@ -1619,7 +1619,6 @@ class CS2Player {
 
     // C4 Bomb or Objective items cannot shoot bullets
     if (this.activeSlot === 5 || this.activeWeapon.id === 'c4' || this.activeWeapon.category === 'objective') {
-      this.isShooting = false;
       return;
     }
 
@@ -2417,7 +2416,7 @@ class CS2Player {
     if (this.jumpRequested && this.isGrounded && !inFreeze && !this.isPlanting && !this.isDefusing) {
       this.jumpRequested = false;
       // Crouch-jump (duck-jump) boost (11.2) to easily clear and land on 2.8m Dust 2 crates
-      const jumpImpulse = this.isCrouched ? 11.2 : 10.0;
+      const jumpImpulse = this.isCrouched ? 12.8 : 12.0;
       this.velocity.y = jumpImpulse;
       this.isGrounded = false;
       window.csAudio.playJump();
@@ -2426,7 +2425,7 @@ class CS2Player {
     this.velocity.y -= 18.0 * dt;
 
     this.isCrouched = !!(this.keys[this.keybinds.crouch] || this.keys['KeyC']);
-    const targetHeight = this.isCrouched ? 1.35 : 2.2;
+    const targetHeight = this.isCrouched ? 1.45 : 2.68;
     const hLerp = 1 - Math.exp(-14.0 * dt);
     const prevHeight = this.playerHeight;
     this.playerHeight += (targetHeight - this.playerHeight) * hLerp;
@@ -2601,19 +2600,14 @@ class CS2Player {
 
     const groundCandidates = getNearbyMeshes(this.position.x, this.position.z);
     if (groundCandidates.length > 0) {
-      // 5-point raycast sampling (center + 4 cardinal offsets) guarantees no slipping through mountain seams
-      const sampleOffsets = [
-        [0, 0],
-        [0.20, 0],
-        [-0.20, 0],
-        [0, 0.20],
-        [0, -0.20]
-      ];
+      if (!this._tempMat3) {
+        this._tempMat3 = new THREE.Matrix3();
+        this._tempNorm = new THREE.Vector3();
+      }
       let highestWalkableY = -999;
       let highestSupportY = -999;
 
-      for (let s = 0; s < sampleOffsets.length; s++) {
-        const [ox, oz] = sampleOffsets[s];
+      const testSample = (ox, oz) => {
         this.downOrigin.set(this.position.x + ox, this.position.y + 0.5, this.position.z + oz);
         this.downRaycaster.set(this.downOrigin, this.downDir);
         this.downRaycaster.far = 16.0;
@@ -2623,8 +2617,9 @@ class CS2Player {
           let worldNormalY = 1.0;
           if (hit.face && hit.face.normal) {
             if (hit.object && hit.object.matrixWorld) {
-              const normMat = new THREE.Matrix3().getNormalMatrix(hit.object.matrixWorld);
-              worldNormalY = hit.face.normal.clone().applyMatrix3(normMat).normalize().y;
+              this._tempMat3.getNormalMatrix(hit.object.matrixWorld);
+              this._tempNorm.copy(hit.face.normal).applyMatrix3(this._tempMat3).normalize();
+              worldNormalY = this._tempNorm.y;
             } else {
               worldNormalY = hit.face.normal.y;
             }
@@ -2639,6 +2634,14 @@ class CS2Player {
             }
           }
         }
+      };
+
+      testSample(0, 0);
+      if (highestWalkableY <= -900) {
+        testSample(0.20, 0);
+        testSample(-0.20, 0);
+        testSample(0, 0.20);
+        testSample(0, -0.20);
       }
 
       if (highestWalkableY > -900) {
