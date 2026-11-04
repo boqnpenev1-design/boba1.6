@@ -138,7 +138,7 @@ class CS2GameManager {
       id: item.id,
       mesh: mesh,
       weapon: w,
-      slot: item.slot || 1,
+      slot: (item.weaponId === 'c4' || (w && w.id === 'c4')) ? 5 : (item.slot || (w && w.slot) || 1),
       pos: mesh.position,
       groundY: targetGroundY,
       isResting: true,
@@ -544,7 +544,7 @@ class CS2GameManager {
     row.className = 'kill-row';
 
     const attackerTeam = victimTeam === 'CT' ? 't' : 'ct';
-    const hsIcon = isHeadshot ? '<span class="kill-headshot">🎯</span>' : '';
+    const hsIcon = isHeadshot ? '<svg class="kill-icon-hs" viewBox="0 0 24 24" width="16" height="16" fill="#e74c3c" style="vertical-align:middle;margin:0 4px;"><circle cx="12" cy="9" r="6" stroke="#fff" stroke-width="1.5"/><circle cx="12" cy="9" r="2.5"/><line x1="12" y1="1" x2="12" y2="4" stroke="#fff" stroke-width="1.5"/><line x1="12" y1="14" x2="12" y2="17" stroke="#fff" stroke-width="1.5"/><line x1="4" y1="9" x2="7" y2="9" stroke="#fff" stroke-width="1.5"/><line x1="17" y1="9" x2="20" y2="9" stroke="#fff" stroke-width="1.5"/></svg>' : '';
 
     row.innerHTML = `
       <span class="kill-killer ${attackerTeam}">${attacker}</span>

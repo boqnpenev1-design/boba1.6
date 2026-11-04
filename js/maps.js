@@ -366,11 +366,13 @@ class CS2MapBuilder {
     this.addCollider(-61.92, 0.00, -120.96, 2.88, 5.76, 2.88, true);  // B double stack crate (model_2)
     this.addCollider(-75.78, 0.00, -127.93, 3.96, 2.88, 3.96, true);  // B back site crate (model_3)
     this.addCollider(-64.50, 0.00, -116.00, 2.40, 1.44, 2.40, true);  // B site jump-assist step pallet (smooth boost onto long crate)
+    this.addCollider(-63.00, 2.88, -118.08, 1.80, 1.08, 1.80, true);  // B stack lower boost step (topY = 3.96)
+    this.addCollider(-61.56, 2.88, -118.44, 2.16, 2.16, 2.16, true);  // B stack mid crate (model_36, topY = 5.04)
+    this.addCollider(-60.10, 5.04, -119.10, 1.80, 0.80, 1.80, true);  // B window jump boost step (topY = 5.84)
     // B window hole is 100% open and traversable (removed blocking box at -59.04)
     this.addCollider(-58.80, 6.48, -119.80, 2.40, 0.60, 2.40, true);  // B window stone sill step floor (walkable ledge)
     this.addCollider(-55.50, 5.03, -118.50, 2.50, 0.60, 2.50, true);  // B window ledge steps (Item C)
     this.addCollider(-65.0, 10.0, -135.0, 30.0, 30.0, 6.0, false); // B site north mountain cliff barrier (blocks void/mountain jump)
-    this.addCollider(-61.56, 2.88, -118.44, 2.16, 2.16, 2.16, true);  // B stack mid crate (model_36)
 
     // ==========================================================
     // BOMBSITES & BUY ZONES (100% Authentic Dust 2 Geometry)

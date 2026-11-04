@@ -264,7 +264,7 @@
       name: 'Schmidt Scout',
       category: 'snipers',
       slot: 1,
-      price: 2750,
+      price: 1700,
       reward: 300,
       team: 'ANY',
       damage: 75, // ReGameDLL_CS: CScout (75 base damage)

@@ -199,9 +199,9 @@ class CS2Player {
     this.viewmodelScene.add(vmFill);
 
     // Authentic CS Muzzle Flash (Cross-plane flash placed at exact weapon barrel tip)
-    const flashMat = new THREE.MeshBasicMaterial({ color: 0xffe680, side: THREE.DoubleSide });
-    const flashPlane1 = new THREE.Mesh(new THREE.PlaneGeometry(0.045, 0.045), flashMat);
-    const flashPlane2 = new THREE.Mesh(new THREE.PlaneGeometry(0.045, 0.045), flashMat);
+    const flashMat = new THREE.MeshBasicMaterial({ color: 0xffaa33, transparent: true, opacity: 0.85, side: THREE.DoubleSide, blending: THREE.AdditiveBlending });
+    const flashPlane1 = new THREE.Mesh(new THREE.PlaneGeometry(0.025, 0.025), flashMat);
+    const flashPlane2 = new THREE.Mesh(new THREE.PlaneGeometry(0.025, 0.025), flashMat);
     flashPlane2.rotation.y = Math.PI / 2;
     this.muzzleFlashMesh = new THREE.Group();
     this.muzzleFlashMesh.add(flashPlane1);
@@ -1208,33 +1208,11 @@ class CS2Player {
     }
 
     const TARGET_DROPPED_LENGTH = {
-      'ak47': 1.00,
-      'm4a1': 0.98,
-      'm4a4': 0.98,
-      'awp': 1.40,
-      'scout': 1.10,
-      'ssg08': 1.10,
-      'g3sg1': 1.20,
-      'sg550': 1.20,
-      'aug': 0.88,
-      'sg552': 0.90,
-      'galil': 0.95,
-      'famas': 0.85,
-      'mp5': 0.70,
-      'p90': 0.68,
-      'mac10': 0.55,
-      'ump45': 0.65,
-      'usp': 0.35,
-      'glock': 0.33,
-      'deagle': 0.38,
-      'p228': 0.33,
-      'fiveseven': 0.33,
-      'elite': 0.35,
-      'knife': 0.35,
-      'hegrenade': 0.22,
-      'flashbang': 0.22,
-      'smokegrenade': 0.22,
-      'molotov': 0.28
+      'ak47': 1.30, 'm4a1': 1.25, 'm4a4': 1.25, 'awp': 1.55, 'scout': 1.40, 'ssg08': 1.40,
+      'g3sg1': 1.45, 'sg550': 1.45, 'aug': 1.20, 'sg552': 1.25, 'galil': 1.25, 'famas': 1.20,
+      'mp5': 0.95, 'p90': 0.90, 'mac10': 0.80, 'ump45': 0.95, 'usp': 0.55, 'glock': 0.52,
+      'deagle': 0.58, 'p228': 0.52, 'fiveseven': 0.52, 'elite': 0.55, 'knife': 0.45,
+      'hegrenade': 0.35, 'flashbang': 0.35, 'smokegrenade': 0.35, 'molotov': 0.40
     };
 
     const meshName = CS2Player.WEAPON_MESH_MAP[weaponId];
@@ -1277,7 +1255,10 @@ class CS2Player {
         const inner = new THREE.Group();
         inner.add(clone);
         inner.scale.set(uniformScale, uniformScale, uniformScale);
-        inner.rotation.set(Math.PI / 2, 0, 0);
+        inner.rotation.set(0, 0, Math.PI / 2);
+        inner.updateMatrixWorld(true);
+        const bInner = new THREE.Box3().setFromObject(inner);
+        inner.position.y = -bInner.min.y;
         dropGroup.add(inner);
 
         const isDebug = !!(window.__CS2_DEBUG || (typeof window !== 'undefined' && window.location && window.location.search.includes('debug=1')));
@@ -1466,7 +1447,9 @@ class CS2Player {
         const wantPickup = (this.keys[this.keybinds.use] && timeSinceDrop > 250) || (horizDist < 1.3 && slotEmpty && timeSinceDrop > 1000);
 
         if (wantPickup) {
-          const targetSlot = item.slot;
+          let targetSlot = item.slot;
+          if (item.weapon && item.weapon.id === 'c4') targetSlot = 5;
+          if (targetSlot === 5) this.hasC4 = true;
 
           // If slot already has a weapon and player presses E to swap, drop existing weapon first
           if (this.inventory[targetSlot] && targetSlot !== 4) {
@@ -1558,12 +1541,14 @@ class CS2Player {
     this.camera.updateProjectionMatrix();
 
     const scopeEl = document.getElementById('scope-overlay');
-    if (scopeEl) {
-      if (['aug', 'sg552', 'sg553'].includes(this.activeWeapon.id)) {
-        scopeEl.classList.add('hidden');
-      } else {
-        scopeEl.classList.remove('hidden');
-      }
+    const augScopeEl = document.getElementById('aug-scope-overlay');
+    const isAugOrSg = ['aug', 'sg552', 'sg553'].includes(this.activeWeapon.id);
+    if (isAugOrSg) {
+      if (scopeEl) scopeEl.classList.add('hidden');
+      if (augScopeEl) augScopeEl.classList.remove('hidden');
+    } else {
+      if (augScopeEl) augScopeEl.classList.add('hidden');
+      if (scopeEl) scopeEl.classList.remove('hidden');
     }
     if (this.viewmodelGroup) this.viewmodelGroup.visible = false;
     if (window.csAudio && typeof window.csAudio.playZoom === 'function') {
@@ -1581,6 +1566,8 @@ class CS2Player {
     }
     const scopeEl = document.getElementById('scope-overlay');
     if (scopeEl) scopeEl.classList.add('hidden');
+    const augScopeEl = document.getElementById('aug-scope-overlay');
+    if (augScopeEl) augScopeEl.classList.add('hidden');
     if (this.viewmodelGroup) this.viewmodelGroup.visible = true;
   }
 
@@ -1720,6 +1707,7 @@ class CS2Player {
       this.isShooting = false;
     }
 
+    this.lastActualShotTime = performance.now();
     this.clipAmmo.add(-1);
     if (this.weaponAmmo[this.activeWeapon.id]) {
       this.weaponAmmo[this.activeWeapon.id].clip = this.clipAmmo.get();
@@ -1795,8 +1783,12 @@ class CS2Player {
       }
 
       // Authentic bullet tracer streak originating from the front barrel tip in world space
-      const barrelCamPos = (this.muzzleFlashMesh && this.muzzleFlashMesh.position) ? this.muzzleFlashMesh.position.clone() : new THREE.Vector3(0.20, -0.10, -0.80);
-      const barrelWorld = barrelCamPos.applyMatrix4(this.camera.matrixWorld);
+      const barrelWorld = new THREE.Vector3();
+      if (this.muzzleFlashMesh) {
+        this.muzzleFlashMesh.getWorldPosition(barrelWorld);
+      } else {
+        barrelWorld.copy(this.camera.position).addScaledVector(pDir, 0.5);
+      }
       const targetPoint = (wallObstacles && wallObstacles.length > 0)
         ? wallObstacles[0].point
         : this.camera.position.clone().addScaledVector(pDir, 60.0);
@@ -1834,10 +1826,11 @@ class CS2Player {
                 const lastDist = intervening[intervening.length - 1].distance;
                 const wallThickness = lastDist - firstDist;
 
-                const hasPen = (this.activeWeapon.armorPen && this.activeWeapon.armorPen >= 0.65) ||
+                const hasPen = (this.activeWeapon.armorPen && this.activeWeapon.armorPen >= 0.70) ||
                                (this.activeWeapon.category === 'rifles' || this.activeWeapon.id === 'awp' || this.activeWeapon.id === 'deagle');
 
-                if (hasPen && wallThickness <= 1.35 && intervening.length <= 2) {
+                // Single thin obstacle penetration only; thick stone walls completely block bullets
+                if (hasPen && intervening.length <= 2 && wallThickness <= 0.60 && wallThickness > 0.02) {
                   penetrationPenalty = 0.50;
                 } else {
                   canHit = false;
@@ -2214,11 +2207,9 @@ class CS2Player {
     document.getElementById('interaction-bar-container').classList.add('hidden');
 
     // Drop primary weapon (or secondary pistol if no primary, plus C4 if carrying) on death
-    if (this.inventory[1]) {
-      this.dropWeaponBySlot(1);
-    } else if (this.inventory[2]) {
-      this.dropWeaponBySlot(2);
-    }
+    if (this.inventory[1]) this.dropWeaponBySlot(1);
+    if (this.inventory[2]) this.dropWeaponBySlot(2);
+    if (this.inventory[4]) this.dropWeaponBySlot(4);
     if (this.hasC4 && this.inventory[5]) this.dropWeaponBySlot(5);
 
     this.enterSpectatorMode();
@@ -2568,25 +2559,27 @@ class CS2Player {
     let decisionNormalY = 1.0;
     let decisionResult = 'CLEAR';
 
-    // Feeler obstacle check at chest height (solid crates/walls block walkover)
+    // Multi-height capsule feeler obstacle check (solid crates & walls block walkover, jumping or grounded)
     const checkMeshWall = (dirX, dirZ, dist) => {
-      // While jumping upwards, allow forward movement onto crates and ledges
-      if (!this.isGrounded && this.velocity.y > 0) return false;
       const candidates = getNearbyMeshes(oldX, oldZ);
       if (candidates.length === 0) return false;
       this.wallDir.set(dirX, 0, dirZ).normalize();
       const currentFeetY = this.position.y - this.playerHeight;
-      this.wallOrigin.set(oldX, currentFeetY + maxStepUp + 0.15, oldZ);
-      this.wallRaycaster.set(this.wallOrigin, this.wallDir);
-      this.wallRaycaster.far = dist;
-      const hits = this.wallRaycaster.intersectObjects(candidates, false);
-      if (hits.length > 0 && hits[0].distance < dist) {
-        if (hits[0].face && hits[0].face.normal) {
-          decisionNormalY = hits[0].face.normal.y;
-          // Walkable slope or sill: do not block
-          if (Math.abs(hits[0].face.normal.y) > 0.55) return false;
+      const testHeights = [currentFeetY + maxStepUp + 0.15, currentFeetY + 1.20, Math.min(this.position.y - 0.20, currentFeetY + 1.80)];
+
+      for (let h = 0; h < testHeights.length; h++) {
+        this.wallOrigin.set(oldX, testHeights[h], oldZ);
+        this.wallRaycaster.set(this.wallOrigin, this.wallDir);
+        this.wallRaycaster.far = dist;
+        const hits = this.wallRaycaster.intersectObjects(candidates, false);
+        if (hits.length > 0 && hits[0].distance < dist) {
+          if (hits[0].face && hits[0].face.normal) {
+            decisionNormalY = hits[0].face.normal.y;
+            // Walkable slope (normal.y > 0.65) does not count as vertical wall
+            if (Math.abs(hits[0].face.normal.y) > 0.65) continue;
+          }
+          return true; // Solid wall detected
         }
-        return true;
       }
       return false;
     };
@@ -2596,7 +2589,7 @@ class CS2Player {
     const currentFeetY_X = this.position.y - this.playerHeight;
     for (let i = 0; i < colliders.length; i++) {
       const c = colliders[i];
-      if (c.isClimbable && (currentFeetY_X >= c.topY - 0.25 || (!this.isGrounded && this.velocity.y > 0))) continue;
+      if (c.isClimbable && (currentFeetY_X >= c.topY - 0.25)) continue;
       const box = c.box;
       if (
         this.position.y > box.min.y && currentFeetY_X < box.max.y &&
@@ -2638,7 +2631,7 @@ class CS2Player {
     const currentFeetY_Z = this.position.y - this.playerHeight;
     for (let i = 0; i < colliders.length; i++) {
       const c = colliders[i];
-      if (c.isClimbable && (currentFeetY_Z >= c.topY - 0.25 || (!this.isGrounded && this.velocity.y > 0))) continue;
+      if (c.isClimbable && (currentFeetY_Z >= c.topY - 0.25)) continue;
       const box = c.box;
       if (
         this.position.y > box.min.y && currentFeetY_Z < box.max.y &&
@@ -2880,7 +2873,8 @@ class CS2Player {
 
     const isPistol = (this.activeWeapon && (this.activeWeapon.category === 'pistols' || this.activeSlot === 2));
 
-    if (this.isShooting && !isPistol && idleTime <= fireInterval * 1.5) {
+    const timeSinceActualShot = (performance.now() - (this.lastActualShotTime || 0)) / 1000;
+    if (this.isShooting && !isPistol && timeSinceActualShot < 0.18) {
       const easeSpeed = 1 - Math.exp(-32.0 * dt);
       this.recoilPitch += ((this.targetRecoilPitch || 0) - this.recoilPitch) * easeSpeed;
       this.recoilYaw += ((this.targetRecoilYaw || 0) - this.recoilYaw) * easeSpeed;

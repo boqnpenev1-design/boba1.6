@@ -385,6 +385,8 @@ class CS2NetworkManager {
         this.gm.score.T = this.gm.tScore;
         this.gm.resetBombHUD();
         this.gm.clearAllDroppedItems();
+        this.gm.purchaseHistory = [];
+        Object.values(this.remotePlayers).forEach(rp => { rp.buffer = []; });
         const roundEndOverlay = document.getElementById('round-end-overlay');
         if (roundEndOverlay) roundEndOverlay.classList.add('hidden');
         this.inMatch = true;
@@ -435,6 +437,7 @@ class CS2NetworkManager {
         break;
 
       case 'match_over':
+        if (this.gm.phase === 'match_over') break;
         this.gm.score.CT = packet.ctScore;
         this.gm.score.T = packet.tScore;
         this.gm.phase = 'match_over';
@@ -487,10 +490,12 @@ class CS2NetworkManager {
           const nextTeam = (this.gm.player.team === 'CT') ? 'T' : 'CT';
           this.serverTeam = nextTeam;
           this.gm.setAuthoritativeTeam(nextTeam, false);
+          this.gm.player.placePlayer(nextTeam, 0);
           this.gm.player.money.set(800);
           this.gm.player.hasHelmet = false;
           this.gm.player.armor.set(0);
         }
+        Object.values(this.remotePlayers).forEach(rp => { rp.buffer = []; });
         this.gm.updateHUD();
         break;
 
@@ -622,8 +627,12 @@ class CS2NetworkManager {
         break;
 
       case 'c4_picked_up':
+        if (this.gm) {
+          this.gm.removeRemoteDroppedWeapon(packet.itemId, 'c4');
+        }
         if (packet.carrierId === this.playerId && this.gm.player) {
           this.gm.player.inventory[5] = CS2_WEAPONS.c4;
+          this.gm.player.hasC4 = true;
           this.gm.player.updateSlotHUD();
           window.csAudio.playWeaponEquip('knife');
         }
@@ -818,6 +827,8 @@ class CS2NetworkManager {
           this.gm.player.money.set(sp.money);
         }
         if (this.gm.player) {
+          if (typeof sp.kills === 'number') this.gm.player.kills = sp.kills;
+          if (typeof sp.deaths === 'number') this.gm.player.deaths = sp.deaths;
           if (sp.isAlive === false && this.gm.player.isAlive) {
             this.gm.player.takeDamage(500, 'Server Elimination', 'world');
           } else if (sp.isAlive === true) {
@@ -865,6 +876,18 @@ class CS2NetworkManager {
     const rp = this.remotePlayers[sp.id];
     rp.team = sp.team;
     rp.isAlive = sp.isAlive;
+    rp.kills = (typeof sp.kills === 'number') ? sp.kills : 0;
+    rp.deaths = (typeof sp.deaths === 'number') ? sp.deaths : 0;
+    rp.money = (typeof sp.money === 'number') ? sp.money : 800;
+    rp.data = {
+      kills: rp.kills,
+      deaths: rp.deaths,
+      money: rp.money,
+      isAlive: sp.isAlive,
+      health: sp.health,
+      team: sp.team,
+      callsign: sp.callsign || rp.name
+    };
     rp.mesh.visible = (sp.inMatch !== false && sp.isAlive);
 
     if (!rp.hasAuthenticModel || rp.currentModelTeam !== sp.team) {
@@ -1011,7 +1034,7 @@ class CS2NetworkManager {
       } else {
         rp.diedAt = null;
         if (rp.mesh.characterWrapper) {
-          rp.mesh.characterWrapper.rotation.set(0, Math.PI, 0);
+          rp.mesh.characterWrapper.rotation.set(0, 0, 0);
           rp.mesh.characterWrapper.position.y = 0;
         }
         if (rp.mesh.nameTagMesh) rp.mesh.nameTagMesh.visible = true;

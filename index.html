@@ -20,7 +20,7 @@
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/OBJLoader.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/utils/SkeletonUtils.js"></script>
   <script>
-    window.BUILD_ID = 'b12c0a1';
+    window.BUILD_ID = 'b14c0a1';
     window.SERVER_URL = (new URLSearchParams(window.location.search).get('server')) || 'wss://cs2-server-1zcq.onrender.com';
   </script>
 </head>
@@ -32,6 +32,12 @@
   <div id="scope-overlay" class="hidden">
     <div class="scope-crosshair"></div>
     <div class="scope-lens"></div>
+  </div>
+
+  <!-- AUG & SG 553 Tactical Scope Overlay -->
+  <div id="aug-scope-overlay" class="hidden">
+    <div class="aug-scope-ring"></div>
+    <div class="aug-scope-dot"></div>
   </div>
 
   <!-- Hit / Flash / Smoke Overlays -->
@@ -502,16 +508,16 @@
   </div>
 
   <!-- Game Scripts (v6.0 Engine Overhaul) -->
-  <script src="js/cs16_weapon_data.js?v=b12c0a1"></script>
-  <script src="js/audio.js?v=b12c0a1"></script>
-  <script src="js/antiCheat.js?v=b12c0a1"></script>
-  <script src="js/weapons.js?v=b12c0a1"></script>
-  <script src="js/cs16_models.js?v=b12c0a1"></script>
-  <script src="js/maps.js?v=b12c0a1"></script>
-  <script src="js/player.js?v=b12c0a1"></script>
-  <script src="js/bots.js?v=b12c0a1"></script>
-  <script src="js/network.js?v=b12c0a1"></script>
-  <script src="js/game.js?v=b12c0a1"></script>
-  <script src="js/main.js?v=b12c0a1"></script>
+  <script src="js/cs16_weapon_data.js?v=b14c0a1"></script>
+  <script src="js/audio.js?v=b14c0a1"></script>
+  <script src="js/antiCheat.js?v=b14c0a1"></script>
+  <script src="js/weapons.js?v=b14c0a1"></script>
+  <script src="js/cs16_models.js?v=b14c0a1"></script>
+  <script src="js/maps.js?v=b14c0a1"></script>
+  <script src="js/player.js?v=b14c0a1"></script>
+  <script src="js/bots.js?v=b14c0a1"></script>
+  <script src="js/network.js?v=b14c0a1"></script>
+  <script src="js/game.js?v=b14c0a1"></script>
+  <script src="js/main.js?v=b14c0a1"></script>
 </body>
 </html>
