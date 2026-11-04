@@ -635,7 +635,9 @@ document.addEventListener('DOMContentLoaded', () => {
     window.__lastReject = { type: 'refund_error', reason: reason, time: new Date().toLocaleTimeString() };
   };
 
+  window.refundWeapon = refundWeapon;
   function refundWeapon(weapon) {
+    window.refundWeapon = refundWeapon;
     if (gameManager.net && gameManager.net.isConnected) {
       gameManager.net.sendRefundItem(weapon.id);
       return;
