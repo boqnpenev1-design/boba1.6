@@ -163,8 +163,19 @@ function parseMdl(filePath, outputModelId, isPlayerModel = false) {
   const numseq = buf.readInt32LE(164);
   const seqindex = buf.readInt32LE(168);
   let animindex = 0;
-  if (isPlayerModel && numseq > 1 && seqindex > 0 && (seqindex + 176 + 128) < buf.length) {
-    animindex = buf.readInt32LE(seqindex + 176 + 124);
+  let animIdle = 0;
+  let animAim = 0;
+  if (isPlayerModel) {
+    for (let s = 0; s < numseq; s++) {
+      const off = seqindex + s * 176;
+      const sName = buf.toString('ascii', off, off + 32).replace(/\0.*$/g, '');
+      if (sName === 'idle1') animIdle = buf.readInt32LE(off + 124);
+      if (sName === 'ref_aim_ak47' || sName === 'ref_aim_carbine') {
+        if (!animAim || sName === 'ref_aim_ak47') {
+          animAim = buf.readInt32LE(off + 124);
+        }
+      }
+    }
   } else if (!isPlayerModel && numseq > 0 && seqindex > 0 && (seqindex + 128) < buf.length) {
     animindex = buf.readInt32LE(seqindex + 124);
   }
@@ -173,8 +184,16 @@ function parseMdl(filePath, outputModelId, isPlayerModel = false) {
   for (let b = 0; b < numbones; b++) {
     const pos = [bones[b].pos[0], bones[b].pos[1], bones[b].pos[2]];
     const rot = [bones[b].rot[0], bones[b].rot[1], bones[b].rot[2]];
-    if (animindex > 0 && animindex < buf.length) {
-      const bOff = animindex + b * 12;
+    let activeAnim = animindex;
+    if (isPlayerModel) {
+      // Bones 2 through 37 are upper body (spine, neck, head, clavicles, arms, hands)
+      // They hold the weapon naturally in front of the chest from animAim!
+      // Bones 0, 1, 38-51 are lower body (root, pelvis, hips, legs, feet) from animIdle!
+      const isUpper = (b >= 2 && b <= 37);
+      activeAnim = (isUpper && animAim > 0) ? animAim : (animIdle > 0 ? animIdle : 0);
+    }
+    if (activeAnim > 0 && activeAnim < buf.length) {
+      const bOff = activeAnim + b * 12;
       for (let c = 0; c < 6; c++) {
         const offset = buf.readUInt16LE(bOff + c * 2);
         if (offset > 0 && (bOff + offset + 2) < buf.length) {

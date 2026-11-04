@@ -78,7 +78,8 @@ class CS16ModelManager {
       return this.loadingPromises.get(modelId);
     }
 
-    const p = fetch(`models/cs16/${modelId}.json?v=b12b0a1`)
+    const v = (typeof window !== 'undefined' && window.BUILD_ID) ? window.BUILD_ID : 'b16c0a1';
+    const p = fetch(`models/cs16/${modelId}.json?v=${v}`)
       .then(res => {
         if (!res.ok) throw new Error(`HTTP ${res.status} loading ${modelId}`);
         return res.json();
