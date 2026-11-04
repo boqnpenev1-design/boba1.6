@@ -1167,7 +1167,9 @@ class CS2Player {
     window.addEventListener('mousemove', (e) => {
       if (!document.pointerLockElement) return;
 
-      const sens = (this.sensitivity * 0.0012) * (this.isScoped ? 0.4 : 1.0);
+      const defaultFov = Number(document.getElementById('setting-fov')?.value) || 85;
+      const fovRatio = this.camera ? (this.camera.fov / defaultFov) : 1.0;
+      const sens = (this.sensitivity * 0.0012) * fovRatio;
 
       // Clamp mouse delta to prevent sudden camera teleporting/aimbot snap glitches
       const maxDelta = 65;
@@ -1192,18 +1194,48 @@ class CS2Player {
     if (weaponId === 'c4') {
       const c4Pack = new THREE.Group();
       const bodyMat = new THREE.MeshLambertMaterial({ color: 0x5a523a });
-      const body = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.12, 0.18), bodyMat);
+      const body = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.14, 0.22), bodyMat);
       c4Pack.add(body);
       const tapeMat = new THREE.MeshLambertMaterial({ color: 0x888888 });
-      const tape = new THREE.Mesh(new THREE.BoxGeometry(0.30, 0.05, 0.08), tapeMat);
+      const tape = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.06, 0.10), tapeMat);
       c4Pack.add(tape);
       const ledMat = new THREE.MeshBasicMaterial({ color: 0xff0000 });
-      const led = new THREE.Mesh(new THREE.SphereGeometry(0.018, 6, 6), ledMat);
-      led.position.set(0.08, 0.07, 0);
+      const led = new THREE.Mesh(new THREE.SphereGeometry(0.022, 6, 6), ledMat);
+      led.position.set(0.10, 0.08, 0);
       c4Pack.add(led);
       dropGroup.add(c4Pack);
       return dropGroup;
     }
+
+    const TARGET_DROPPED_LENGTH = {
+      'ak47': 1.00,
+      'm4a1': 0.98,
+      'm4a4': 0.98,
+      'awp': 1.40,
+      'scout': 1.10,
+      'ssg08': 1.10,
+      'g3sg1': 1.20,
+      'sg550': 1.20,
+      'aug': 0.88,
+      'sg552': 0.90,
+      'galil': 0.95,
+      'famas': 0.85,
+      'mp5': 0.70,
+      'p90': 0.68,
+      'mac10': 0.55,
+      'ump45': 0.65,
+      'usp': 0.35,
+      'glock': 0.33,
+      'deagle': 0.38,
+      'p228': 0.33,
+      'fiveseven': 0.33,
+      'elite': 0.35,
+      'knife': 0.35,
+      'hegrenade': 0.22,
+      'flashbang': 0.22,
+      'smokegrenade': 0.22,
+      'molotov': 0.28
+    };
 
     const meshName = CS2Player.WEAPON_MESH_MAP[weaponId];
     if (meshName && this.findWeaponMesh) {
@@ -1226,26 +1258,28 @@ class CS2Player {
           }
         });
 
-        // Reset transform to accurately compute geometry center
         clone.position.set(0, 0, 0);
         clone.rotation.set(0, 0, 0);
         clone.scale.set(1, 1, 1);
         clone.updateMatrixWorld(true);
 
-        // Center FBX mesh pivot perfectly (root cause of distant/invisible drops)
         const bbox = new THREE.Box3().setFromObject(clone);
         const center = new THREE.Vector3();
         bbox.getCenter(center);
         clone.position.sub(center);
 
+        const size = new THREE.Vector3();
+        bbox.getSize(size);
+        const maxDim = Math.max(size.x, size.y, size.z);
+        const targetLen = TARGET_DROPPED_LENGTH[weaponId] || 0.80;
+        const uniformScale = targetLen / Math.max(0.001, maxDim);
+
         const inner = new THREE.Group();
         inner.add(clone);
-        inner.scale.set(0.016, 0.016, 0.016);
-        // Lie completely flat on ground (barrel forward, receiver flat)
+        inner.scale.set(uniformScale, uniformScale, uniformScale);
         inner.rotation.set(Math.PI / 2, 0, 0);
         dropGroup.add(inner);
 
-        // Debug beacon and weapon badge under ?debug=1
         const isDebug = !!(window.__CS2_DEBUG || (typeof window !== 'undefined' && window.location && window.location.search.includes('debug=1')));
         if (isDebug) {
           const beaconMat = new THREE.MeshBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 0.65 });
@@ -1268,21 +1302,8 @@ class CS2Player {
           sprite.scale.set(0.8, 0.2, 1);
           dropGroup.add(sprite);
         }
-
-        return dropGroup;
       }
     }
-
-    // Proportional fallback box so pistols never look like rifles
-    const w = CS2_WEAPONS[weaponId];
-    const isPistol = (w && (w.slot === 2 || w.category === 'pistols'));
-    const texFile = CS2Player.WEAPON_TEX_MAP[weaponId] || 'w_rif_ak47.png';
-    const tex = this.getWeaponTexture(texFile);
-    const boxMat = new THREE.MeshBasicMaterial({ map: tex, color: 0xffffff, side: THREE.DoubleSide });
-    const length = isPistol ? 0.22 : 0.70;
-    const box = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.05, length), boxMat);
-    box.rotation.set(0, 0, Math.PI / 2);
-    dropGroup.add(box);
     return dropGroup;
   }
 
@@ -1522,19 +1543,45 @@ class CS2Player {
 
   toggleScope() {
     if (!this.activeWeapon || !this.activeWeapon.canScope) return;
-    this.isScoped = !this.isScoped;
-    const scopeEl = document.getElementById('scope-overlay');
-    if (this.isScoped) {
-      this.camera.fov = 25;
-      scopeEl.classList.remove('hidden');
-      this.viewmodelGroup.visible = false;
-      window.csAudio.playZoom();
-    } else {
-      this.camera.fov = Number(document.getElementById('setting-fov').value) || 85;
-      scopeEl.classList.add('hidden');
-      this.viewmodelGroup.visible = true;
+    const defaultFov = Number(document.getElementById('setting-fov')?.value) || 85;
+    const levels = this.activeWeapon.zoomLevels || (['aug', 'sg552', 'sg553'].includes(this.activeWeapon.id) ? [55] : [40, 12]);
+
+    this.scopeLevel = (this.scopeLevel || 0) + 1;
+    if (this.scopeLevel > levels.length) {
+      this.resetScope();
+      return;
     }
+
+    this.isScoped = true;
+    const targetFov = levels[this.scopeLevel - 1];
+    this.camera.fov = targetFov;
     this.camera.updateProjectionMatrix();
+
+    const scopeEl = document.getElementById('scope-overlay');
+    if (scopeEl) {
+      if (['aug', 'sg552', 'sg553'].includes(this.activeWeapon.id)) {
+        scopeEl.classList.add('hidden');
+      } else {
+        scopeEl.classList.remove('hidden');
+      }
+    }
+    if (this.viewmodelGroup) this.viewmodelGroup.visible = false;
+    if (window.csAudio && typeof window.csAudio.playZoom === 'function') {
+      window.csAudio.playZoom();
+    }
+  }
+
+  resetScope() {
+    this.scopeLevel = 0;
+    this.isScoped = false;
+    const defaultFov = Number(document.getElementById('setting-fov')?.value) || 85;
+    if (this.camera) {
+      this.camera.fov = defaultFov;
+      this.camera.updateProjectionMatrix();
+    }
+    const scopeEl = document.getElementById('scope-overlay');
+    if (scopeEl) scopeEl.classList.add('hidden');
+    if (this.viewmodelGroup) this.viewmodelGroup.visible = true;
   }
 
   switchSlot(slot) {
@@ -1553,7 +1600,7 @@ class CS2Player {
     this.isReloading = false;
     this.isShooting = false;
     this.sprayCount = 0;
-    if (this.isScoped) this.toggleScope();
+    this.resetScope();
 
     // Restore persistent ammo
     if (this.activeWeapon.clip) {
@@ -2162,7 +2209,7 @@ class CS2Player {
 
   onDeath(attackerName, weaponName) {
     window.csAudio.playSound('death');
-    if (this.isScoped) this.toggleScope();
+    this.resetScope();
     document.getElementById('action-prompt').classList.add('hidden');
     document.getElementById('interaction-bar-container').classList.add('hidden');
 
@@ -2267,7 +2314,7 @@ class CS2Player {
     this.isDefusing = false;
     this.jumpRequested = false;
     this.spaceHeld = false;
-    if (this.isScoped) this.toggleScope();
+    this.resetScope();
 
     // Reset fresh ammo for all loadout weapons on round respawn
     this.weaponAmmo = {};
@@ -2578,7 +2625,8 @@ class CS2Player {
 
     let targetGroundY = (this.lastGroundY !== undefined) ? this.lastGroundY : -5.8;
 
-    // Check all climbable crate tops directly (100% solid tops, edges, and corners)
+    // Ground candidate search with authentic CS rules: probe starts at feet + stepHeight (0.75m), normal.y >= 0.70
+    const groundProbeY = curFeet + maxStepUp;
     let highestCrateY = -999;
     for (let i = 0; i < colliders.length; i++) {
       const c = colliders[i];
@@ -2590,7 +2638,7 @@ class CS2Player {
         this.position.z + playerRadius * 0.7 > box.min.z &&
         this.position.z - playerRadius * 0.7 < box.max.z
       ) {
-        if (prevFeetY >= c.topY - 0.40 || curFeet >= c.topY - 0.50) {
+        if (c.topY <= groundProbeY + 0.05 && (prevFeetY >= c.topY - 0.40 || curFeet >= c.topY - 0.50)) {
           if (c.topY > highestCrateY) {
             highestCrateY = c.topY;
           }
@@ -2605,10 +2653,10 @@ class CS2Player {
         this._tempNorm = new THREE.Vector3();
       }
       let highestWalkableY = -999;
-      let highestSupportY = -999;
 
       const testSample = (ox, oz) => {
-        this.downOrigin.set(this.position.x + ox, this.position.y + 0.5, this.position.z + oz);
+        // Probe starts at feet + stepHeight (never hits door arches, ceilings or high overhangs)
+        this.downOrigin.set(this.position.x + ox, groundProbeY, this.position.z + oz);
         this.downRaycaster.set(this.downOrigin, this.downDir);
         this.downRaycaster.far = 16.0;
         const hits = this.downRaycaster.intersectObjects(groundCandidates, false);
@@ -2625,12 +2673,10 @@ class CS2Player {
             }
           }
           const ptY = hit.point.y;
-          if (ptY <= (curFeet + 0.85) && ptY <= 16.0) {
-            if (worldNormalY >= 0.55 && ptY > highestWalkableY) {
+          // Rule B: Only upward-facing triangles (normal.y >= 0.70) count, and never accept a point above probe start
+          if (ptY <= groundProbeY + 0.05 && ptY <= 16.0) {
+            if (worldNormalY >= 0.70 && ptY > highestWalkableY) {
               highestWalkableY = ptY;
-            }
-            if (worldNormalY >= 0.10 && ptY > highestSupportY) {
-              highestSupportY = ptY;
             }
           }
         }
@@ -2647,9 +2693,6 @@ class CS2Player {
       if (highestWalkableY > -900) {
         targetGroundY = highestWalkableY;
         this.lastGroundY = highestWalkableY;
-      } else if (highestSupportY > -900) {
-        targetGroundY = highestSupportY;
-        this.lastGroundY = highestSupportY;
       }
     }
 
@@ -2666,7 +2709,19 @@ class CS2Player {
       this.lastGroundY = -3.56;
     }
 
+    // Clamp step-up: never snap up more than maxStepUp (0.75m)
+    const rawDy = targetGroundY - curFeet;
+    if (rawDy > maxStepUp) {
+      targetGroundY = curFeet;
+    }
+
     const groundSurfaceY = targetGroundY + this.playerHeight;
+    const dy = targetGroundY - curFeet;
+    window.__groundSnapDy = (dy >= 0 ? '+' : '') + dy.toFixed(3) + 'm';
+    if (Math.abs(dy) > 0.30) {
+      console.log(`[GROUND SNAP dy] |dy| > 0.30m at pos(${this.position.x.toFixed(2)}, ${this.position.y.toFixed(2)}, ${this.position.z.toFixed(2)}): dy=${dy.toFixed(3)}m`);
+    }
+
     const heightDiff = groundSurfaceY - this.position.y;
     const preFallVelocityY = this.velocity.y;
 
@@ -2675,16 +2730,12 @@ class CS2Player {
       this.velocity.y = 0;
       this.isGrounded = true;
     } else if (this.isGrounded && heightDiff >= -0.55 && heightDiff <= 0.45) {
-      // Step up gentle elevation or smoothly snap down walkable slopes (keeps player continuously grounded)
       this.position.y = groundSurfaceY;
       this.velocity.y = 0;
-      this.isGrounded = true;
     } else {
-      // Natural free-fall off crates and ledges (zero teleportation)
       this.isGrounded = false;
     }
 
-    // Landing audio effect: strictly after a genuine vertical drop (downward speed < -4.0 m/s, never on crouch or ramp)
     if (!wasGrounded && this.isGrounded && preFallVelocityY < -4.0) {
       window.csAudio.playLand();
     }
