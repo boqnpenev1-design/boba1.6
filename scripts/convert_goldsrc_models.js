@@ -160,12 +160,10 @@ function parseMdl(filePath, outputModelId, isPlayerModel = false) {
     });
   }
 
-  // Check sequence 0 (idle animation frame 0) for authentic gameplay holding pose (essential for knife)
   const numseq = buf.readInt32LE(164);
   const seqindex = buf.readInt32LE(168);
   let animindex = 0;
   if (isPlayerModel && numseq > 1 && seqindex > 0 && (seqindex + 176 + 128) < buf.length) {
-    // Seq 1 is idle1 for player models (arms down, authentic standing combat stance holding gun)
     animindex = buf.readInt32LE(seqindex + 176 + 124);
   } else if (!isPlayerModel && numseq > 0 && seqindex > 0 && (seqindex + 128) < buf.length) {
     animindex = buf.readInt32LE(seqindex + 124);
@@ -195,7 +193,6 @@ function parseMdl(filePath, outputModelId, isPlayerModel = false) {
   const numbodyparts = buf.readInt32LE(204);
   const bodypartindex = buf.readInt32LE(208);
 
-  // First pass: find min_ty for canonical viewmodel positioning and min_tz for player feet positioning
   let min_ty = 99999;
   let max_ty = -99999;
   let min_tz = 99999;
@@ -231,8 +228,8 @@ function parseMdl(filePath, outputModelId, isPlayerModel = false) {
         if (tz > max_tz) max_tz = tz;
 
         if (bpName !== 'rhand' && bpName !== 'lhand') {
-          if (tx > max_tx_weapon) { max_tx_weapon = tx;
-            bestWeaponY = ty;
+          if (tx > max_tx_weapon) {
+            max_tx_weapon = tx;
             bestWeaponVert = [tx, ty, tz];
           }
         }
@@ -261,9 +258,11 @@ function parseMdl(filePath, outputModelId, isPlayerModel = false) {
 
       const transformedVerts = [];
       const transformedNorms = [];
+      const vertBones = [];
 
       for (let v = 0; v < numverts; v++) {
         const b = buf.readUInt8(vertinfoindex + v);
+        vertBones.push(b);
         const vx = buf.readFloatLE(vertindex + v * 12);
         const vy = buf.readFloatLE(vertindex + v * 12 + 4);
         const vz = buf.readFloatLE(vertindex + v * 12 + 8);
@@ -273,18 +272,20 @@ function parseMdl(filePath, outputModelId, isPlayerModel = false) {
         const tz = vx*mat[2][0] + vy*mat[2][1] + vz*mat[2][2] + mat[2][3];
 
         if (isPlayerModel) {
-          // Player model: feet normalized to floor (Y=0.00), standing upright facing forward (-Z in Three.js)
-          // Scale 0.045 exactly matches Dust 2 map scale (72 units * 0.045 = 3.24m height, taller than standard 2.88m crates)
+          // Standing upright facing forward (-Z in Three.js), normalized feet to Y=0.00
           const pScale = 3.20 / Math.max(1, max_tz - min_tz);
           const py = (tz - min_tz) * pScale;
           const px = -ty * pScale;
           const pz = -tx * pScale;
           transformedVerts.push([px, py, pz]);
         } else {
-          // Viewmodel: pointing downrange (-Z), hands situated canonically in lower-right quadrant (+0.52 offset)
-          const x3 = (-ty * 0.025) + 0.35;
-          const y3 = (tz * 0.025) + 0.08;
-          const z3 = (-tx * 0.025) - 0.15;
+          // Viewmodel: Centered lower-right quadrant, seamless lower entry
+          const xOffset = (outputModelId === 'knife') ? 0.08 : 0.20;
+          const yOffset = 0.04;
+          const zOffset = -0.15;
+          const x3 = (-ty * 0.025) + xOffset;
+          const y3 = (tz * 0.025) + yOffset;
+          const z3 = (-tx * 0.025) + zOffset;
           transformedVerts.push([x3, y3, z3]);
         }
       }
@@ -298,11 +299,7 @@ function parseMdl(filePath, outputModelId, isPlayerModel = false) {
         const tnx = nx*mat[0][0] + ny*mat[0][1] + nz*mat[0][2];
         const tny = nx*mat[1][0] + ny*mat[1][1] + nz*mat[1][2];
         const tnz = nx*mat[2][0] + ny*mat[2][1] + nz*mat[2][2];
-        if (isPlayerModel) {
-          transformedNorms.push([-tny, tnz, -tnx]);
-        } else {
-          transformedNorms.push([-tny, tnz, -tnx]);
-        }
+        transformedNorms.push([-tny, tnz, -tnx]);
       }
 
       for (let mi = 0; mi < nummesh; mi++) {
@@ -338,12 +335,19 @@ function parseMdl(filePath, outputModelId, isPlayerModel = false) {
             triVerts.push({
               pos: transformedVerts[vIdx],
               norm: transformedNorms[nIdx] || [0, 1, 0],
+              bone: vertBones[vIdx],
               u: s / tex.width,
               v: 1.0 - (t / tex.height)
             });
           }
 
           function addTri(v1, v2, v3) {
+            // For knife viewmodel: skip leftover left hand vertices (bones 3 to 19)
+            if (outputModelId === 'knife') {
+              if (v1.bone >= 3 && v1.bone <= 19) return;
+              if (v2.bone >= 3 && v2.bone <= 19) return;
+              if (v3.bone >= 3 && v3.bone <= 19) return;
+            }
             grp.positions.push(...v1.pos, ...v2.pos, ...v3.pos);
             grp.normals.push(...v1.norm, ...v2.norm, ...v3.norm);
             grp.uvs.push(v1.u, v1.v, v2.u, v2.v, v3.u, v3.v);
@@ -368,17 +372,37 @@ function parseMdl(filePath, outputModelId, isPlayerModel = false) {
     }
   }
 
-  let barrelTip = [0.35, -0.10, -0.85];
+  let barrelTip = [0.20, -0.05, -0.85];
   if (bestWeaponVert) {
     const [bx, by, bz] = bestWeaponVert;
+    const xOffset = (outputModelId === 'knife') ? 0.08 : 0.20;
     barrelTip = [
-      (-by * 0.025) + 0.35,
-      (bz * 0.025) + 0.08,
+      (-by * 0.025) + xOffset,
+      (bz * 0.025) + 0.04,
       (-bx * 0.025) - 0.15
     ];
   }
 
-  const meshes = Object.values(meshGroups).map(g => ({
+  // Sockets for hands attachment
+  let gripSocket = [0.20, -0.04, -0.38];
+  let foregripSocket = null;
+  if (outputModelId === 'knife') {
+    gripSocket = [0.22, -0.05, -0.42];
+  } else if (outputModelId === 'glock') {
+    gripSocket = [0.23, -0.05, -0.42];
+    foregripSocket = [0.21, -0.07, -0.41]; // two-handed pistol cup
+  } else if (outputModelId === 'usp') {
+    gripSocket = [0.23, -0.05, -0.42];
+    foregripSocket = [0.21, -0.07, -0.41];
+  } else if (outputModelId === 'ak47') {
+    gripSocket = [0.18, -0.09, -0.32];
+    foregripSocket = [0.18, -0.03, -0.60];
+  } else if (outputModelId === 'awp') {
+    gripSocket = [0.19, -0.05, -0.32];
+    foregripSocket = [0.19, -0.02, -0.60];
+  }
+
+  const meshes = Object.values(meshGroups).filter(g => g.positions.length > 0).map(g => ({
     texture: g.texturePath,
     positions: g.positions,
     normals: g.normals,
@@ -389,7 +413,9 @@ function parseMdl(filePath, outputModelId, isPlayerModel = false) {
     id: outputModelId,
     type: isPlayerModel ? 'player' : 'viewmodel',
     meshes,
-    barrelTip
+    barrelTip,
+    gripSocket,
+    foregripSocket
   };
 
   const outModelsDir = path.join('models', 'cs16');
@@ -398,7 +424,7 @@ function parseMdl(filePath, outputModelId, isPlayerModel = false) {
   fs.writeFileSync(outJsonPath, JSON.stringify(outData));
   
   const totalTris = meshes.reduce((acc, m) => acc + m.positions.length / 9, 0);
-  console.log(`Exported ${outputModelId}: ${meshes.length} submeshes, ${totalTris} tris, barrelTip: [${barrelTip.map(n=>n.toFixed(3)).join(', ')}] -> ${outJsonPath}`);
+  console.log(`Exported ${outputModelId}: ${meshes.length} submeshes, ${totalTris} tris -> ${outJsonPath}`);
   return outData;
 }
 
@@ -451,4 +477,4 @@ for (const [id, mdlPath] of Object.entries(playerMap)) {
   parseMdl(mdlPath, id, true);
 }
 
-console.log('=== All CS 1.6 Assets Converted Successfully! ===');
+console.log('=== All CS 1.6 Assets Converted with Centered Hands & Zero Left-Arm Pipe! ===');

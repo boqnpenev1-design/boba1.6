@@ -78,7 +78,7 @@ class CS16ModelManager {
       return this.loadingPromises.get(modelId);
     }
 
-    const p = fetch(`models/cs16/${modelId}.json?v=b11m0a1`)
+    const p = fetch(`models/cs16/${modelId}.json?v=b12a0a1`)
       .then(res => {
         if (!res.ok) throw new Error(`HTTP ${res.status} loading ${modelId}`);
         return res.json();
@@ -137,6 +137,38 @@ class CS16ModelManager {
       );
     } else {
       group.userData.barrelTip = new THREE.Vector3(0.08, -0.05, -0.85);
+    }
+
+    if (data.gripSocket) {
+      group.userData.gripSocket = new THREE.Vector3(...data.gripSocket);
+    }
+    if (data.foregripSocket) {
+      group.userData.foregripSocket = new THREE.Vector3(...data.foregripSocket);
+    }
+
+    // When ?debug=1 is enabled, render bright debug socket markers (Item 2 / C)
+    const isDebug = typeof window !== 'undefined' && window.location && window.location.search.includes('debug=1');
+    if (isDebug && isViewmodel) {
+      if (group.userData.gripSocket) {
+        const gripMarker = new THREE.Mesh(
+          new THREE.SphereGeometry(0.009, 8, 8),
+          new THREE.MeshBasicMaterial({ color: 0xff0033, depthTest: false })
+        );
+        gripMarker.position.copy(group.userData.gripSocket);
+        gripMarker.renderOrder = 9999;
+        gripMarker.name = 'debug_grip_marker';
+        group.add(gripMarker);
+      }
+      if (group.userData.foregripSocket) {
+        const foregripMarker = new THREE.Mesh(
+          new THREE.SphereGeometry(0.009, 8, 8),
+          new THREE.MeshBasicMaterial({ color: 0x00ff66, depthTest: false })
+        );
+        foregripMarker.position.copy(group.userData.foregripSocket);
+        foregripMarker.renderOrder = 9999;
+        foregripMarker.name = 'debug_foregrip_marker';
+        group.add(foregripMarker);
+      }
     }
 
     return group;
