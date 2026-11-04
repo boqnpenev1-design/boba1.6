@@ -670,7 +670,9 @@ document.addEventListener('DOMContentLoaded', () => {
     gameManager.updateHUD();
   }
 
+  window.buyWeapon = buyWeapon;
   function buyWeapon(weapon) {
+    window.buyWeapon = buyWeapon;
     // 0. Guard against buying outside buy zone or after buy time expired (Items 7 & 13)
     if (!gameManager.canBuy()) {
       const reason = 'Buy time expired';
