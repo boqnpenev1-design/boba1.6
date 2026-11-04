@@ -198,14 +198,29 @@ class CS2Player {
     vmFill.layers.enable(1);
     this.viewmodelScene.add(vmFill);
 
-    // Authentic CS Muzzle Flash (Cross-plane flash placed at exact weapon barrel tip)
-    const flashMat = new THREE.MeshBasicMaterial({ color: 0xffaa33, transparent: true, opacity: 0.85, side: THREE.DoubleSide, blending: THREE.AdditiveBlending });
-    const flashPlane1 = new THREE.Mesh(new THREE.PlaneGeometry(0.025, 0.025), flashMat);
-    const flashPlane2 = new THREE.Mesh(new THREE.PlaneGeometry(0.025, 0.025), flashMat);
-    flashPlane2.rotation.y = Math.PI / 2;
-    this.muzzleFlashMesh = new THREE.Group();
-    this.muzzleFlashMesh.add(flashPlane1);
-    this.muzzleFlashMesh.add(flashPlane2);
+    // Authentic CS Muzzle Flash (Sprite using extracted authentic CS .spr textures)
+    const texLoader = new THREE.TextureLoader();
+    this.muzzleFlashTextures = [
+      texLoader.load('textures/muzzleflash1.png'),
+      texLoader.load('textures/muzzleflash2.png'),
+      texLoader.load('textures/muzzleflash3.png'),
+      texLoader.load('textures/muzzleflash4.png')
+    ];
+    this.muzzleFlashTextures.forEach(t => {
+      t.encoding = THREE.sRGBEncoding;
+      t.generateMipmaps = false;
+      t.minFilter = THREE.LinearFilter;
+      t.magFilter = THREE.LinearFilter;
+    });
+
+    const flashSpriteMat = new THREE.SpriteMaterial({
+      map: this.muzzleFlashTextures[0],
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      transparent: true
+    });
+    this.muzzleFlashMesh = new THREE.Sprite(flashSpriteMat);
+    this.muzzleFlashMesh.scale.set(0.08, 0.08, 1);
     this.muzzleFlashMesh.position.set(0.20, -0.12, -0.75);
     this.muzzleFlashMesh.visible = false;
     this.viewmodelGroup.add(this.muzzleFlashMesh);
@@ -1720,10 +1735,15 @@ class CS2Player {
       }
     }
 
+    if (this.muzzleFlashTextures && this.muzzleFlashTextures.length > 0 && this.muzzleFlashMesh.material) {
+      const rndTex = this.muzzleFlashTextures[Math.floor(Math.random() * this.muzzleFlashTextures.length)];
+      this.muzzleFlashMesh.material.map = rndTex;
+      this.muzzleFlashMesh.material.rotation = Math.random() * Math.PI * 2;
+    }
     this.muzzleFlashMesh.visible = true;
     setTimeout(() => {
       this.muzzleFlashMesh.visible = false;
-    }, 40);
+    }, 35);
 
     // Authentic Deterministic CS Recoil Spray Pattern (Cumulative target scaling)
     this.sprayCount = (this.sprayCount || 0) + 1;
@@ -1792,7 +1812,7 @@ class CS2Player {
       const targetPoint = (wallObstacles && wallObstacles.length > 0)
         ? wallObstacles[0].point
         : this.camera.position.clone().addScaledVector(pDir, 60.0);
-      this.spawnTracer(barrelWorld, targetPoint);
+      // Tracer line removed per authentic CS request
 
       // Hit players with authentic headshot/body multiplier, hit sound, and strict penetration rules
       if (gameManager && gameManager.net) {
@@ -1841,12 +1861,15 @@ class CS2Player {
             if (canHit) {
               const hitObj = playerHits[0].object;
               const hitPoint = playerHits[0].point;
-              // Headshot if hit head hitbox OR hit point Y is in the head region (top 25cm of model)
+              // Headshot strictly if hit head hitbox OR hit point Y is in the head region (top of model >= 1.72)
               let isHeadshot = (hitObj === p.mesh.headHitbox || (hitObj.userData && hitObj.userData.isHead === true));
-              if (!isHeadshot && p.mesh) {
+              let localY = 1.30;
+              if (p.mesh) {
                 const localHit = p.mesh.worldToLocal(hitPoint.clone());
-                if (localHit.y >= 1.50) isHeadshot = true;
+                localY = localHit.y;
+                if (localHit.y >= 1.72) isHeadshot = true;
               }
+              const hitgroup = isHeadshot ? 'head' : (localY >= 1.25 ? 'chest' : (localY >= 0.90 ? 'stomach' : 'legs'));
               const dmgMult = (isHeadshot ? 4.0 : 1.0) * penetrationPenalty;
               const finalDamage = Math.max(1, Math.round(pelletDmg * dmgMult));
 
@@ -1857,7 +1880,7 @@ class CS2Player {
               }
 
               const wepId = (this.activeWeapon && this.activeWeapon.id) ? this.activeWeapon.id : 'glock';
-              gameManager.net.sendDamage(id, finalDamage, wepId, isHeadshot);
+              gameManager.net.sendDamage(id, finalDamage, wepId, isHeadshot, hitgroup);
             }
           }
         });
@@ -1877,19 +1900,9 @@ class CS2Player {
     window.csAudio.playSound('bullet_impact', 'sfx', 0.5);
   }
 
-  // Authentic CS2 tracer line from forward barrel tip to impact point (zero allocation pooled)
+  // Bullet tracers disabled per authentic CS request
   spawnTracer(start, end) {
-    if (!this.tracerPool || this.tracerPool.length === 0) return;
-    const line = this.tracerPool[this.tracerPoolIndex];
-    this.tracerPoolIndex = (this.tracerPoolIndex + 1) % this.tracerPool.length;
-    const pos = line.geometry.attributes.position;
-    pos.setXYZ(0, start.x, start.y, start.z);
-    pos.setXYZ(1, end.x, end.y, end.z);
-    pos.needsUpdate = true;
-    line.visible = true;
-    setTimeout(() => {
-      line.visible = false;
-    }, 45);
+    return;
   }
 
   // Physical thrown utility with authentic trajectory & velocity
@@ -2164,18 +2177,22 @@ class CS2Player {
     // Peripheral (0 < dot <= 0.5): partial flash
     // Turned away (dot <= 0): subtle 0.1s flicker only if very close
     let maxOpacity = 0;
-    let fadeRate = 0.035;
+    let holdMs = 0;
+    let fadeRate = 0.020;
 
-    if (dot > 0.5) {
-      maxOpacity = Math.min(1.0, 1.2 - (distToFlash / 35.0) * 0.6);
-      fadeRate = 0.015;
+    if (dot > 0.25) {
+      maxOpacity = 1.0;
+      holdMs = 2000; // Screen stays full white for 2.0 seconds
+      fadeRate = 0.016; // Slowly fades out over ~3.0s
     } else if (dot > 0.0) {
-      maxOpacity = Math.max(0.15, (0.75 - (distToFlash / 35.0) * 0.5) * (dot / 0.5));
-      fadeRate = 0.04;
+      maxOpacity = Math.max(0.20, (0.80 - (distToFlash / 35.0) * 0.5) * (dot / 0.25));
+      holdMs = 800;
+      fadeRate = 0.03;
     } else {
       if (distToFlash <= 12.0) {
-        maxOpacity = 0.20 * (1.0 - distToFlash / 12.0);
-        fadeRate = 0.08;
+        maxOpacity = 0.25 * (1.0 - distToFlash / 12.0);
+        holdMs = 0;
+        fadeRate = 0.06;
       }
     }
 
@@ -2184,19 +2201,22 @@ class CS2Player {
     const flashEl = document.getElementById('flash-overlay');
     if (flashEl) {
       if (this._flashTimer) clearInterval(this._flashTimer);
+      if (this._flashHoldTimer) clearTimeout(this._flashHoldTimer);
       flashEl.style.backgroundColor = '#ffffff';
       flashEl.style.opacity = String(maxOpacity);
       let op = maxOpacity;
-      this._flashTimer = setInterval(() => {
-        op -= fadeRate;
-        if (op <= 0) {
-          flashEl.style.opacity = '0';
-          clearInterval(this._flashTimer);
-          this._flashTimer = null;
-        } else {
-          flashEl.style.opacity = String(op);
-        }
-      }, 50);
+      this._flashHoldTimer = setTimeout(() => {
+        this._flashTimer = setInterval(() => {
+          op -= fadeRate;
+          if (op <= 0) {
+            flashEl.style.opacity = '0';
+            clearInterval(this._flashTimer);
+            this._flashTimer = null;
+          } else {
+            flashEl.style.opacity = String(op);
+          }
+        }, 50);
+      }, holdMs);
     }
   }
 
@@ -2285,6 +2305,12 @@ class CS2Player {
     this.__lastSpawnGroundBelow = groundBelow;
     this.__lastSpawnFloorY = floorY;
 
+    if (targetTeam === 'CT') {
+      floorY = Math.max(-3.56, floorY);
+    } else {
+      floorY = Math.max(5.76, floorY);
+    }
+    this.lastGroundY = floorY;
     this.isAlive = true;
     this.health.set(100);
     this.velocity.set(0, 0, 0);
@@ -2560,6 +2586,10 @@ class CS2Player {
     let decisionResult = 'CLEAR';
 
     // Multi-height capsule feeler obstacle check (solid crates & walls block walkover, jumping or grounded)
+    if (!this._wallMat3) {
+      this._wallMat3 = new THREE.Matrix3();
+      this._wallNorm = new THREE.Vector3();
+    }
     const checkMeshWall = (dirX, dirZ, dist) => {
       const candidates = getNearbyMeshes(oldX, oldZ);
       if (candidates.length === 0) return false;
@@ -2572,13 +2602,21 @@ class CS2Player {
         this.wallRaycaster.set(this.wallOrigin, this.wallDir);
         this.wallRaycaster.far = dist;
         const hits = this.wallRaycaster.intersectObjects(candidates, false);
-        if (hits.length > 0 && hits[0].distance < dist) {
-          if (hits[0].face && hits[0].face.normal) {
-            decisionNormalY = hits[0].face.normal.y;
-            // Walkable slope (normal.y > 0.65) does not count as vertical wall
-            if (Math.abs(hits[0].face.normal.y) > 0.65) continue;
+        for (let i = 0; i < hits.length; i++) {
+          const hit = hits[i];
+          if (hit.distance >= dist) continue;
+          if (hit.face && hit.face.normal) {
+            let worldNormalY = hit.face.normal.y;
+            if (hit.object && hit.object.matrixWorld) {
+              this._wallMat3.getNormalMatrix(hit.object.matrixWorld);
+              this._wallNorm.copy(hit.face.normal).applyMatrix3(this._wallMat3).normalize();
+              worldNormalY = this._wallNorm.y;
+            }
+            decisionNormalY = worldNormalY;
+            // Walkable slope (world normal.y > 0.60) does not count as vertical wall
+            if (Math.abs(worldNormalY) > 0.60) continue;
           }
-          return true; // Solid wall detected
+          return true; // Solid vertical wall detected!
         }
       }
       return false;
@@ -2822,9 +2860,10 @@ class CS2Player {
       const inBoxZ = (this.position.z + playerRadius * 0.7 > box.min.z && this.position.z - playerRadius * 0.7 < box.max.z);
 
       if (inBoxX && inBoxZ) {
-        // Landing or stepping on crate top (supports jumping up, edge landing, and corner contact)
-        const crossedTop = (prevFeetY >= c.topY - 0.25 && currentFeetY <= c.topY + 0.40);
-        const nearTop = (currentFeetY >= c.topY - 0.40 && currentFeetY <= c.topY + 0.65);
+        // Landing or stepping on crate top (ONLY when descending or standing, never while rising in jump!)
+        const isDescending = (this.velocity.y <= 0.1);
+        const crossedTop = isDescending && (prevFeetY >= c.topY - 0.30 && currentFeetY <= c.topY + 0.40);
+        const nearTop = isDescending && (currentFeetY >= c.topY - 0.40 && currentFeetY <= c.topY + 0.65);
         if (crossedTop || nearTop) {
           this.position.y = c.topY + this.playerHeight;
           this.velocity.y = 0;

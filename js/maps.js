@@ -349,6 +349,13 @@ class CS2MapBuilder {
     this.addCollider(-85, 12.0, -90, 25, 25, 40);  // Wall high above B site back plateau
     this.addCollider(-60, 5.0, 42.0, 60, 30, 8); // T spawn south mountain wall barrier (prevents falling through mountain)
     this.addCollider(-85, 5.0, 35.0, 10, 30, 40); // T spawn west canyon barrier
+    this.addCollider(-75.0, 5.0, 48.0, 60.0, 25.0, 8.0, false); // Mountain wall behind T spawn
+    this.addCollider(-28.0, 0.0, 28.0, 6.0, 20.0, 28.0, false); // Solid wall corridor going down from T spawn to A doors
+    this.addCollider(-32.0, -3.0, -25.0, 8.0, 20.0, 40.0, false); // Mid curvature canyon barrier
+
+    // Solid Unpenetrable Spawn Platform Slabs (Guarantees zero players fall into void under any conditions)
+    this.addCollider(-5.0, -6.0, -98.0, 30.0, 2.44, 30.0, true); // CT spawn floor slab (topY = -3.56)
+    this.addCollider(-65.0, 5.0, 35.0, 40.0, 0.76, 40.0, true);  // T spawn floor slab (topY = 5.76)
     // Outside rock face behind B window removed: B window hole & ledge crates 100% free and open
 
     // ==========================================================
@@ -409,11 +416,11 @@ class CS2MapBuilder {
     ];
 
     this.spawnPoints.T = [
-      { x: -65.0, y: 7.96, z: 35.0, yaw: 0 },
-      { x: -61.0, y: 7.96, z: 33.0, yaw: 0 },
-      { x: -69.0, y: 7.96, z: 33.0, yaw: 0 },
-      { x: -65.0, y: 7.96, z: 38.0, yaw: 0 },
-      { x: -58.0, y: 7.96, z: 36.0, yaw: 0 }
+      { x: -65.0, y: 5.76, z: 35.0, yaw: 0 },
+      { x: -61.0, y: 5.76, z: 33.0, yaw: 0 },
+      { x: -69.0, y: 5.76, z: 33.0, yaw: 0 },
+      { x: -65.0, y: 5.76, z: 38.0, yaw: 0 },
+      { x: -58.0, y: 5.76, z: 36.0, yaw: 0 }
     ];
   }
 }

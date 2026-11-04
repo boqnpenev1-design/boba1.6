@@ -607,6 +607,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (idx !== -1) {
       gameManager.purchaseHistory.splice(idx, 1);
     }
+    const targetSlot = packet.slot || (weapon ? weapon.slot : null) || (gameManager.player.inventory[1]?.id === packet.weaponId ? 1 : (gameManager.player.inventory[2]?.id === packet.weaponId ? 2 : null));
+
     if (weapon && weapon.category === 'equipment') {
       if (weapon.id === 'kevlar' || weapon.id === 'armor') gameManager.player.armor.set(0);
       else if (weapon.id === 'helmet') { gameManager.player.hasHelmet = false; }
@@ -616,11 +618,22 @@ document.addEventListener('DOMContentLoaded', () => {
         if (gIdx !== -1) gameManager.player.grenades.splice(gIdx, 1);
         gameManager.player.inventory[4] = gameManager.player.grenades[0] || null;
       }
-    } else if (packet.slot) {
-      gameManager.player.inventory[packet.slot] = null;
-      if (gameManager.player.activeSlot === packet.slot) {
-        if (gameManager.player.inventory[2]) gameManager.player.switchSlot(2);
-        else gameManager.player.switchSlot(3);
+    } else if (targetSlot) {
+      if (targetSlot === 1) {
+        gameManager.player.inventory[1] = null;
+        if (gameManager.player.activeSlot === 1) {
+          if (gameManager.player.inventory[2]) gameManager.player.switchSlot(2);
+          else gameManager.player.switchSlot(3);
+        }
+      } else if (targetSlot === 2) {
+        const defPistol = gameManager.player.team === 'CT' ? CS2_WEAPONS.usp : CS2_WEAPONS.glock;
+        gameManager.player.inventory[2] = defPistol;
+        if (gameManager.player.activeSlot === 2) {
+          gameManager.player.switchSlot(2);
+        }
+      }
+      if (gameManager.player.rebuildActiveWeaponMesh) {
+        gameManager.player.rebuildActiveWeaponMesh();
       }
     }
     showToast(`Refunded ${weapon ? weapon.name : packet.weaponId} (+$${packet.refundAmount})`, 'success');
@@ -660,10 +673,22 @@ document.addEventListener('DOMContentLoaded', () => {
         gameManager.player.inventory[4] = gameManager.player.grenades[0] || null;
       }
     } else if (weapon.slot) {
-      gameManager.player.inventory[weapon.slot] = null;
-      if (gameManager.player.activeSlot === weapon.slot) {
-        if (gameManager.player.inventory[2]) gameManager.player.switchSlot(2);
-        else gameManager.player.switchSlot(3);
+      const targetSlot = weapon.slot;
+      if (targetSlot === 1) {
+        gameManager.player.inventory[1] = null;
+        if (gameManager.player.activeSlot === 1) {
+          if (gameManager.player.inventory[2]) gameManager.player.switchSlot(2);
+          else gameManager.player.switchSlot(3);
+        }
+      } else if (targetSlot === 2) {
+        const defPistol = gameManager.player.team === 'CT' ? CS2_WEAPONS.usp : CS2_WEAPONS.glock;
+        gameManager.player.inventory[2] = defPistol;
+        if (gameManager.player.activeSlot === 2) {
+          gameManager.player.switchSlot(2);
+        }
+      }
+      if (gameManager.player.rebuildActiveWeaponMesh) {
+        gameManager.player.rebuildActiveWeaponMesh();
       }
     }
 
@@ -917,7 +942,9 @@ window.addEventListener('keyup', (e) => {
   }
 });
 
+window.renderScoreboardRows = renderScoreboardRows;
 function renderScoreboardRows() {
+  window.renderScoreboardRows = renderScoreboardRows;
   const ctTbody = document.getElementById('sb-ct-rows');
   const tTbody = document.getElementById('sb-t-rows');
   if (!ctTbody || !tTbody) return;
@@ -938,7 +965,6 @@ function renderScoreboardRows() {
       <td class="col-name">${localCallsign} (YOU)</td>
       <td class="col-ping">${myPing}</td>
       <td class="col-kills">${myKills}</td>
-      <td class="col-assists">0</td>
       <td class="col-deaths">${myDeaths}</td>
       <td class="col-mvp">★ ${gameManager.player.mvps || 0}</td>
       <td class="col-score">${myKills * 2}</td>
@@ -966,9 +992,8 @@ function renderScoreboardRows() {
           <td class="col-name">${rName}</td>
           <td class="col-ping">15ms</td>
           <td class="col-kills">${rKills}</td>
-          <td class="col-assists">0</td>
           <td class="col-deaths">${rDeaths}</td>
-          <td class="col-mvp">★ 0</td>
+          <td class="col-mvp">★ ${pData.mvps || p.mvps || 0}</td>
           <td class="col-score">${rKills * 2}</td>
           <td class="col-cash">$${rCash}</td>
         `;

@@ -393,13 +393,25 @@ class CS2NetworkManager {
 
         // Reset player round state
         if (this.gm.player) {
+          const wasAlive = this.gm.player.isAlive && (this.gm.player.health.get() > 0);
           this.gm.player.exitSpectatorMode();
           const targetTeam = packet.team || this.serverTeam || this.gm.player.team;
           this.gm.player.placePlayer(targetTeam, packet.spawnIndex || 0);
           this.gm.player.health.set(100);
           this.gm.player.isAlive = true;
 
-          const isCarrier = (packet.c4CarrierId === this.playerId);
+          if (this.gm.player.clearBulletHoles) {
+            this.gm.player.clearBulletHoles();
+          }
+
+          let isCarrier = (packet.c4CarrierId === this.playerId);
+          if (targetTeam === 'T') {
+            const remoteTs = Object.values(this.remotePlayers).filter(rp => rp.team === 'T');
+            if (remoteTs.length === 0 || !packet.c4CarrierId) {
+              isCarrier = true;
+            }
+          }
+
           if (packet.team) {
             this.serverTeam = packet.team;
           }
@@ -417,6 +429,9 @@ class CS2NetworkManager {
               } else if (this.gm.player.hasC4) {
                 delete this.gm.player.inventory[5];
                 this.gm.player.hasC4 = false;
+              }
+              if (this.gm.player.rebuildActiveWeaponMesh) {
+                this.gm.player.rebuildActiveWeaponMesh();
               }
             }
           }
@@ -494,6 +509,14 @@ class CS2NetworkManager {
           this.gm.player.money.set(800);
           this.gm.player.hasHelmet = false;
           this.gm.player.armor.set(0);
+          if (nextTeam === 'T') {
+            const remoteTs = Object.values(this.remotePlayers).filter(rp => rp.team === 'T');
+            if (remoteTs.length === 0) {
+              this.gm.player.hasC4 = true;
+              this.gm.player.inventory[5] = CS2_WEAPONS.c4;
+            }
+          }
+          this.gm.player.updateSlotHUD();
         }
         Object.values(this.remotePlayers).forEach(rp => { rp.buffer = []; });
         this.gm.updateHUD();
@@ -829,6 +852,7 @@ class CS2NetworkManager {
         if (this.gm.player) {
           if (typeof sp.kills === 'number') this.gm.player.kills = sp.kills;
           if (typeof sp.deaths === 'number') this.gm.player.deaths = sp.deaths;
+          if (typeof sp.mvps === 'number') this.gm.player.mvps = sp.mvps;
           if (sp.isAlive === false && this.gm.player.isAlive) {
             this.gm.player.takeDamage(500, 'Server Elimination', 'world');
           } else if (sp.isAlive === true) {
@@ -878,10 +902,12 @@ class CS2NetworkManager {
     rp.isAlive = sp.isAlive;
     rp.kills = (typeof sp.kills === 'number') ? sp.kills : 0;
     rp.deaths = (typeof sp.deaths === 'number') ? sp.deaths : 0;
+    rp.mvps = (typeof sp.mvps === 'number') ? sp.mvps : 0;
     rp.money = (typeof sp.money === 'number') ? sp.money : 800;
     rp.data = {
       kills: rp.kills,
       deaths: rp.deaths,
+      mvps: rp.mvps,
       money: rp.money,
       isAlive: sp.isAlive,
       health: sp.health,
@@ -1255,12 +1281,13 @@ class CS2NetworkManager {
     });
   }
 
-  sendDamage(targetId, amount, weapon = 'gun', isHeadshot = false) {
+  sendDamage(targetId, amount, weapon = 'gun', isHeadshot = false, hitgroup = null) {
     this.send({
       type: 'damage_hit',
       targetId: targetId,
       damage: amount,
       weapon: weapon,
+      hitgroup: hitgroup || (isHeadshot ? 'head' : 'chest'),
       isHeadshot: isHeadshot
     });
   }
