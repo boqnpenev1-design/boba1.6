@@ -435,6 +435,29 @@ class CS2NetworkManager {
         this.gm.onRoundEnd(packet.winner, packet.reason, packet.mvp);
         break;
 
+      case 'match_over':
+        this.gm.score.CT = packet.ctScore;
+        this.gm.score.T = packet.tScore;
+        this.gm.phase = 'match_over';
+        const matchWinnerTitle = packet.winnerTitle || ((packet.winner === 'CT') ? 'COUNTER-TERRORISTS WIN' : 'TERRORISTS WIN');
+        this.gm.onRoundEnd(packet.winner, `${matchWinnerTitle} (FINAL SCORE: CT ${packet.ctScore} - ${packet.tScore} T)`, packet.mvp);
+        if (window.showCS2Toast) {
+          window.showCS2Toast(`MATCH OVER: ${matchWinnerTitle} (${packet.ctScore}-${packet.tScore})`, 'success');
+        }
+        break;
+
+      case 'overtime_start':
+        this.gm.score.CT = packet.ctScore;
+        this.gm.score.T = packet.tScore;
+        if (window.showCS2Toast) {
+          window.showCS2Toast(packet.message || `OVERTIME ${packet.otNumber} (MR3) - $10,000 START CASH`, 'warning');
+        }
+        if (this.gm.player) {
+          this.gm.player.money.set(10000);
+        }
+        this.gm.updateHUD();
+        break;
+
       case 'team_swapped':
         if (packet.playerId === this.playerId && this.gm) {
           this.serverTeam = packet.newTeam;
@@ -565,13 +588,21 @@ class CS2NetworkManager {
         break;
 
       case 'drop_error':
-        console.log('[DROP_REJECT]', packet.reason);
+        console.warn('[DROP_REJECT]', packet.reason);
         window.__lastReject = { type: 'drop_error', reason: packet.reason, time: new Date().toLocaleTimeString() };
+        if (window.showCS2Toast) window.showCS2Toast(`[REJECT] ${packet.reason}`, 'warning');
         break;
 
       case 'pickup_error':
-        console.log('[PICKUP_REJECT]', packet.reason);
+        console.warn('[PICKUP_REJECT]', packet.reason);
         window.__lastReject = { type: 'pickup_error', reason: packet.reason, time: new Date().toLocaleTimeString() };
+        if (window.showCS2Toast) window.showCS2Toast(`[REJECT] ${packet.reason}`, 'warning');
+        break;
+
+      case 'buy_error':
+        console.warn('[BUY_REJECT]', packet.reason);
+        window.__lastReject = { type: 'buy_error', reason: packet.reason, time: new Date().toLocaleTimeString() };
+        if (window.showCS2Toast) window.showCS2Toast(`[REJECT] ${packet.reason}`, 'warning');
         break;
 
       case 'c4_dropped':
@@ -822,9 +853,10 @@ class CS2NetworkManager {
     rp.isAlive = sp.isAlive;
     rp.mesh.visible = (sp.inMatch !== false && sp.isAlive);
 
-    if (!rp.hasAuthenticModel) {
+    if (!rp.hasAuthenticModel || rp.currentModelTeam !== sp.team) {
       if (this.applyAuthenticModel(rp.mesh, sp.team)) {
         rp.hasAuthenticModel = true;
+        rp.currentModelTeam = sp.team;
       }
     }
 
@@ -1120,6 +1152,9 @@ class CS2NetworkManager {
         if (mesh) {
           const wrapper = new THREE.Group();
           wrapper.name = 'characterWrapper';
+          // Separate forward yaw axis calibration per model (SAS=0, Terrorist=PI) (Item 10)
+          const yawOffset = isCT ? 0 : Math.PI;
+          wrapper.rotation.set(0, yawOffset, 0);
           mesh.rotation.set(0, 0, 0);
           mesh.position.set(0, 0, 0);
           wrapper.add(mesh);
