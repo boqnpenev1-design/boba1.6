@@ -433,23 +433,23 @@ class CS2GameManager {
     this.player.money.set(800);
   }
 
-  // Authentic CS2 Buy Zone & Buy Time Rules (Strict 15s Window in Buy Zone)
+  // Authentic CS 1.6 & CS2 Buy Time Rules (Strict 30s from round start derived from server buyEndsAt)
   canBuy() {
     if (!this.player || !this.player.position) return false;
     const inZone = this.mapBuilder.isInBuyZone(this.player.team, this.player.position);
     if (!inZone) return false;
 
-    // 1. Freezetime: allowed within Buy Zone
-    if (this.phase === 'freeze') return true;
+    // Use authoritative server timestamp buyEndsAt (Item 7 & 13)
+    const now = Date.now();
+    if (this.buyEndsAt) {
+      return now <= this.buyEndsAt;
+    }
 
-    // 2. Live Round: strictly allowed only within the first 15.0 seconds
+    // Fallback: 30s total (15s freeze + 15s live)
+    if (this.phase === 'freeze') return true;
     if (this.phase === 'live') {
-      const now = Date.now();
-      const serverOffset = (this.net && typeof this.net.serverClockOffset === 'number') ? this.net.serverClockOffset : 0;
-      const effectiveNow = now + serverOffset;
-      if (this.liveRoundStartTime > 0 && (effectiveNow - this.liveRoundStartTime) > 15500) return false;
-      if (typeof this.phaseTimer === 'number' && this.phaseTimer < 99.0) return false;
-      return true;
+      const start = this.liveRoundStartTime || this.roundStartTime || 0;
+      return (now - start) <= 15000;
     }
     return false;
   }
@@ -813,10 +813,13 @@ class CS2GameManager {
     this.player.isPlanting = false;
     this.player.isDefusing = false;
 
-    // T planting C4: strictly living Terrorist C4 carrier only
+    // T planting C4: strictly living Terrorist holding C4 in hand inside bombsite during live phase (Item 5)
     const plantTeam = this.player.team;
-    const hasC4Item = (this.player.inventory[5] && this.player.inventory[5].id === 'c4') || this.player.hasC4;
-    if (plantTeam === 'T' && !this.c4Planted && hasC4Item) {
+    const isHoldingC4 = (this.player.activeSlot === 5 && this.player.activeWeapon && this.player.activeWeapon.id === 'c4');
+    const isCarrier = (this.player.inventory[5] && this.player.inventory[5].id === 'c4') || this.player.hasC4;
+    const canPlantNow = (plantTeam === 'T' && !this.c4Planted && isCarrier && isHoldingC4 && this.player.isAlive && this.phase === 'live');
+
+    if (canPlantNow) {
       let inSite = null;
       let siteY = 0.1;
       const playerFeetY = this.player.position.y - this.player.playerHeight;
@@ -846,7 +849,7 @@ class CS2GameManager {
 
       if (inSite) {
         actionPrompt.classList.remove('hidden');
-        promptText.innerText = `HOLD [E] OR [LEFT CLICK] TO PLANT C4 ON SITE ${inSite}`;
+        promptText.innerText = `HOLD [E] TO PLANT C4 ON SITE ${inSite}`;
 
         const isPlantInput = !!(this.player.keys[this.player.keybinds.use] || (this.player.activeSlot === 5 && this.player.isShooting));
         if (isPlantInput) {
@@ -925,9 +928,10 @@ class CS2GameManager {
           progressTrack.classList.add('hidden');
         }
       }
-    } else if (this.c4Planted) {
+    } else {
       if (promptText && promptText.innerText.includes('PLANT')) {
         actionPrompt.classList.add('hidden');
+        progressTrack.classList.add('hidden');
       }
     }
 
@@ -1350,14 +1354,21 @@ class CS2GameManager {
       }
     }
 
-    // Buyzone active state & 15s window enforcement
+    // Buyzone active state & 30s window enforcement from buyEndsAt (Items 7 & 13)
     const inBuy = this.canBuy();
+    const buyEnds = this.buyEndsAt || (this.roundStartTime ? this.roundStartTime + 30000 : 0);
+    const buyLeftSec = Math.max(0, Math.ceil((buyEnds - Date.now()) / 1000));
+    if (h.buyzoneBox) {
+      if (inBuy && buyLeftSec > 0) {
+        h.buyzoneBox.classList.remove('inactive');
+        const bText = h.buyzoneBox.querySelector('.buyzone-text');
+        if (bText) bText.textContent = `BUYZONE [B] (${buyLeftSec}s)`;
+      } else {
+        h.buyzoneBox.classList.add('inactive');
+      }
+    }
     if (c.buyzoneActive !== inBuy) {
       c.buyzoneActive = inBuy;
-      if (h.buyzoneBox) {
-        if (inBuy) h.buyzoneBox.classList.remove('inactive');
-        else h.buyzoneBox.classList.add('inactive');
-      }
       if (!inBuy) {
         const buyMenu = document.getElementById('buy-menu');
         if (buyMenu && !buyMenu.classList.contains('hidden')) {
