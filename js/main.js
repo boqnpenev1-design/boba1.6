@@ -671,6 +671,15 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function buyWeapon(weapon) {
+    // 0. Guard against buying outside buy zone or after buy time expired (Items 7 & 13)
+    if (!gameManager.canBuy()) {
+      const reason = 'Buy time expired';
+      window.__lastReject = { type: 'buy_item', reason: reason, time: new Date().toLocaleTimeString() };
+      showToast(reason, 'warning');
+      window.__buyTrace = `click(${weapon.id}) -> rejected(buy time expired)`;
+      return;
+    }
+
     // 1. Guard against buying a second primary without dropping first
     if (weapon.slot === 1 && gameManager.player.inventory[1]) {
       const reason = 'Drop your primary first (press G)';
@@ -1518,6 +1527,7 @@ HITBOXES:      ${hitboxStr}
 DROPS:         ${dropsStr}
 CAMERA:        ${camStr} | fog: ${fogStr}
 PLAYER:        pos: ${pPosStr} | feetY: ${feetYStr}
+GROUND SNAP dy: ${window.__groundSnapDy || '0.000m'}
 LAST CORRECTION: ${corrStr}
 COLLISION:     ${collDecisionStr}
 WEAPON:        ${wpnStr}${calibStr}
