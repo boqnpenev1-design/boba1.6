@@ -368,7 +368,8 @@ class CS2MapBuilder {
     this.addCollider(-64.50, 0.00, -116.00, 2.40, 1.44, 2.40, true);  // B site jump-assist step pallet (smooth boost onto long crate)
     // B window hole is 100% open and traversable (removed blocking box at -59.04)
     this.addCollider(-58.80, 6.48, -119.80, 2.40, 0.60, 2.40, true);  // B window stone sill step floor (walkable ledge)
-    // Misplaced collider at -55.50 removed: it blocked the mid ramp corridor and caused camera snaps!
+    this.addCollider(-55.50, 5.03, -118.50, 2.50, 0.60, 2.50, true);  // B window ledge steps (Item C)
+    this.addCollider(-65.0, 10.0, -135.0, 30.0, 30.0, 6.0, false); // B site north mountain cliff barrier (blocks void/mountain jump)
     this.addCollider(-61.56, 2.88, -118.44, 2.16, 2.16, 2.16, true);  // B stack mid crate (model_36)
 
     // ==========================================================

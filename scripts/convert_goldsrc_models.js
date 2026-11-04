@@ -272,8 +272,8 @@ function parseMdl(filePath, outputModelId, isPlayerModel = false) {
         const tz = vx*mat[2][0] + vy*mat[2][1] + vz*mat[2][2] + mat[2][3];
 
         if (isPlayerModel) {
-          // Standing upright facing forward (-Z in Three.js), normalized feet to Y=0.00
-          const pScale = 3.20 / Math.max(1, max_tz - min_tz);
+          // Standing upright facing forward (-Z in Three.js), normalized feet to Y=0.00, standing height 2.20m
+          const pScale = 2.20 / Math.max(1, max_tz - min_tz);
           const py = (tz - min_tz) * pScale;
           const px = -ty * pScale;
           const pz = -tx * pScale;

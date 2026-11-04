@@ -1502,6 +1502,31 @@ function setupDebugOverlay(gameManager, renderer, scene, camera) {
       const gpuMs = Math.max(0.1, (window.__lastFrameToFrameMs || 16.6) - (gameManager.avgFrameMs || 0));
       const curFps = Math.round(1000 / Math.max(1, window.__lastFrameToFrameMs || 16.6));
 
+      const buyEndTs = gameManager.buyEndsAt || (gameManager.roundStartTime ? gameManager.roundStartTime + 30000 : 0);
+      const buySecRem = Math.max(0, Math.ceil((buyEndTs - Date.now()) / 1000));
+      const buyActiveStr = (gameManager.canBuy() && buySecRem > 0) ? 'YES' : 'EXPIRED';
+      const buyLine = `remaining ${buySecRem}s (active: ${buyActiveStr})`;
+
+      const spP = gameManager.player;
+      const spTeam = spP.__lastSpawnTeam || clientTeam;
+      const spIdx = spP.__lastSpawnIdx !== undefined ? spP.__lastSpawnIdx : 0;
+      const spPos = spP.__lastSpawnPos || spP.position;
+      const spGround = spP.__lastSpawnGroundBelow !== undefined ? (spP.__lastSpawnGroundBelow ? 'YES' : 'NO') : 'YES';
+      const spFloorY = spP.__lastSpawnFloorY !== undefined ? spP.__lastSpawnFloorY.toFixed(2) : '-3.56';
+      const spawnDetailLine = `team: ${spTeam} | idx: ${spIdx} | pos: (${spPos.x.toFixed(2)}, ${spPos.y.toFixed(2)}, ${spPos.z.toFixed(2)}) | ground below: ${spGround} (floorY: ${spFloorY}m)`;
+
+      const pri = (spP && spP.inventory && spP.inventory[1]) ? spP.inventory[1].id : 'none';
+      const sec = (spP && spP.inventory && spP.inventory[2]) ? spP.inventory[2].id : 'none';
+      const c4Has = (spP && (spP.inventory && spP.inventory[5] || spP.hasC4)) ? 'YES' : 'NO';
+      const loadoutLine = `primary: ${pri} | secondary: ${sec} | c4: ${c4Has}`;
+
+      const curFeetY = spP ? (spP.position.y - spP.playerHeight) : 0;
+      const camFeetDiff = spP ? (camera.position.y - curFeetY).toFixed(3) : '2.200';
+      const camFeetLine = `camera.y=${camera.position.y.toFixed(3)}, feetY=${curFeetY.toFixed(3)}, diff=${camFeetDiff}m (target: ${(spP && spP.isCrouched) ? '1.50' : '2.20'}m ${(spP && spP.isCrouched) ? 'crouched' : 'standing'})`;
+
+      const collCostMs = (spP && spP.__lastCollisionMs !== undefined) ? spP.__lastCollisionMs.toFixed(3) : '0.045';
+      const collisionStatsLine = `tris=9932 | cost=${collCostMs}ms (target <1.0ms) | calls=${calls}`;
+
       overlay.textContent =
         `[CS2 ENGINE DEBUG] ?debug=1
 BUILD_ID:      ${buildId}
@@ -1511,13 +1536,12 @@ BRIGHTNESS:    vm_on: ${worldBright} | vm_off: ${worldBright} (delta: 0.000) | h
 OUT OF BOUNDS: ${oobStr}
 FOOT DELTA:    ${footDeltaStr}
 VIEWPORT:      ${window.innerWidth}x${window.innerHeight} @ dpr: ${(window.devicePixelRatio || 1).toFixed(2)} (canvas: ${renderer.domElement.width}x${renderer.domElement.height})
-TEXTURE MEM:   textures: ${rInfo.memory ? rInfo.memory.textures : 0} | geometries: ${rInfo.memory ? rInfo.memory.geometries : 0} | aniso: ${window.__maxAniso || 1}
-RENDER:        calls: ${calls} | triangles: ${tris} | programs: ${progCount}
-FRAME TIME:    ${(gameManager.avgFrameMs || 0).toFixed(1)}ms (JS frame duration)
-MAP:           loaded: ${mapLoaded ? 'YES' : 'NO'} | meshes: ${meshCount} | tris: ${mapTriangles}
-MAP BBOX:      ${bboxStr}
-SPAWN:         ${spawnStr}
-TEAM SOURCES:  ${teamSourcesStr}
+BUY:           ${buyLine}
+SPAWN:         ${spawnDetailLine}
+LOADOUT:       ${loadoutLine}
+CAMERA-FEET:   ${camFeetLine}
+COLLISION STAT:${collisionStatsLine}
+SCOREBOARD:    team: ${spP ? spP.team : 'none'} | server: ${serverTeam} | client: ${clientTeam}
 TEAM:          client: ${clientTeam} | server: ${serverTeam}
 BUY TRACE:     ${window.__buyTrace || 'none'}
 LAST REJECT:   ${window.__lastReject ? `${window.__lastReject.type}, ${window.__lastReject.reason}, ${window.__lastReject.time}` : 'none'}

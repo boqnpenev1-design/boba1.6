@@ -53,7 +53,7 @@ class CS2Player {
     this.lastGroundY = -5.8;
     this.isCrouched = false;
     this.isScoped = false;
-    this.playerHeight = 2.88;
+    this.playerHeight = 2.20;
 
     // Jump Input State (Strictly single-press: prevents auto bunny-hop)
     this.jumpRequested = false;
@@ -2260,7 +2260,79 @@ class CS2Player {
     }
   }
 
+  placePlayer(team, index = 0) {
+    this.exitSpectatorMode();
+    const targetTeam = (team === 'T' || team === 'CT') ? team : this.team;
+    this.team = targetTeam;
+    this.spawnTeam = targetTeam;
+
+    const spawns = (this.mapBuilder && this.mapBuilder.spawnPoints && this.mapBuilder.spawnPoints[targetTeam]) ||
+                   (this.map && this.map.spawnPoints && this.map.spawnPoints[targetTeam]) || [];
+    const idx = (typeof index === 'number' && index >= 0 && index < spawns.length) ? index : 0;
+    const defaultX = targetTeam === 'CT' ? -5.0 : -65.0;
+    const defaultY = targetTeam === 'CT' ? -3.56 : 7.96;
+    const defaultZ = targetTeam === 'CT' ? -98.0 : 35.0;
+    const defaultYaw = targetTeam === 'CT' ? Math.PI : 0;
+    const s = spawns.length > 0 ? spawns[idx] : { x: defaultX, y: defaultY, z: defaultZ, yaw: defaultYaw };
+
+    let floorY = s.y;
+    let groundBelow = false;
+    const groundMeshes = (this.mapBuilder && this.mapBuilder.groundMeshes) || (this.map && this.map.groundMeshes);
+    if (groundMeshes && groundMeshes.length > 0) {
+      const rayOrigin = new THREE.Vector3(s.x, s.y + 4.0, s.z);
+      const raycaster = new THREE.Raycaster(rayOrigin, new THREE.Vector3(0, -1, 0), 0, 40);
+      const hits = raycaster.intersectObjects(groundMeshes, false);
+      if (hits.length > 0) {
+        floorY = hits[0].point.y;
+        groundBelow = true;
+      }
+    }
+
+    this.__lastSpawnTeam = targetTeam;
+    this.__lastSpawnIdx = idx;
+    this.__lastSpawnPos = { x: s.x, y: floorY, z: s.z };
+    this.__lastSpawnGroundBelow = groundBelow;
+    this.__lastSpawnFloorY = floorY;
+
+    this.isAlive = true;
+    this.health.set(100);
+    this.velocity.set(0, 0, 0);
+    this.isGrounded = true;
+    this.isJumping = false;
+    this.outOfBounds = false;
+    this.groundSnapDy = 0;
+    this.isCrouched = false;
+    this.playerHeight = 2.20;
+
+    this.position.set(s.x, floorY + this.playerHeight, s.z);
+    this.camera.position.set(s.x, floorY + this.playerHeight, s.z);
+    this.camera.rotation.order = 'YXZ';
+    this.yaw = s.yaw !== undefined ? s.yaw : defaultYaw;
+    this.pitch = 0;
+    this.camera.rotation.set(0, this.yaw, 0);
+
+    // Rebuild team loadout
+    if (targetTeam === 'T') {
+      this.inventory[1] = null;
+      this.inventory[2] = CS2_WEAPONS.glock;
+      this.inventory[3] = CS2_WEAPONS.knife;
+      if (this.hasC4) this.inventory[5] = CS2_WEAPONS.c4;
+      else delete this.inventory[5];
+    } else {
+      this.inventory[1] = null;
+      this.inventory[2] = CS2_WEAPONS.usp;
+      this.inventory[3] = CS2_WEAPONS.knife;
+      this.hasC4 = false;
+      delete this.inventory[5];
+    }
+    this.switchSlot(2);
+    this.updateSlotHUD();
+  }
+
   respawn(spawnPos) {
+    const idx = (spawnPos && typeof spawnPos.index === 'number') ? spawnPos.index : (this.spawnIndex || 0);
+    this.placePlayer(this.team, idx);
+    return;
     this.exitSpectatorMode();
     const defaultX = this.team === 'CT' ? -5.0 : -65.0;
     const defaultY = this.team === 'CT' ? -3.56 : 7.96; // Exact floor height (-5.76 / 5.76) + playerHeight
@@ -2472,7 +2544,7 @@ class CS2Player {
     this.velocity.y -= 18.0 * dt;
 
     this.isCrouched = !!(this.keys[this.keybinds.crouch] || this.keys['KeyC']);
-    const targetHeight = this.isCrouched ? 1.55 : 2.88;
+    const targetHeight = this.isCrouched ? 1.50 : 2.20;
     const hLerp = 1 - Math.exp(-14.0 * dt);
     const prevHeight = this.playerHeight;
     this.playerHeight += (targetHeight - this.playerHeight) * hLerp;
@@ -2703,10 +2775,10 @@ class CS2Player {
       }
     }
 
-    // Safety floor: in Dust 2, minimum playable ground is CT spawn at -3.56m. Never fall below -4.5m.
-    if (targetGroundY < -4.5) {
-      targetGroundY = -3.56;
-      this.lastGroundY = -3.56;
+    // Safety floor: allow Dust 2 lower tunnel / mid floor down to -8.5m without bogus clamp
+    if (targetGroundY < -8.5) {
+      targetGroundY = -8.5;
+      this.lastGroundY = -8.5;
     }
 
     // Clamp step-up: never snap up more than maxStepUp (0.75m)
@@ -2724,6 +2796,13 @@ class CS2Player {
 
     const heightDiff = groundSurfaceY - this.position.y;
     const preFallVelocityY = this.velocity.y;
+
+    if (!this.isGrounded) {
+      if (!this.__lastFallLog || (Date.now() - this.__lastFallLog > 250)) {
+        this.__lastFallLog = Date.now();
+        console.log(`[FALLING] vy=${this.velocity.y.toFixed(2)}, groundProbe=${targetGroundY.toFixed(2)}, feetY=${curFeet.toFixed(2)}, dy=${rawDy.toFixed(2)}, pos=(${this.position.x.toFixed(2)}, ${this.position.y.toFixed(2)}, ${this.position.z.toFixed(2)})`);
+      }
+    }
 
     if (this.position.y <= groundSurfaceY) {
       this.position.y = groundSurfaceY;

@@ -302,6 +302,7 @@ class CS2NetworkManager {
         this.matchId = packet.matchId;
         this.gm.matchId = packet.matchId;
         this.serverTeam = packet.team;
+        if (packet.buyEndsAt && this.gm) this.gm.buyEndsAt = packet.buyEndsAt;
         if (packet.team && this.gm) {
           this.gm.setAuthoritativeTeam(packet.team, packet.c4CarrierId === this.playerId);
         }
@@ -390,14 +391,11 @@ class CS2NetworkManager {
 
         // Reset player round state
         if (this.gm.player) {
-          const wasAlive = this.gm.player.isAlive && (this.gm.player.health.get() > 0);
+          this.gm.player.exitSpectatorMode();
+          const targetTeam = packet.team || this.serverTeam || this.gm.player.team;
+          this.gm.player.placePlayer(targetTeam, packet.spawnIndex || 0);
           this.gm.player.health.set(100);
           this.gm.player.isAlive = true;
-          this.gm.player.isSpectating = false;
-          const spectHud = document.getElementById('spectator-hud');
-          if (spectHud) spectHud.classList.add('hidden');
-          const hud = document.getElementById('hud');
-          if (hud) hud.classList.remove('hidden');
 
           const isCarrier = (packet.c4CarrierId === this.playerId);
           if (packet.team) {
@@ -428,6 +426,7 @@ class CS2NetworkManager {
         this.gm.updateHUD();
         break;
 
+      case 'round_over':
       case 'round_end':
         this.gm.score.CT = packet.ctScore;
         this.gm.score.T = packet.tScore;
@@ -456,6 +455,17 @@ class CS2NetworkManager {
           this.gm.player.money.set(10000);
         }
         this.gm.updateHUD();
+        break;
+
+            case 'team_changed':
+        this.serverTeam = packet.team;
+        if (this.gm) {
+          this.gm.setAuthoritativeTeam(packet.team, packet.hasC4);
+          if (this.gm.player) {
+            this.gm.player.hasC4 = !!packet.hasC4;
+            this.gm.player.placePlayer(packet.team, packet.spawnIdx || 0);
+          }
+        }
         break;
 
       case 'team_swapped':
@@ -717,8 +727,12 @@ class CS2NetworkManager {
       this.gm.phase = packet.phase;
 
       // Accurate server clock synchronization (Window 1 and Window 2 agree within 0.1s)
+      if (packet.buyEndsAt) {
+        this.gm.buyEndsAt = packet.buyEndsAt;
+      }
       if (typeof packet.phaseEndTime === 'number' && typeof packet.serverTime === 'number') {
         this.serverClockOffset = packet.serverTime - Date.now();
+        this.gm.serverTime = packet.serverTime;
         this.phaseEndTime = packet.phaseEndTime;
         const accurateSecs = Math.max(0, (packet.phaseEndTime - (Date.now() + this.serverClockOffset)) / 1000);
         this.gm.phaseTimer = accurateSecs;
@@ -1153,7 +1167,7 @@ class CS2NetworkManager {
           const wrapper = new THREE.Group();
           wrapper.name = 'characterWrapper';
           // Separate forward yaw axis calibration per model (SAS=0, Terrorist=PI) (Item 10)
-          const yawOffset = isCT ? 0 : Math.PI;
+          const yawOffset = 0; // Both models face forward (-Z) naturally without yaw inversion
           wrapper.rotation.set(0, yawOffset, 0);
           mesh.rotation.set(0, 0, 0);
           mesh.position.set(0, 0, 0);

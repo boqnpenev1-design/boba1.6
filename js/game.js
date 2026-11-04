@@ -282,12 +282,12 @@ class CS2GameManager {
   chooseTeam(team) {
     this.selectedTeam = team;
     this.playerInMatch = true;
+    if (this.player) {
+      this.player.placePlayer(team, 0);
+    }
     if (this.net) {
       this.net.serverTeam = team;
       this.net.sendSelectTeam(team);
-    }
-    if (this.player) {
-      this.player.setTeam(team);
     }
 
     document.getElementById('team-select-screen').classList.add('hidden');
@@ -569,11 +569,11 @@ class CS2GameManager {
 
   onHalftime() {
     if (this.player) {
-      this.player.team = (this.player.team === 'CT') ? 'T' : 'CT';
+      const newTeam = (this.player.team === 'CT') ? 'T' : 'CT';
+      this.player.placePlayer(newTeam, 0);
       this.player.money.set(800);
       this.player.hasHelmet = false;
       this.player.armor.set(0);
-      this.player.setTeam(this.player.team);
     }
     this.updateHUD();
   }
