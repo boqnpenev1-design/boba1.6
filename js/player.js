@@ -1542,7 +1542,7 @@ class CS2Player {
   }
 
   toggleScope() {
-    if (!this.activeWeapon || !this.activeWeapon.canScope) return;
+    if (!this.activeWeapon || (!this.activeWeapon.canScope && !this.activeWeapon.hasScope)) return;
     const defaultFov = Number(document.getElementById('setting-fov')?.value) || 85;
     const levels = this.activeWeapon.zoomLevels || (['aug', 'sg552', 'sg553'].includes(this.activeWeapon.id) ? [55] : [40, 12]);
 
