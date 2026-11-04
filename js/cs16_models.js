@@ -78,7 +78,7 @@ class CS16ModelManager {
       return this.loadingPromises.get(modelId);
     }
 
-    const p = fetch(`models/cs16/${modelId}.json?v=b12a0a1`)
+    const p = fetch(`models/cs16/${modelId}.json?v=b12b0a1`)
       .then(res => {
         if (!res.ok) throw new Error(`HTTP ${res.status} loading ${modelId}`);
         return res.json();

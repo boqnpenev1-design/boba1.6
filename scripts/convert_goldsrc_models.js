@@ -280,9 +280,9 @@ function parseMdl(filePath, outputModelId, isPlayerModel = false) {
           transformedVerts.push([px, py, pz]);
         } else {
           // Viewmodel: Centered lower-right quadrant, seamless lower entry
-          const xOffset = (outputModelId === 'knife') ? 0.08 : 0.20;
-          const yOffset = 0.04;
-          const zOffset = -0.15;
+          let xOffset = (outputModelId === 'knife') ? 0.20 : 0.22;
+          let yOffset = (outputModelId === 'knife') ? -0.15 : -0.10;
+          let zOffset = -0.14;
           const x3 = (-ty * 0.025) + xOffset;
           const y3 = (tz * 0.025) + yOffset;
           const z3 = (-tx * 0.025) + zOffset;
@@ -342,11 +342,11 @@ function parseMdl(filePath, outputModelId, isPlayerModel = false) {
           }
 
           function addTri(v1, v2, v3) {
-            // For knife viewmodel: skip leftover left hand vertices (bones 3 to 19)
+            // For knife viewmodel: skip leftover left arm & left hand vertices (bones 1 to 19)
             if (outputModelId === 'knife') {
-              if (v1.bone >= 3 && v1.bone <= 19) return;
-              if (v2.bone >= 3 && v2.bone <= 19) return;
-              if (v3.bone >= 3 && v3.bone <= 19) return;
+              if (v1.bone >= 1 && v1.bone <= 19) return;
+              if (v2.bone >= 1 && v2.bone <= 19) return;
+              if (v3.bone >= 1 && v3.bone <= 19) return;
             }
             grp.positions.push(...v1.pos, ...v2.pos, ...v3.pos);
             grp.normals.push(...v1.norm, ...v2.norm, ...v3.norm);
