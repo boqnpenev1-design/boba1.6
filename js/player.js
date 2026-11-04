@@ -221,9 +221,9 @@ class CS2Player {
     });
     this.muzzleFlashMesh = new THREE.Sprite(flashSpriteMat);
     this.muzzleFlashMesh.scale.set(0.08, 0.08, 1);
-    this.muzzleFlashMesh.position.set(0.20, -0.12, -0.75);
+    this.muzzleFlashMesh.position.set(0.10, -0.17, -0.70);
     this.muzzleFlashMesh.visible = false;
-    this.viewmodelGroup.add(this.muzzleFlashMesh);
+    this.weaponRig.add(this.muzzleFlashMesh);
 
     this.initControls();
     try {
@@ -565,8 +565,9 @@ class CS2Player {
           usedCS16 = true;
 
           // Position muzzle flash precisely at the front barrel tip
-          if (mesh.userData.barrelTip) {
+          if (mesh.userData.barrelTip && this.muzzleFlashMesh) {
             this.muzzleFlashMesh.position.copy(mesh.userData.barrelTip);
+            group.add(this.muzzleFlashMesh);
           }
         }
       } else {
@@ -596,6 +597,9 @@ class CS2Player {
     });
 
     this.weaponRig.add(group);
+    if (this.muzzleFlashMesh && !this.muzzleFlashMesh.parent) {
+      this.weaponRig.add(this.muzzleFlashMesh);
+    }
   }
 
   // Socket offsets per weapon category in weapon-local coordinates
@@ -2281,7 +2285,7 @@ class CS2Player {
                    (this.map && this.map.spawnPoints && this.map.spawnPoints[targetTeam]) || [];
     const idx = (typeof index === 'number' && index >= 0 && index < spawns.length) ? index : 0;
     const defaultX = targetTeam === 'CT' ? -5.0 : -65.0;
-    const defaultY = targetTeam === 'CT' ? -3.56 : 7.96;
+    const defaultY = targetTeam === 'CT' ? -5.76 : 5.76;
     const defaultZ = targetTeam === 'CT' ? -98.0 : 35.0;
     const defaultYaw = targetTeam === 'CT' ? Math.PI : 0;
     const s = spawns.length > 0 ? spawns[idx] : { x: defaultX, y: defaultY, z: defaultZ, yaw: defaultYaw };
@@ -2306,7 +2310,7 @@ class CS2Player {
     this.__lastSpawnFloorY = floorY;
 
     if (targetTeam === 'CT') {
-      floorY = Math.max(-3.56, floorY);
+      floorY = Math.max(-5.76, floorY);
     } else {
       floorY = Math.max(5.76, floorY);
     }
@@ -2328,22 +2332,33 @@ class CS2Player {
     this.pitch = 0;
     this.camera.rotation.set(0, this.yaw, 0);
 
-    // Rebuild team loadout
-    if (targetTeam === 'T') {
-      this.inventory[1] = null;
-      this.inventory[2] = CS2_WEAPONS.glock;
-      this.inventory[3] = CS2_WEAPONS.knife;
-      if (this.hasC4) this.inventory[5] = CS2_WEAPONS.c4;
-      else delete this.inventory[5];
+    // Rebuild team loadout only if inventory is empty (fresh game / respawn after death)
+    if (!this.inventory[2] && !this.inventory[3]) {
+      this.rebuildLoadout(targetTeam, this.hasC4);
     } else {
-      this.inventory[1] = null;
-      this.inventory[2] = CS2_WEAPONS.usp;
-      this.inventory[3] = CS2_WEAPONS.knife;
-      this.hasC4 = false;
-      delete this.inventory[5];
+      // Retain existing weapons across rounds! Refresh ammo clips for active weapons.
+      if (this.inventory[1] && this.inventory[1].clip) {
+        if (!this.weaponAmmo) this.weaponAmmo = {};
+        this.weaponAmmo[this.inventory[1].id] = {
+          clip: this.inventory[1].clip,
+          reserve: this.inventory[1].reserve
+        };
+      }
+      if (this.inventory[2] && this.inventory[2].clip) {
+        if (!this.weaponAmmo) this.weaponAmmo = {};
+        this.weaponAmmo[this.inventory[2].id] = {
+          clip: this.inventory[2].clip,
+          reserve: this.inventory[2].reserve
+        };
+      }
+      // If primary weapon exists, equip primary (slot 1), else secondary (slot 2)
+      if (this.inventory[1]) {
+        this.switchSlot(1);
+      } else {
+        this.switchSlot(2);
+      }
+      this.updateSlotHUD();
     }
-    this.switchSlot(2);
-    this.updateSlotHUD();
   }
 
   respawn(spawnPos) {

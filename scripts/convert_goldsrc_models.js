@@ -391,15 +391,27 @@ function parseMdl(filePath, outputModelId, isPlayerModel = false) {
     }
   }
 
-  let barrelTip = [0.20, -0.05, -0.85];
-  if (bestWeaponVert) {
-    const [bx, by, bz] = bestWeaponVert;
-    const xOffset = (outputModelId === 'knife') ? 0.08 : 0.20;
-    barrelTip = [
-      (-by * 0.025) + xOffset,
-      (bz * 0.025) + 0.04,
-      (-bx * 0.025) - 0.15
-    ];
+  let barrelTip = [0.20, -0.15, -0.85];
+  if (!isPlayerModel && outputModelId !== 'knife' && outputModelId !== 'c4') {
+    let allVerts = [];
+    Object.values(meshGroups).forEach(g => {
+      for (let i = 0; i < g.positions.length; i += 3) {
+        allVerts.push({ x: g.positions[i], y: g.positions[i+1], z: g.positions[i+2] });
+      }
+    });
+    if (allVerts.length > 0) {
+      const minZ = Math.min(...allVerts.map(v => v.z));
+      const tipVerts = allVerts.filter(v => v.z <= minZ + 0.05);
+      if (tipVerts.length > 0) {
+        const avgX = tipVerts.reduce((s, v) => s + v.x, 0) / tipVerts.length;
+        const avgY = tipVerts.reduce((s, v) => s + v.y, 0) / tipVerts.length;
+        barrelTip = [
+          Number(avgX.toFixed(4)),
+          Number(avgY.toFixed(4)),
+          Number((minZ - 0.02).toFixed(4))
+        ];
+      }
+    }
   }
 
   // Sockets for hands attachment

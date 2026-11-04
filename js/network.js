@@ -518,7 +518,18 @@ class CS2NetworkManager {
           }
           this.gm.player.updateSlotHUD();
         }
-        Object.values(this.remotePlayers).forEach(rp => { rp.buffer = []; });
+        Object.values(this.remotePlayers).forEach(rp => {
+          rp.buffer = [];
+          const nextRTeam = (rp.team === 'CT') ? 'T' : 'CT';
+          rp.team = nextRTeam;
+          if (rp.mesh) {
+            this.applyAuthenticModel(rp.mesh, nextRTeam);
+            const defaultX = nextRTeam === 'CT' ? -5.0 : -65.0;
+            const defaultY = nextRTeam === 'CT' ? -5.76 : 5.76;
+            const defaultZ = nextRTeam === 'CT' ? -98.0 : 35.0;
+            rp.mesh.position.set(defaultX, defaultY, defaultZ);
+          }
+        });
         this.gm.updateHUD();
         break;
 
@@ -925,11 +936,24 @@ class CS2NetworkManager {
 
     const playerH = (this.gm.player && typeof this.gm.player.playerHeight === 'number') ? this.gm.player.playerHeight : 2.2;
     const feetY = sp.pos.y - playerH;
+    const newPos = new THREE.Vector3(sp.pos.x, feetY, sp.pos.z);
+
+    // Instant snap on large distance delta (teleport, respawn, team change)
+    if (rp.mesh.position.distanceTo(newPos) > 8.0) {
+      rp.mesh.position.copy(newPos);
+      rp.buffer = [{
+        t: now,
+        pos: newPos.clone(),
+        yaw: sp.yaw || 0,
+        pitch: sp.pitch || 0
+      }];
+      return;
+    }
 
     // Push into snapshot interpolation buffer (100ms render delay)
     rp.buffer.push({
       t: now,
-      pos: new THREE.Vector3(sp.pos.x, feetY, sp.pos.z),
+      pos: newPos,
       yaw: sp.yaw || 0,
       pitch: sp.pitch || 0
     });
@@ -997,14 +1021,39 @@ class CS2NetworkManager {
         rp.mesh.rotation.y = latest.yaw;
       }
 
+      // Teleport snap guard: If latest snapshot is over 8 meters away, snap instantly and clear stale lerp
+      if (latest && rp.mesh.position.distanceTo(latest.pos) > 8.0) {
+        rp.mesh.position.copy(latest.pos);
+        rp.buffer = [latest];
+      }
+
       // 1. Precise Ground Contact every frame (measure lowest vertex delta, snap model foot to floor)
-      let groundY = rp.mesh.position.y;
+      let groundY = (latest && latest.pos) ? latest.pos.y : rp.mesh.position.y;
       if (this.gm && this.gm.mapBuilder && this.gm.mapBuilder.groundMeshes && this.gm.mapBuilder.groundMeshes.length > 0) {
-        if (!this.floorRay) this.floorRay = new THREE.Raycaster(new THREE.Vector3(), new THREE.Vector3(0, -1, 0), 0.1, 20.0);
-        this.floorRay.ray.origin.set(rp.mesh.position.x, rp.mesh.position.y + 1.2, rp.mesh.position.z);
+        if (!this.floorRay) this.floorRay = new THREE.Raycaster(new THREE.Vector3(), new THREE.Vector3(0, -1, 0), 0.05, 40.0);
+        const targetY = (latest && latest.pos) ? latest.pos.y : rp.mesh.position.y;
+        const probeY = Math.max(rp.mesh.position.y, targetY) + 4.0;
+        this.floorRay.ray.origin.set(rp.mesh.position.x, probeY, rp.mesh.position.z);
+        this.floorRay.far = 40.0;
         const hits = this.floorRay.intersectObjects(this.gm.mapBuilder.groundMeshes, false);
         if (hits.length > 0) {
-          groundY = hits[0].point.y;
+          let bestHit = null;
+          let bestDist = 999;
+          for (let i = 0; i < hits.length; i++) {
+            const hy = hits[i].point.y;
+            if (hy <= targetY + 1.5) {
+              const d = Math.abs(hy - targetY);
+              if (d < bestDist) {
+                bestDist = d;
+                bestHit = hits[i];
+              }
+            }
+          }
+          if (bestHit) {
+            groundY = bestHit.point.y;
+          } else {
+            groundY = hits[0].point.y;
+          }
         }
       }
       const lowestOffset = rp.mesh.measuredMetrics ? parseFloat(rp.mesh.measuredMetrics.lowestVertexY) : 0;
